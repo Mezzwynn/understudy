@@ -1,5 +1,7 @@
 import { chat as llmChat } from "./llm.mjs";
+import { embed } from "./embed.mjs";
 import { buildMessages, buildProactiveMessages, buildNudgeMessages, buildDryMessages } from "./prompt.mjs";
+import { recallMemory, addMemory } from "./store.mjs";
 import { extractControl, clean, looksBroken, deflection, stripAudioTags } from "./guard.mjs";
 import { drift, applyDeltas, heuristicNudge, normalize } from "./mood.mjs";
 import { analyzeAffect } from "./affect.mjs";
@@ -27,7 +29,15 @@ function applyControl(chat, control) {
   const mem = chat.memory;
   for (const key of ["facts", "plans", "jokes", "boundaries"]) {
     const src = Array.isArray(control[key]) ? control[key] : key === "facts" && Array.isArray(control.remember) ? control.remember : [];
-    for (const v of src.slice(0, key === "facts" ? 3 : 2)) pushFact(mem[key], v);
+    for (const v of src.slice(0, key === "facts" ? 3 : 2)) {
+      const before = mem[key]?.length || 0;
+      pushFact(mem[key], v);
+      if (key === "facts" && (mem[key]?.length || 0) > before) {
+        mem.factDates = mem.factDates || {};
+        const text = String(v).trim();
+        if (text && !mem.factDates[text]) mem.factDates[text] = Date.now();
+      }
+    }
   }
   if (Array.isArray(control.forget)) {
     for (const f of control.forget) {
@@ -97,11 +107,29 @@ async function maybeSummarize(chat) {
 /**
  * Produce one in-character reply and update the chat state.
  */
-export async function generateReply(chat, incoming, persona, { displayName, voice, startedIt, thawed } = {}) {
+export async function generateReply(chat, incoming, persona, { displayName, voice, startedIt, thawed, injection } = {}) {
   chat.mood = normalize(chat.mood);
   chat.mood = drift(chat.mood, chat.lastInteraction || Date.now());
 
-  const messages = buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed });
+  // semantic recall: find what they said about this topic before, even far back
+  let recalled = [];
+  try {
+    if (config.memoryEmbeddings) {
+      const vec = await embed(incoming);
+      if (vec) {
+        recalled = recallMemory(chat.jid, vec, {
+          topK: config.recallTopK,
+          minScore: config.recallMinScore,
+          exclude: incoming,
+        });
+        addMemory(chat.jid, incoming, vec, { max: config.memoryMaxEntries });
+      }
+    }
+  } catch (err) {
+    log(`recall failed: ${err.message}`);
+  }
+
+  const messages = buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled });
 
   let raw = await llmChat(messages);
   if (config.debug) log(`RAW:\n${raw}`);

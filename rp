@@ -55,6 +55,16 @@ case "$cmd" in
   config|setting) node scripts/config.mjs "$@" ;;
   test)       node scripts/selftest.mjs ;;
   stats|biaya) node scripts/stats.mjs ;;
+  doctor|cek)
+    node scripts/doctor.mjs ;;
+  watchdog|wd)
+    if pgrep -f "watchdog.sh" >/dev/null 2>&1; then
+      echo "watchdog sudah jalan (pid $(cat data/watchdog.pid 2>/dev/null))"
+    else
+      setsid ./watchdog.sh >/dev/null 2>&1 < /dev/null &
+      sleep 1
+      echo "watchdog jalan (pid $(cat data/watchdog.pid 2>/dev/null))"
+    fi ;;
   turing|tt)  node scripts/turing.mjs ;;
   bench)      node scripts/bench.mjs ;;
   sync|push)

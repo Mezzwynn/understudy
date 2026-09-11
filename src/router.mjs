@@ -5,9 +5,9 @@ import { loadPersona } from "./prompt.mjs";
 import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst, maybeLongDelay } from "./texting.mjs";
 import { describeImage, transcribeAudio } from "./vision.mjs";
 import { synthesize, toSpeakable } from "./voice.mjs";
-import { stripAudioTags } from "./guard.mjs";
+import { stripAudioTags, detectInjection } from "./guard.mjs";
 import { applyDeltas, normalize } from "./mood.mjs";
-import { generateImage, randomSticker } from "./image.mjs";
+import { generateImage, randomSticker, saveUserSticker } from "./image.mjs";
 import {
   phoneFromJid,
   sendText,
@@ -92,7 +92,17 @@ async function toText(sock, msg) {
   }
 
   if (c.videoMessage) return `[dia ngirim video${base ? `, caption: "${base}"` : ""}]`;
-  if (c.stickerMessage) return `[dia ngirim stiker]`;
+  if (c.stickerMessage) {
+    if (config.saveUserStickers) {
+      try {
+        const buf = await downloadMedia(msg);
+        saveUserSticker(buf);
+      } catch (err) {
+        log(`sticker download failed: ${err.message}`);
+      }
+    }
+    return `[dia ngirim stiker]`;
+  }
   if (c.documentMessage) return `[dia ngirim file${c.documentMessage.fileName ? `: ${c.documentMessage.fileName}` : ""}${base ? ` — "${base}"` : ""}]`;
   if (c.locationMessage || c.liveLocationMessage) return `[dia ngirim lokasi]`;
   if (c.contactMessage || c.contactsArrayMessage) return `[dia ngirim kontak]`;
@@ -186,6 +196,45 @@ const APOLOGY = /(maaf|sorry|sori|aku salah|aku khilaf|minta maaf|i'?m sorry|my 
 const SWEET = /(sayang|kangen|miss you|please|plis|jangan gitu|aku cinta|love you)/i;
 const SOFTEN = new RegExp(`${APOLOGY.source}|${SWEET.source}`, "i");
 
+/** Mood influences which kind of reply she reaches for. */
+function moodMultipliers(mood) {
+  if (!config.moodMedia || !mood) return { sticker: 1, reaction: 1, voice: 1, typo: 1 };
+  const { valence = 0, energy = 0.6, patience = 0.6, playfulness = 0.5 } = mood;
+  return {
+    sticker: (playfulness > 0.6 ? 1.6 : 1) * (patience < 0.3 ? 0.5 : 1),
+    reaction: (playfulness > 0.6 ? 1.4 : 1) * (valence < -0.2 ? 0.6 : 1),
+    voice: (patience < 0.3 ? 1.5 : 1) * (energy < 0.35 ? 1.3 : 1),
+    typo: energy < 0.4 ? 1.4 : 1,
+  };
+}
+
+const MILESTONES = [
+  [/\b(aku sayang kamu|aku cinta kamu|i love you|love u)\b/i, "love", "Dia bilang sayang/cinta pertama kali"],
+  [/\b(kangen|miss you|miss u)\b/i, "miss", "Dia bilang kangen pertama kali"],
+  [APOLOGY, "apology", "Dia minta maaf pertama kali"],
+  [INSULT, "fight", "Pertama kali dia kasar / kalian berantem"],
+];
+
+/** Record a "first time" once — she can reference these later. */
+function recordMilestone(chat, key, label) {
+  if (!config.milestones) return false;
+  chat.memory.milestones = chat.memory.milestones || [];
+  if (chat.memory.milestones.some((m) => m.key === key)) return false;
+  chat.memory.milestones.push({ key, label, ts: Date.now() });
+  log(`milestone (${chat.jid}): ${label}`);
+  return true;
+}
+
+function detectMilestones(chat, incoming) {
+  for (const [re, key, label] of MILESTONES) {
+    if (re.test(incoming)) recordMilestone(chat, key, label);
+  }
+  if (/^\[voice note/i.test(incoming)) recordMilestone(chat, "first_voice", "Dia kirim voice note pertama kali");
+  if (/^\[dia ngirim foto/i.test(incoming)) recordMilestone(chat, "first_photo", "Dia kirim foto pertama kali");
+}
+
+const DELETE_COVERS = ["nothing.", "lupa.", "gak jadi.", "eh salah.", "nothing, forget it."];
+
 export function isGenuineApology(text) {
   if (!APOLOGY.test(text)) return false;
   return text.replace(/\s/g, "").length >= 8; // bare "maaf" is not enough
@@ -242,6 +291,10 @@ async function respond(sock, jid, p) {
   const persona = loadPersona(chat.persona || undefined);
   const isMedia = incoming.startsWith("[");
   const bare = isMedia ? "" : incoming.replace(/\s/g, "");
+  const mm = moodMultipliers(chat.mood);
+  detectMilestones(chat, incoming);
+  const injection = config.injectionGuard && detectInjection(incoming);
+  if (injection) log(`possible prompt-injection from ${jid}`);
 
   // sulking chain: dry (contextual short replies) -> silent (no reply at all)
   const pstate = (chat.proactive ||= { state: "idle", sentAt: 0, nudgedAt: 0, drySince: 0, dryCount: 0, lastDry: "", lastSlot: "" });
@@ -309,7 +362,7 @@ async function respond(sock, jid, p) {
     config.reactionChance > 0 &&
     p.keys.length &&
     bare.length <= 14 &&
-    Math.random() < config.reactionChance
+    Math.random() < Math.min(0.9, config.reactionChance * mm.reaction)
   ) {
     try {
       await sendReaction(sock, jid, p.keys[p.keys.length - 1], pickReaction());
@@ -352,7 +405,9 @@ async function respond(sock, jid, p) {
   const mirrorVoice = incomingVoice && Math.random() < config.voiceMirrorChance;
   const wantVoice =
     !asksText &&
-    (asksVoice || mirrorVoice || (config.voiceChance > 0 && Math.random() < config.voiceChance));
+    (asksVoice ||
+      mirrorVoice ||
+      (config.voiceChance > 0 && Math.random() < Math.min(0.95, config.voiceChance * mm.voice)));
 
   // she texted first and they finally replied: react to that
   const startedIt = pstate.state === "awaiting" || pstate.state === "nudged";
@@ -368,6 +423,7 @@ async function respond(sock, jid, p) {
       voice: wantVoice,
       startedIt,
       thawed,
+      injection,
     });
   } catch (err) {
     log(`generate failed: ${err.stack || err.message}`);
@@ -380,7 +436,7 @@ async function respond(sock, jid, p) {
 
   // a very human typo, sometimes corrected on the next line
   let correction = null;
-  if (Math.random() < config.typoChance) {
+  if (Math.random() < Math.min(0.6, config.typoChance * mm.typo)) {
     const { text, original, typo } = makeTypo(chatText);
     if (typo) {
       chatText = text;
@@ -426,7 +482,8 @@ async function respond(sock, jid, p) {
   }
 
   // ── sticker: can be the whole reply, or an addition to text/voice ──
-  const stickerRoll = config.stickerChance > 0 && Math.random() < config.stickerChance;
+  const stickerRoll =
+    config.stickerChance > 0 && Math.random() < Math.min(0.95, config.stickerChance * mm.sticker);
   const stickerAlone = stickerRoll && !sentMedia && Math.random() < config.stickerOnlyChance;
   const stickerBuf = stickerRoll ? randomSticker() : null;
 
@@ -517,10 +574,40 @@ async function respond(sock, jid, p) {
         await sleep(plan.rest);
       }
       try {
-        await sendText(sock, jid, bubbles[i], i === 0 ? quoted : undefined);
+        const sent = await sendText(sock, jid, bubbles[i], i === 0 ? quoted : undefined);
         chat.stats.outbound = (chat.stats.outbound || 0) + 1;
         chat.lastReplyAt = Date.now();
         if (config.debug) log(`→ ${jid}${i === 0 && quoted ? " (quote)" : ""}: ${bubbles[i]}`);
+
+        // "almost said something honest, then deleted it"
+        if (
+          i === 0 &&
+          bubbles.length <= 2 &&
+          sent?.key &&
+          config.deleteChance > 0 &&
+          Math.random() < config.deleteChance
+        ) {
+          const delay = config.deleteMinMs + Math.random() * (config.deleteMaxMs - config.deleteMinMs);
+          const original = bubbles[i];
+          setTimeout(async () => {
+            try {
+              await sock.sendMessage(jid, { delete: sent.key });
+              const c = loadChat(jid);
+              c.history.push({ role: "system", content: `(kamu hapus pesan: "${original}")`, ts: Date.now() });
+              saveChat(c);
+              log(`deleted own message → ${jid}`);
+              if (Math.random() < config.deleteCoverChance) {
+                const cover = DELETE_COVERS[Math.floor(Math.random() * DELETE_COVERS.length)];
+                await presence(sock, jid, "composing");
+                await sleep(700 + Math.random() * 1800);
+                await sendText(sock, jid, cover);
+                log(`deleted-message cover-up → ${jid}: ${cover}`);
+              }
+            } catch (err) {
+              log(`delete failed: ${err.message}`);
+            }
+          }, delay);
+        }
       } catch (err) {
         log(`send failed: ${err.message}`);
         break;

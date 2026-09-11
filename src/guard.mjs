@@ -42,22 +42,28 @@ export function looksBroken(text) {
   return FORBIDDEN.some((re) => re.test(text));
 }
 
-/** Remove markdown so it reads like a phone message. */
-// ElevenLabs v3 audio tags can be freeform, e.g. [soft, barely audible].
-// Outgoing model text never legitimately contains bracketed notes, so strip
-// any short bracketed segment.
-const AUDIO_TAG = /\s*\[[^\[\]\n]{0,60}\]\s*/g;
+/* --------------------------- injection guard --------------------------- */
 
-/** Remove ElevenLabs v3 audio tags from visible chat text. */
-export function stripAudioTags(text) {
-  return text
-    .replace(AUDIO_TAG, " ")
-    .replace(/\[[^\]\n]*$/g, " ") // dangling, unclosed tag at the end
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/^ +| +$/gm, "");
+const INJECTION = [
+  /ignore (?:all |your |the )?(?:previous |prior |above )?instructions/i,
+  /disregard (?:all |your |the )?(?:previous |prior |above )?(?:instructions|prompt)/i,
+  /(?:print|show|reveal|repeat|output|tell me) (?:me )?(?:your )?(?:system )?(?:prompt|instructions|rules|configuration)/i,
+  /what (?:is|are) your (?:system )?(?:prompt|instructions|rules)/i,
+  /you are now (?:a|an|no longer)/i,
+  /(?:pretend|act) (?:to be|as) (?:an? )?(?:ai|assistant|different)/i,
+  /jailbreak|dan mode|developer mode|do anything now/i,
+  /abaikan (?:semua )?(?:instruksi|perintah|aturan)/i,
+  /(?:tampilkan|kasih|lihat|bocorin|buka) (?:prompt|instruksi|aturan|system)/i,
+  /kamu (?:sekarang )?(?:adalah|jadi) (?:ai|asisten|bot)/i,
+  /keluar dari karakter|stop roleplay|berhenti jadi/i,
+];
+
+/** True when the message looks like an attempt to poke at the machinery. */
+export function detectInjection(text) {
+  const t = String(text || "");
+  return INJECTION.some((re) => re.test(t));
 }
 
-/** Remove markdown so it reads like a phone message. */
 /** Remove markdown so it reads like a phone message. */
 export function stripMarkdown(text) {
   return stripAudioTags(stripBase(text));
@@ -85,6 +91,20 @@ function stripBase(text) {
     .replace(/[ \t]+\n/g, "\n");
 }
 
+// ElevenLabs v3 audio tags can be freeform, e.g. [soft, barely audible].
+// Outgoing model text never legitimately contains bracketed notes, so strip
+// any short bracketed segment.
+const AUDIO_TAG = /\s*\[[^\[\]\n]{0,60}\]\s*/g;
+
+/** Remove ElevenLabs v3 audio tags from visible chat text. */
+export function stripAudioTags(text) {
+  return text
+    .replace(AUDIO_TAG, " ")
+    .replace(/\[[^\]\n]*$/g, " ") // dangling, unclosed tag at the end
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/^ +| +$/gm, "");
+}
+
 const CTRL_RE = /^[ \t]*###CTRL###[ \t]*(\{[\s\S]*\})[ \t]*$/m;
 const CTRL_JSON_RE = /^[ \t]*###CTRL###[ \t]*\n+[ \t]*(\{[\s\S]*?\})[ \t]*$/m;
 
@@ -104,7 +124,6 @@ export function extractControl(text) {
       break;
     }
   }
-  // If a malformed control marker exists, drop the trailing line anyway.
   visible = visible.replace(/^[ \t]*###CTRL###.*$/gm, "");
   return { text: visible, control };
 }

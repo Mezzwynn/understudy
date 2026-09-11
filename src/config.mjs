@@ -48,8 +48,8 @@ export function envGet(key, fallback = "") {
 }
 
 export const config = {
-  botName: envGet("BOT_NAME", "Alya"),
-  persona: envGet("PERSONA", "example"),
+  botName: envGet("BOT_NAME", "Character"),
+  persona: envGet("PERSONA", "character"),
   // what the character calls the user by default (per-contact override: rp contacts set)
   defaultNick: envGet("DEFAULT_NICK", ""),
 
@@ -67,7 +67,7 @@ export const config = {
     .filter(Boolean),
 
   // WhatsApp LIDs (new anonymous ids) mapped to real numbers, e.g.
-  // LID_MAP=215341758152901:+6285111046991
+  // LID_MAP=123456789012345:+6281234567890
   lidMap: (() => {
     const out = {};
     for (const pair of envGet("LID_MAP", "").split(",")) {
@@ -153,6 +153,35 @@ export const config = {
   dashboardPort: num(envGet("DASHBOARD_PORT", "8787"), 8787),
   dashboardHost: envGet("DASHBOARD_HOST", "127.0.0.1"),
   dashboardToken: envGet("DASHBOARD_TOKEN", ""),
+
+  // ── human extras ────────────────────────────────────────
+  // "read then delete": she almost says something honest, then removes it
+  deleteChance: num(envGet("DELETE_CHANCE", "0.06"), 0.06),
+  deleteCoverChance: num(envGet("DELETE_COVER_CHANCE", "0.5"), 0.5),
+  deleteMinMs: num(envGet("DELETE_MIN_MS", "1500"), 1500),
+  deleteMaxMs: num(envGet("DELETE_MAX_MS", "6000"), 6000),
+  // keep the stickers people send her and reuse them later
+  saveUserStickers: envGet("SAVE_USER_STICKERS", "true") === "true",
+  userStickerKeep: num(envGet("USER_STICKER_KEEP", "30"), 30),
+  preferUserSticker: num(envGet("PREFER_USER_STICKER", "0.5"), 0.5),
+  // let mood influence which kind of reply she sends
+  moodMedia: envGet("MOOD_MEDIA", "true") === "true",
+  // prompt-injection resistance (DMs are open)
+  injectionGuard: envGet("INJECTION_GUARD", "true") === "true",
+  // relationship milestones (first "I love you", first fight, ...)
+  milestones: envGet("MILESTONES", "true") === "true",
+
+  // ── semantic memory (embeddings) ────────────────────────
+  memoryEmbeddings: envGet("MEMORY_EMBEDDINGS", "true") === "true",
+  embedModel: envGet("EMBED_MODEL", "gemini-embedding-001"),
+  recallTopK: num(envGet("RECALL_TOP_K", "4"), 4),
+  recallMinScore: num(envGet("RECALL_MIN_SCORE", "0.62"), 0.62),
+  memoryMaxEntries: num(envGet("MEMORY_MAX_ENTRIES", "400"), 400),
+
+  // ── maintenance ─────────────────────────────────────────
+  backup: envGet("BACKUP", "true") === "true",
+  backupDir: envGet("BACKUP_DIR", ""),
+  backupKeep: num(envGet("BACKUP_KEEP", "7"), 7),
 
   // Voice notes out (Gemini TTS -> Ogg/Opus PTT)
   ttsProvider: envGet("TTS_PROVIDER", "auto"), // auto | elevenlabs | gemini

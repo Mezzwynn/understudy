@@ -66,8 +66,7 @@ export function saveChat(chat) {
   fs.writeFileSync(fileFor(chat.jid), JSON.stringify(chat, null, 2));
 }
 
-export function listChats() {
-  if (!fs.existsSync(CHATS_DIR)) return [];
+export function listChats() {  if (!fs.existsSync(CHATS_DIR)) return [];
   return fs
     .readdirSync(CHATS_DIR)
     .filter((f) => f.endsWith(".json"))
@@ -96,8 +95,7 @@ export function saveState(state) {
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
 }
 
-/** Accumulate LLM token usage per provider, per day (for `rp status`). */
-export function recordUsage(label, tokensIn, tokensOut) {
+/** Accumulate LLM token usage per provider, per day (for `rp status`). */export function recordUsage(label, tokensIn, tokensOut) {
   if (!tokensIn && !tokensOut) return;
   try {
     const st = loadState();
@@ -116,4 +114,53 @@ export function recordUsage(label, tokensIn, tokensOut) {
   } catch {
     /* never break a reply because of stats */
   }
+}
+
+/* ------------------- semantic memory index (per contact) ------------------- */
+
+import { cosine } from "./embed.mjs";
+
+function memoryFile(jid) {
+  return path.join(CHATS_DIR, `${safe(jid)}.memory.json`);
+}
+
+export function loadMemoryIndex(jid) {
+  try {
+    const j = JSON.parse(fs.readFileSync(memoryFile(jid), "utf8"));
+    return Array.isArray(j.entries) ? j : { entries: [] };
+  } catch {
+    return { entries: [] };
+  }
+}
+
+export function saveMemoryIndex(jid, idx) {
+  try {
+    fs.mkdirSync(CHATS_DIR, { recursive: true });
+    fs.writeFileSync(memoryFile(jid), JSON.stringify(idx));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Store a line of conversation in the semantic index. */
+export function addMemory(jid, text, vec, { max = 400 } = {}) {
+  const t = String(text || "").trim();
+  if (!t || !vec) return;
+  const idx = loadMemoryIndex(jid);
+  if (!idx.entries.some((e) => e.text === t)) idx.entries.push({ text: t, vec, ts: Date.now() });
+  if (idx.entries.length > max) idx.entries = idx.entries.slice(-max);
+  saveMemoryIndex(jid, idx);
+}
+
+/** Top-K most similar past lines for this contact. */
+export function recallMemory(jid, vec, { topK = 4, minScore = 0.6, exclude = "" } = {}) {
+  if (!vec) return [];
+  const idx = loadMemoryIndex(jid);
+  if (!idx.entries.length) return [];
+  return idx.entries
+    .filter((e) => e.text !== exclude)
+    .map((e) => ({ text: e.text, ts: e.ts, score: cosine(vec, e.vec) }))
+    .filter((e) => e.score >= minScore)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK);
 }

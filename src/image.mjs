@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { config, DATA_DIR, log } from "./config.mjs";
+import { config, DATA_DIR, ROOT, log } from "./config.mjs";
 
 /**
  * image.mjs — generate photos (Gemini image model) and convert images into
@@ -9,6 +9,55 @@ import { config, DATA_DIR, log } from "./config.mjs";
  */
 
 const TMP = path.join(DATA_DIR, "tmp");
+const STICKER_DIR = path.join(ROOT, "assets", "stickers");
+
+/** Remember a sticker someone sent us, so she can send it back later. */
+export function saveUserSticker(buffer) {
+  if (!config.saveUserStickers || !buffer?.length) return null;
+  try {
+    fs.mkdirSync(STICKER_DIR, { recursive: true });
+    const name = `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.webp`;
+    const file = path.join(STICKER_DIR, name);
+    fs.writeFileSync(file, buffer, { mode: 0o644 });
+    try {
+      fs.chmodSync(file, 0o644); // WhatsApp media can arrive with odd permissions
+    } catch {
+      /* ignore */
+    }
+    // keep the folder from growing forever
+    const users = fs
+      .readdirSync(STICKER_DIR)
+      .filter((f) => f.startsWith("user-") && f.endsWith(".webp"))
+      .sort();
+    for (const old of users.slice(0, Math.max(0, users.length - config.userStickerKeep))) {
+      try {
+        fs.rmSync(path.join(STICKER_DIR, old), { force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+    log(`saved sticker from user → ${name}`);
+    return name;
+  } catch (err) {
+    log(`could not save user sticker: ${err.message}`);
+    return null;
+  }
+}
+
+/** Random sticker from assets/stickers. Prefers ones the user sent, sometimes. */
+export function randomSticker() {
+  try {
+    const all = fs.readdirSync(STICKER_DIR).filter((f) => f.endsWith(".webp"));
+    if (!all.length) return null;
+    const fromUser = all.filter((f) => f.startsWith("user-"));
+    const pool =
+      fromUser.length && Math.random() < config.preferUserSticker ? fromUser : all;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    return fs.readFileSync(path.join(STICKER_DIR, pick));
+  } catch {
+    return null;
+  }
+}
 
 export async function generateImage(prompt) {
   if (!config.geminiApiKey || !prompt) return null;
@@ -64,18 +113,5 @@ export function toSticker(buffer, { quality = 80, size = 512 } = {}) {
     } catch {
       /* ignore */
     }
-  }
-}
-
-/** Random sticker from assets/stickers (if the user dropped any in). */
-export function randomSticker() {
-  const dir = path.join(DATA_DIR, "..", "assets", "stickers");
-  try {
-    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".webp"));
-    if (!files.length) return null;
-    const pick = files[Math.floor(Math.random() * files.length)];
-    return fs.readFileSync(path.join(dir, pick));
-  } catch {
-    return null;
   }
 }
