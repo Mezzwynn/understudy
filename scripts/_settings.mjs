@@ -43,7 +43,12 @@ export function currentValues() {
   const out = {};
   for (const k of KNOBS) {
     const raw = envGet(k.key, "");
-    out[k.key] = raw === "" ? k.def : k.kind === "text" ? raw : Number(raw);
+    if (k.kind === "text") {
+      out[k.key] = raw === "" ? k.def : raw;
+      continue;
+    }
+    const n = Number(raw);
+    out[k.key] = raw === "" || !Number.isFinite(n) ? k.def : n;
   }
   return out;
 }

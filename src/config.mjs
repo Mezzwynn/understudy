@@ -20,6 +20,8 @@ function parseEnvFile(file) {
     if (i === -1) continue;
     const k = line.slice(0, i).trim();
     let v = line.slice(i + 1).trim();
+    // strip an inline comment ("value   # note") unless the value is quoted
+    if (!v.startsWith('"') && !v.startsWith("'")) v = v.replace(/\s+#.*$/, "").trim();
     if (
       (v.startsWith('"') && v.endsWith('"') && v.length > 1) ||
       (v.startsWith("'") && v.endsWith("'") && v.length > 1)
@@ -45,8 +47,8 @@ export function envGet(key, fallback = "") {
 }
 
 export const config = {
-  botName: envGet("BOT_NAME", "Character"),
-  persona: envGet("PERSONA", "character"),
+  botName: envGet("BOT_NAME", "Alya"),
+  persona: envGet("PERSONA", "example"),
   // what the character calls the user by default (per-contact override: rp contacts set)
   defaultNick: envGet("DEFAULT_NICK", ""),
 
@@ -64,7 +66,7 @@ export const config = {
     .filter(Boolean),
 
   // WhatsApp LIDs (new anonymous ids) mapped to real numbers, e.g.
-  // LID_MAP=123456789012345:+6281234567890
+  // LID_MAP=215341758152901:+6285111046991
   lidMap: (() => {
     const out = {};
     for (const pair of envGet("LID_MAP", "").split(",")) {
