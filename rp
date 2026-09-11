@@ -16,13 +16,13 @@
 
 SELF="$(readlink -f "$0" 2>/dev/null || echo "$0")"
 DIR="$(cd "$(dirname "$SELF")" && pwd)"
-HERMES_DIR="${UNDERSTUDY_DIR:-$DIR}"
+US_DIR="${UNDERSTUDY_DIR:-$DIR}"
 
-if [ ! -d "$HERMES_DIR" ]; then
-  echo "understudy not found at: $HERMES_DIR"
+if [ ! -d "$US_DIR" ]; then
+  echo "understudy not found at: $US_DIR"
   exit 1
 fi
-cd "$HERMES_DIR" || exit 1
+cd "$US_DIR" || exit 1
 
 cmd="${1:-status}"
 [ $# -gt 0 ] && shift
@@ -33,7 +33,7 @@ case "$cmd" in
   restart)  ./restart.sh ;;
   status|st) ./status.sh ;;
   log|logs|tail)
-    echo "following $HERMES_DIR/rp.log — Ctrl+C to exit"
+    echo "following $US_DIR/rp.log — Ctrl+C to exit"
     tail -n "${1:-30}" -f rp.log ;;
   last)
     grep -av '█\|▄' rp.log 2>/dev/null | grep -aE '←|→|ignored|failed' | tail -n "${1:-10}" ;;
@@ -67,7 +67,7 @@ case "$cmd" in
     n="$(grep -a 'connected as' rp.log 2>/dev/null | tail -1 | sed 's/.*as //')"
     echo "${n:-unknown (never connected)}" ;;
   boot)  ./install-boot.sh ;;
-  dir)   echo "$HERMES_DIR" ;;
+  dir)   echo "$US_DIR" ;;
   edit)
     f="${1:-.env}"
     [ -f "$f" ] || { echo "no such file: $f"; exit 1; }
