@@ -48,8 +48,8 @@ export function envGet(key, fallback = "") {
 }
 
 export const config = {
-  botName: envGet("BOT_NAME", "Character"),
-  persona: envGet("PERSONA", "character"),
+  botName: envGet("BOT_NAME", "Alya"),
+  persona: envGet("PERSONA", "example"),
   // what the character calls the user by default (per-contact override: rp contacts set)
   defaultNick: envGet("DEFAULT_NICK", ""),
 
@@ -67,7 +67,7 @@ export const config = {
     .filter(Boolean),
 
   // WhatsApp LIDs (new anonymous ids) mapped to real numbers, e.g.
-  // LID_MAP=123456789012345:+6281234567890
+  // LID_MAP=215341758152901:+6285111046991
   lidMap: (() => {
     const out = {};
     for (const pair of envGet("LID_MAP", "").split(",")) {
@@ -144,6 +144,13 @@ export const config = {
 
   // jam kerja user (biar pertanyaan "udah makan?" dll pas waktunya)
   userWorkHours: envGet("USER_WORK_HOURS", "9-17"),
+
+  // nickname behaviour ("honey")
+  nickAffectionMin: num(envGet("NICK_AFFECTION_MIN", "0.45"), 0.45),
+  nickValenceMin: num(envGet("NICK_VALENCE_MIN", "-0.05"), -0.05),
+  nickPatienceMin: num(envGet("NICK_PATIENCE_MIN", "0.35"), 0.35),
+  nickChance: num(envGet("NICK_CHANCE", "0.25"), 0.25),
+  nickAcceptWarm: envGet("NICK_ACCEPT_WARM", "true") === "true",
 
   // Show as "online" only during her active hours
   presence: envGet("PRESENCE", "true") === "true",

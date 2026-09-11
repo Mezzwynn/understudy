@@ -66,6 +66,10 @@ export const KNOBS = [
   { key: "PROACTIVE_IDLE_MIN", label: "Sepi berapa lama sebelum dia chat duluan", kind: "int", def: 45 },
   { key: "PROACTIVE_GAP_MIN", label: "Jeda minimal antar chat duluan", kind: "int", def: 180 },
   { key: "DEFAULT_NICK", label: "Dia manggil kamu apa", kind: "text", def: "" },
+  { key: "NICK_CHANCE", label: "Seberapa sering dia pakai panggilan itu", kind: "float", def: 0.25 },
+  { key: "NICK_AFFECTION_MIN", label: "Syarat affection biar boleh manis", kind: "float", def: 0.45 },
+  { key: "NICK_VALENCE_MIN", label: "Syarat valence biar boleh manis", kind: "float", def: -0.05 },
+  { key: "NICK_PATIENCE_MIN", label: "Syarat patience biar boleh manis", kind: "float", def: 0.35 },
   { key: "USER_WORK_HOURS", label: "Jam kerja user (buat pertanyaan natural)", kind: "text", def: "9-17" },
 ];
 

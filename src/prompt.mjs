@@ -127,11 +127,18 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
   const warm =
     !sulking &&
     (soft ||
-      (mood.affection >= 0.45 && mood.valence >= -0.05 && mood.patience >= 0.35));
+      (mood.affection >= config.nickAffectionMin &&
+        mood.valence >= config.nickValenceMin &&
+        mood.patience >= config.nickPatienceMin));
+  const nickPct = Math.round(config.nickChance * 100);
   const nickLine = profile.nick
     ? warm
-      ? `Kamu manggil dia: ${profile.nick} (boleh dipakai, tapi jangan tiap pesan)`
-      : `Kamu manggil dia: ${profile.nick} — TAPI SEKARANG JANGAN PAKAI itu. Kamu lagi dingin/kesel. Panggil \"you\"/\"kamu\" aja.`
+      ? `Kamu manggil dia: ${profile.nick}. Pakai sesekali saja (kira-kira ${nickPct}% pesan), bukan tiap pesan.` +
+        (config.nickAcceptWarm
+          ? `\nKalau DIA yang manggil kamu dengan nama sayang (${profile.nick}, sayang, baby, dll): terima dengan malu-malu atau ngeles — jangan ketus menolak, kecuali kamu memang lagi kesel.`
+          : "")
+      : `Kamu manggil dia: ${profile.nick} — TAPI SEKARANG JANGAN PAKAI itu. Kamu lagi dingin/kesel. Panggil \"you\"/\"kamu\" aja.` +
+        `\nKalau dia manggil kamu dengan nama sayang, kamu boleh nolak ketus (\"don't call me that\").`
     : "Kamu manggil dia: —";
 
   const state = [
