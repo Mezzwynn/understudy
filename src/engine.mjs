@@ -261,6 +261,10 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
   chat.history.push({ role: "user", content: incoming, ts: Date.now() });
   chat.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
   chat.stats.inbound = (chat.stats.inbound || 0) + 1;
+  // long back-and-forth tires her out a little (she's not a machine)
+  if (Date.now() - (chat.lastInteraction || 0) < 15 * 60000) {
+    chat.mood = applyDeltas(chat.mood, { energy: -0.02 });
+  }
   chat.lastInteraction = Date.now();
 
   // they acknowledged something she told them to do -> no need to nag

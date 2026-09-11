@@ -38,34 +38,50 @@ export function normalize(mood) {
   return m;
 }
 
-/** Circadian / time-of-day offset. */
+import { config } from "./config.mjs";
+
+/**
+ * Circadian / time-of-day offsets, tied to HER sleep window (quiet hours).
+ * She sleeps in quiet hours (default 2-8), is slow right after waking and is a
+ * night owl in the evening.
+ */
 function circadian(date = new Date()) {
   const h = date.getHours();
+  const sleepStart = config.quietStart;
+  const sleepEnd = config.quietEnd;
+  const asleep = sleepStart <= sleepEnd ? h >= sleepStart && h < sleepEnd : h >= sleepStart || h < sleepEnd;
   const d = { valence: 0, energy: 0, arousal: 0, affection: 0, patience: 0, playfulness: 0 };
-  if (h >= 0 && h < 5) {
-    d.energy -= 0.18;
-    d.patience -= 0.1;
-    d.valence -= 0.06;
-    d.playfulness -= 0.05;
-  } else if (h < 9) {
-    d.energy -= 0.12;
-    d.valence += 0.02;
-  } else if (h < 12) {
-    d.energy += 0.1;
-    d.arousal += 0.05;
-  } else if (h < 15) {
-    d.valence += 0.05;
-    d.energy -= 0.05;
-  } else if (h < 18) {
-    d.energy += 0.02;
-  } else if (h < 22) {
-    d.playfulness += 0.08;
-    d.affection += 0.04;
-    d.energy += 0.03;
+
+  if (asleep) {
+    // asleep / just woken: drained, groggy, low patience
+    d.energy = -0.34;
+    d.arousal = -0.12;
+    d.patience = -0.1;
+    d.playfulness = -0.08;
+  } else if (h === (sleepEnd % 24)) {
+    // first hour after waking: still slow
+    d.energy = -0.22;
+    d.arousal = -0.05;
+  } else if (h < (sleepEnd + 3) % 24) {
+    // slow start
+    d.energy = -0.1;
+    d.valence = 0.02;
+  } else if (h >= 11 && h < 15) {
+    d.energy = 0.12;
+    d.arousal = 0.05;
+  } else if (h >= 15 && h < 19) {
+    d.energy = 0.14;
+  } else if (h >= 19 && h < 23) {
+    // her peak: night owl
+    d.energy = 0.18;
+    d.playfulness = 0.08;
+    d.affection = 0.04;
   } else {
-    d.energy -= 0.08;
-    d.playfulness -= 0.03;
-    d.valence -= 0.02;
+    // 23:00 - sleep start: getting sleepy
+    d.energy = -0.06;
+    d.arousal = -0.05;
+    d.playfulness = -0.03;
+    d.valence = -0.02;
   }
   return d;
 }
