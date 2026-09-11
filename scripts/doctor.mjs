@@ -13,6 +13,7 @@ import { providers, trackerProvider, judgeProvider } from "../src/config.mjs";
 import { chat as llmChat } from "../src/llm.mjs";
 import { listChats, loadState } from "../src/store.mjs";
 import { isConnected } from "../src/whatsapp.mjs";
+import { readableStickers } from "../src/image.mjs";
 
 const ok = (m) => console.log(`  \x1b[32m✓\x1b[0m ${m}`);
 const warn = (m) => console.log(`  \x1b[33m!\x1b[0m ${m}`);
@@ -94,6 +95,21 @@ else bad("WhatsApp tidak tersambung — cek: rp log");
 
 const chats = listChats();
 ok(`${chats.length} kontak tersimpan`);
+
+/* stickers */
+const stickerDir = path.join(ROOT, "assets", "stickers");
+let stickerTotal = 0;
+try {
+  stickerTotal = fs.readdirSync(stickerDir).filter((f) => f.endsWith(".webp")).length;
+} catch {
+  /* none */
+}
+const stickerOk = readableStickers().length;
+if (!stickerTotal) warn("belum ada stiker — taruh .webp di assets/stickers/ atau: rp sticker --sync");
+else if (!stickerOk) bad(`0/${stickerTotal} stiker bisa dibaca — jalankan: rp sticker --sync`);
+else if (stickerOk < stickerTotal)
+  warn(`${stickerOk}/${stickerTotal} stiker bisa dibaca (sisanya milik app lain) — jalankan: rp sticker --sync`);
+else ok(`${stickerOk} stiker siap dipakai`);
 const st = loadState();
 ok(`pemakaian hari ini: foto ${st.photoCount || 0}/${config.photoGlobalDailyMax} · TTS ${st.elChars || 0} karakter`);
 

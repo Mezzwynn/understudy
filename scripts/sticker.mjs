@@ -4,6 +4,7 @@
  *
  *   node scripts/sticker.mjs <image.png|jpg> [name]
  *   node scripts/sticker.mjs --generate "kucing lucu pakai topi" [name]
+ *   node scripts/sticker.mjs --sync            # import dari folder stiker WhatsApp
  *
  * Stickers are saved to assets/stickers/*.webp and sent at random by the bot
  * (STICKER_CHANCE). Requires cwebp (pkg install libwebp).
@@ -11,9 +12,19 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ROOT } from "../src/config.mjs";
-import { generateImage, toSticker } from "../src/image.mjs";
+import { generateImage, toSticker, syncStickers, readableStickers } from "../src/image.mjs";
 
 const args = process.argv.slice(2);
+
+// import stickers from the WhatsApp sticker folder (they are usually owned by
+// another app, so copies made by us are the only ones we can read)
+if (args[0] === "--sync" || args[0] === "sync") {
+  const copied = syncStickers(args.slice(1));
+  console.log(`✓ import ${copied} stiker baru ke assets/stickers/`);
+  console.log(`  total yang bisa dipakai: ${readableStickers().length}`);
+  process.exit(0);
+}
+
 const genIdx = args.indexOf("--generate");
 const dir = path.join(ROOT, "assets", "stickers");
 fs.mkdirSync(dir, { recursive: true });

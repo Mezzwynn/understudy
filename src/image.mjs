@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { config, DATA_DIR, ROOT, log } from "./config.mjs";
+import { config, DATA_DIR, ROOT, envGet, log } from "./config.mjs";
 
 /**
  * image.mjs — generate photos (Gemini image model) and convert images into
@@ -50,13 +50,78 @@ export function randomSticker() {
     const all = fs.readdirSync(STICKER_DIR).filter((f) => f.endsWith(".webp"));
     if (!all.length) return null;
     const fromUser = all.filter((f) => f.startsWith("user-"));
-    const pool =
+    const preferred =
       fromUser.length && Math.random() < config.preferUserSticker ? fromUser : all;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    return fs.readFileSync(path.join(STICKER_DIR, pick));
+    // some files can be unreadable (owned by another app) — try a few, not just one
+    const pool = [...preferred].sort(() => Math.random() - 0.5);
+    const fallback = [...all].sort(() => Math.random() - 0.5);
+    for (const name of [...pool, ...fallback]) {
+      try {
+        return fs.readFileSync(path.join(STICKER_DIR, name));
+      } catch {
+        /* unreadable — try the next one */
+      }
+    }
+    log("no readable sticker in assets/stickers (fix with: rp stickers sync)");
+    return null;
   } catch {
     return null;
   }
+}
+
+/** Which stickers can we actually read? (used by doctor / sticker sync) */
+export function readableStickers() {
+  try {
+    return fs
+      .readdirSync(STICKER_DIR)
+      .filter((f) => f.endsWith(".webp"))
+      .filter((f) => {
+        try {
+          fs.accessSync(path.join(STICKER_DIR, f), fs.constants.R_OK);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Import stickers from the WhatsApp sticker folder into our own folder,
+ * with permissions we can read (files copied by another app are often not).
+ */
+export function syncStickers(sourceDirs = []) {
+  const candidates = [
+    ...sourceDirs,
+    envGet("STICKER_SOURCE", ""),
+    "/sdcard/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Stickers",
+    "/sdcard/Download",
+  ].filter(Boolean);
+  fs.mkdirSync(STICKER_DIR, { recursive: true });
+  let copied = 0;
+  for (const dir of candidates) {
+    if (!fs.existsSync(dir)) continue;
+    let files = [];
+    try {
+      files = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith(".webp"));
+    } catch {
+      continue;
+    }
+    for (const f of files) {
+      const target = path.join(STICKER_DIR, `imp-${f.replace(/[^\w.\-]+/g, "_")}`);
+      if (fs.existsSync(target)) continue;
+      try {
+        const buf = fs.readFileSync(path.join(dir, f));
+        fs.writeFileSync(target, buf, { mode: 0o644 });
+        copied++;
+      } catch {
+        /* skip unreadable */
+      }
+    }
+  }
+  return copied;
 }
 
 export async function generateImage(prompt) {

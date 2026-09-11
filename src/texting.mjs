@@ -85,35 +85,89 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const randInt = (n) => Math.floor(Math.random() * n);
 
-/** Introduce a plausible typo into one word. Returns { text, typo, original } */
-export function makeTypo(input) {
-  const words = [...input.matchAll(/[A-Za-zÀ-ÿ]{4,}/g)];
-  if (!words.length) return { text: input, typo: null, original: null };
+/**
+ * Classic autocorrect-ish confusions. These actually change the meaning, so a
+ * real person would usually correct them.
+ */
+const CONFUSIONS = [
+  ["lagi", "lagu"],
+  ["kamu", "kami"],
+  ["makan", "makam"],
+  ["sayang", "sarang"],
+  ["kangen", "kangin"],
+  ["bentar", "bentur"],
+  ["sudah", "sudak"],
+  ["tidak", "tida"],
+  ["besok", "besus"],
+  ["kenapa", "kenap"],
+  ["jangan", "jan gan"],
+  ["pulang", "pulung"],
+  ["kerja", "kerka"],
+  ["tidur", "tidung"],
+  ["minum", "minun"],
+  ["sorry", "soryy"],
+  ["work", "wrok"],
+  ["night", "nigt"],
+  ["you", "yuo"],
+  ["please", "plase"],
+];
 
-  // prefer a middle/longer word, not a URL
+/**
+ * Introduce a plausible typo.
+ * mode "heavy" = wrong whole word (needs a correction)
+ * mode "mild"  = letter-level slip (readable, no correction needed)
+ * Returns { text, typo, original, severity }
+ */
+export function makeTypo(input, { heavy = Math.random() < 0.35 } = {}) {
+  // heavy: swap a whole word for a confusable one
+  if (heavy) {
+    const hits = CONFUSIONS.filter(([a]) => new RegExp(`\\b${a}\\b`, "i").test(input));
+    if (hits.length) {
+      const [from, to] = hits[randInt(hits.length)];
+      const inText = input.match(new RegExp(`\\b${from}\\b`, "i"))[0];
+      const replacement = inText[0] === inText[0].toUpperCase() ? to[0].toUpperCase() + to.slice(1) : to;
+      const at = input.search(new RegExp(`\\b${from}\\b`, "i"));
+      return {
+        text: input.slice(0, at) + replacement + input.slice(at + inText.length),
+        typo: replacement,
+        original: inText,
+        severity: "heavy",
+      };
+    }
+  }
+
+  const words = [...input.matchAll(/[A-Za-zÀ-ÿ]{4,}/g)];
+  if (!words.length) return { text: input, typo: null, original: null, severity: null };
+
   const pick = words[randInt(words.length)];
   const w = pick[0];
-  if (/^https?/i.test(w) || w.length < 4) return { text: input, typo: null, original: null };
+  if (/^https?/i.test(w) || w.length < 4) return { text: input, typo: null, original: null, severity: null };
 
-  const mode = randInt(4);
+  const mode = randInt(5);
   let m = w;
   if (mode === 0 && w.length > 3) {
     const i = 1 + randInt(w.length - 2);
-    m = w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2); // swap
+    m = w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2); // swap two letters
   } else if (mode === 1) {
     const i = 1 + randInt(w.length - 2);
-    m = w.slice(0, i) + w.slice(i + 1); // drop a char
+    m = w.slice(0, i) + w.slice(i + 1); // drop a letter
   } else if (mode === 2) {
     const i = 1 + randInt(w.length - 1);
-    m = w.slice(0, i) + w[i] + w.slice(i); // double a char
-  } else {
+    m = w.slice(0, i) + w[i] + w.slice(i); // double a letter
+  } else if (mode === 3) {
     m = w.replace(/[aiueo]/, (c) => c + c); // double a vowel
+  } else {
+    m = w.slice(0, 2) + w.slice(2, -1).split("").sort(() => Math.random() - 0.5).join("") + w.slice(-1); // scramble the middle
   }
-  if (m === w) return { text: input, typo: null, original: null };
+  if (m === w) return { text: input, typo: null, original: null, severity: null };
 
   const at = pick.index;
-  const text = input.slice(0, at) + m + input.slice(at + w.length);
-  return { text, typo: m, original: w };
+  return {
+    text: input.slice(0, at) + m + input.slice(at + w.length),
+    typo: m,
+    original: w,
+    severity: "mild",
+  };
 }
 
 /** A correction follow-up, the way people actually do it. */

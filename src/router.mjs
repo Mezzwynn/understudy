@@ -450,10 +450,14 @@ async function respond(sock, jid, p) {
   // a very human typo, sometimes corrected on the next line
   let correction = null;
   if (Math.random() < Math.min(0.6, config.typoChance * mm.typo)) {
-    const { text, original, typo } = makeTypo(chatText);
+    const { text, original, typo, severity } = makeTypo(chatText);
     if (typo) {
       chatText = text;
-      if (Math.random() < config.correctionChance) correction = correctionFor(original);
+      // only correct typos that actually change the meaning (wrong word) —
+      // a letter slip is still readable, people don't bother correcting those
+      if (severity === "heavy" && Math.random() < config.correctionChance) {
+        correction = correctionFor(original);
+      }
     }
   }
 
