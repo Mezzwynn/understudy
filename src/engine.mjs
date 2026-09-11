@@ -185,7 +185,7 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
       ...messages,
       { role: "assistant", content: raw },
       {
-        role: "system",
+        role: "user",
         content:
           `STOP. That draft broke character — it used assistant/AI/meta language. ` +
           `Rewrite the reply now as ${persona.name}, a real person texting on WhatsApp. ` +

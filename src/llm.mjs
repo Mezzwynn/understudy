@@ -55,7 +55,12 @@ async function callProvider(p, { messages, temperature, maxTokens, json }) {
         });
         const text2 = await res2.text();
         if (!res2.ok) throw new Error(`${p.label} ${res2.status}: ${text2.slice(0, 300)}`);
-        const data2 = JSON.parse(text2);
+        let data2;
+        try {
+          data2 = JSON.parse(text2);
+        } catch {
+          throw new Error(`${p.label}: empty/non-JSON response${text2 ? `: ${text2.slice(0, 160)}` : " (empty body)"}`);
+        }
         trackUsage(p.label, data2);
         const c2 = (data2.choices?.[0]?.message?.content ?? "").trim();
         if (!c2) throw new Error(`${p.label}: empty content`);
@@ -87,11 +92,17 @@ export async function chat(messages, opts = {}) {
   const list = opts.provider ? [opts.provider] : providers();
   let lastErr;
 
+  // some providers (Gemini) refuse a request whose last turn is not a user turn,
+  // and our prompt builders sometimes append a trailing system/assistant note
+  const safe = messages.length && messages[messages.length - 1].role === "user"
+    ? messages
+    : [...messages, { role: "user", content: "(lanjut)" }];
+
   for (const p of list) {
     const temperature = opts.temperature ?? p.temperature ?? config.temperature;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        return await callProvider(p, { messages, temperature, maxTokens, json: opts.json });
+        return await callProvider(p, { messages: safe, temperature, maxTokens, json: opts.json });
       } catch (err) {
         lastErr = err;
         log(`llm ${p.label}/${p.model} attempt ${attempt} failed: ${err.message}`);
