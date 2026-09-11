@@ -19,7 +19,7 @@ understudy: u first.
 ## Install (4 steps, no character writing)
 
 ```bash
-git clone <this-repo> understudy
+git clone <Mezzwynn> understudy
 cd understudy
 ./install.sh                 # deps + .env + media tools
 
