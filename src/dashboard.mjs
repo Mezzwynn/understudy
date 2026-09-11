@@ -150,6 +150,9 @@ async function summary() {
     state: c.proactive?.state || "idle",
     trusted: c.trusted === true,
     moodLabel: c.mood ? moodLabel(normalize(c.mood)) : "",
+    moodMode: c.moodLock?.locked ? "manual" : "auto",
+    moodLockedAt: c.moodLock?.locked ? c.moodLock.at || 0 : 0,
+    baseline: baselineFor(c),
     dryCount: c.proactive?.dryCount || 0,
     commitments: (c.commitments || []).filter((x) => !x.done).map((x) => ({ what: x.what, due: x.due })),
     softMinutes:
@@ -267,6 +270,7 @@ export function startDashboard() {
             // gaining trust back restores the default pet name
             chat.profile.nick = config.defaultNick;
           }
+          chat.moodLock = null;
           chat.mood = newMood(baselineFor(chat));
           saveChat(chat);
           log(`dashboard: trusted=${chat.trusted} for ${body.jid}`);
@@ -275,7 +279,7 @@ export function startDashboard() {
 
         if (url.pathname === "/api/mood") {
           const chat = loadChat(body.jid);
-          const m = normalize(chat.mood || newMood());
+          const m = normalize(chat.mood || newMood(baselineFor(chat)));
           for (const k of MOOD_KEYS) {
             if (body.mood && body.mood[k] !== undefined) {
               const n = Number(body.mood[k]);
@@ -283,9 +287,15 @@ export function startDashboard() {
             }
           }
           chat.mood = cohere(m);
+          // manual mode is sticky: she keeps exactly these numbers until
+          // "Auto mood" is pressed again
+          if (body.lock === true) {
+            chat.moodLock = { locked: true, at: Date.now(), value: { ...chat.mood } };
+            if (chat.moodLock.value.updatedAt) delete chat.moodLock.value.updatedAt;
+          }
           saveChat(chat);
-          log(`dashboard: mood ${body.jid} → ${moodLabel(chat.mood)}`);
-          return json(res, 200, { ok: true, mood: chat.mood, label: moodLabel(chat.mood) });
+          log(`dashboard: mood ${body.jid} → ${moodLabel(chat.mood)}${body.lock ? " (dikunci)" : ""}`);
+          return json(res, 200, { ok: true, mood: chat.mood, label: moodLabel(chat.mood), locked: chat.moodLock?.locked === true });
         }
 
         if (url.pathname === "/api/mood/auto") {
@@ -299,11 +309,13 @@ export function startDashboard() {
           }
           if (!suggested) return json(res, 400, { ok: false, error: "model tidak mengembalikan mood" });
           if (body.apply) {
+            // leaving manual mode: hand the mood back to the tracker
+            chat.moodLock = null;
             chat.mood = cohere({ ...normalize(chat.mood), ...suggested.mood });
             saveChat(chat);
             log(`dashboard: auto mood ${body.jid} → ${moodLabel(chat.mood)} (${suggested.reason})`);
           }
-          return json(res, 200, { ok: true, suggested, mood: chat.mood, label: moodLabel(chat.mood) });
+          return json(res, 200, { ok: true, suggested, mood: chat.mood, label: moodLabel(chat.mood), locked: false });
         }
 
         if (url.pathname === "/api/contact") {

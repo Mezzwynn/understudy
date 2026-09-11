@@ -4,7 +4,7 @@ import { loadPersona } from "./prompt.mjs";
 import { generateProactive, generateNudge, generateFollowup, generateCheckup } from "./engine.mjs";
 import { getSock, sendText, presence, setGlobalPresence } from "./whatsapp.mjs";
 import { splitBubbles, typingDelayFor, sleep } from "./texting.mjs";
-import { applyDeltas, normalize } from "./mood.mjs";
+import { applyDeltas, normalize, isMoodLocked } from "./mood.mjs";
 
 /**
  * proactive.mjs — she has her own life.
@@ -177,7 +177,7 @@ async function checkSoft(sock) {
   for (const chat of listChats()) {
     if (!chat.softUntil || chat.softUntil > now) continue;
     chat.softUntil = 0;
-    chat.mood = applyDeltas(normalize(chat.mood), {
+    if (!isMoodLocked(chat)) chat.mood = applyDeltas(normalize(chat.mood), {
       affection: -0.18,
       valence: -0.06,
       playfulness: -0.1,
@@ -310,7 +310,7 @@ async function escalate(sock) {
       chat.coldUntil = Date.now() + 60 * 60 * 1000;
     }
     // being ignored hurts
-    chat.mood = applyDeltas(normalize(chat.mood), {
+    if (!isMoodLocked(chat)) chat.mood = applyDeltas(normalize(chat.mood), {
       valence: -0.12,
       patience: -0.15,
       affection: -0.05,

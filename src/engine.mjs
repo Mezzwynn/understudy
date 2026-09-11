@@ -3,7 +3,7 @@ import { embed } from "./embed.mjs";
 import { buildMessages, buildProactiveMessages, buildNudgeMessages, buildDryMessages, buildFollowupMessages, buildCheckupMessages } from "./prompt.mjs";
 import { recallMemory, addMemory } from "./store.mjs";
 import { extractControl, clean, looksBroken, deflection, stripAudioTags } from "./guard.mjs";
-import { drift, applyDeltas, heuristicNudge, normalize, baselineFor } from "./mood.mjs";
+import { drift, applyDeltas, heuristicNudge, normalize, baselineFor, isMoodLocked, lockValue } from "./mood.mjs";
 import { analyzeAffect } from "./affect.mjs";
 import { config, log } from "./config.mjs";
 
@@ -46,7 +46,7 @@ function applyControl(chat, control, incoming = "") {
       if (!Number.isFinite(n)) continue;
       deltas[k] = Math.max(-0.25, Math.min(0.25, n));
     }
-    chat.mood = applyDeltas(chat.mood, deltas);
+    bump(chat, deltas);
   }
   const mem = chat.memory;
   for (const key of ["facts", "plans", "jokes", "boundaries"]) {
@@ -154,12 +154,23 @@ async function maybeSummarize(chat) {
   }
 }
 
+/** Change the mood — unless the dashboard locked it for this contact. */
+function bump(session, deltas) {
+  if (isMoodLocked(session)) { session.mood = lockValue(session); return; }
+  session.mood = applyDeltas(session.mood, deltas);
+}
+
+function reDrift(session) {
+  if (isMoodLocked(session)) { session.mood = lockValue(session); return; }
+  session.mood = drift(session.mood, session.lastInteraction || Date.now(), Date.now(), baselineFor(session));
+}
+
 /**
  * Produce one in-character reply and update the chat state.
  */
 export async function generateReply(chat, incoming, persona, { displayName, voice, startedIt, thawed, injection, worried } = {}) {
   chat.mood = normalize(chat.mood);
-  chat.mood = drift(chat.mood, chat.lastInteraction || Date.now(), Date.now(), baselineFor(chat));
+  reDrift(chat);
 
   // semantic recall: find what they said about this topic before, even far back
   let recalled = [];
@@ -223,7 +234,7 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
     if (affect) applyControl(chat, affect, incoming);
     else {
       const nudge = heuristicNudge(incoming);
-      if (Object.keys(nudge).length) chat.mood = applyDeltas(chat.mood, nudge);
+      if (Object.keys(nudge).length) bump(chat, nudge);
     }
 
     // she melts for a while, then pulls back (tsundere). Nothing lasts.
@@ -247,7 +258,7 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
         const mins = config.softMinMin + Math.random() * span;
         chat.softUntil = now + mins * 60000;
         const deep = chat.mood.valence < -0.5;
-        chat.mood = applyDeltas(chat.mood, {
+        bump(chat, {
           valence: deep ? 0.22 : 0.14,
           affection: 0.18,
           playfulness: 0.12,
@@ -259,7 +270,7 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
   } catch (err) {
     log(`affect tracker failed: ${err.message}`);
     const nudge = heuristicNudge(incoming);
-    if (Object.keys(nudge).length) chat.mood = applyDeltas(chat.mood, nudge);
+    if (Object.keys(nudge).length) bump(chat, nudge);
   }
 
   chat.history.push({ role: "user", content: incoming, ts: Date.now() });
@@ -267,7 +278,7 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
   chat.stats.inbound = (chat.stats.inbound || 0) + 1;
   // long back-and-forth tires her out a little (she's not a machine)
   if (Date.now() - (chat.lastInteraction || 0) < 15 * 60000) {
-    chat.mood = applyDeltas(chat.mood, { energy: -0.02 });
+    bump(chat, { energy: -0.02 });
   }
   chat.lastInteraction = Date.now();
 
@@ -331,7 +342,7 @@ function similarity(a, b) {
  */
 export async function generateProactive(session, persona, { displayName } = {}) {
   session.mood = normalize(session.mood);
-  session.mood = drift(session.mood, session.lastInteraction || Date.now(), Date.now(), baselineFor(session));
+  reDrift(session);
 
   const recentAssistant = (session.history || [])
     .filter((h) => h.role === "assistant")
@@ -359,7 +370,7 @@ export async function generateProactive(session, persona, { displayName } = {}) 
 
     session.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
     session.lastInteraction = Date.now();
-    session.mood = applyDeltas(session.mood, { affection: 0.02 });
+    bump(session, { affection: 0.02 });
     return text;
   }
   return null;
@@ -396,7 +407,7 @@ export async function generateDryReply(session, incoming, persona, { displayName
  */
 export async function generateCheckup(session, persona, instruction, { displayName } = {}) {
   session.mood = normalize(session.mood);
-  session.mood = drift(session.mood, session.lastInteraction || Date.now(), Date.now(), baselineFor(session));
+  reDrift(session);
   const messages = buildCheckupMessages(session, persona, instruction, { displayName });
   for (let attempt = 0; attempt < 2; attempt++) {
     const raw = await llmChat(messages, { maxTokens: 1500 });
@@ -414,7 +425,7 @@ export async function generateCheckup(session, persona, instruction, { displayNa
  */
 export async function generateFollowup(session, persona, commitment, { displayName } = {}) {
   session.mood = normalize(session.mood);
-  session.mood = drift(session.mood, session.lastInteraction || Date.now(), Date.now(), baselineFor(session));
+  reDrift(session);
   const messages = buildFollowupMessages(session, persona, commitment, { displayName });
   for (let attempt = 0; attempt < 2; attempt++) {
     const raw = await llmChat(messages, { maxTokens: 1500 });

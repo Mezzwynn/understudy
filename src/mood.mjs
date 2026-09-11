@@ -125,6 +125,17 @@ function circadian(date = new Date()) {
  * Drift the mood based on how long it has been since the last interaction.
  * Long silences pull energy/affection down a bit; time of day shifts the target.
  */
+/**
+ * The dashboard can LOCK a contact's mood (manual mode). While locked she keeps
+ * exactly those numbers — the tracker, the drift and the tantrums are all
+ * ignored — until someone presses "Auto mood" again.
+ */
+export const isMoodLocked = (chat) => chat?.moodLock?.locked === true;
+
+export function lockValue(chat) {
+  return isMoodLocked(chat) ? normalize(chat.moodLock.value) : null;
+}
+
 export function drift(mood, lastInteraction = Date.now(), now = Date.now(), anchor = BASELINE) {
   const empty = !mood || !Number.isFinite(Number(mood.valence));
   const m = empty ? newMood(anchor) : normalize(mood);

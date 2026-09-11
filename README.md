@@ -130,7 +130,7 @@ rp dash          # prints the URL and opens it
 
 | Tab | What you can do |
 |---|---|
-| **Kontak** | mood bars + sulk state, **mood editor (manual sliders / Auto = the model reads the chat and sets it / Netral)**, **trusted toggle**, nickname & per-contact character, **"chat duluan sekarang"**, reset context |
+| **Kontak** | live mood bars + sulk state · **mood: Auto (the model reads the chat) → press Manual and the same block turns into sliders that LOCK her mood until you press Auto again** · trusted toggle · nickname & per-contact character · search · "chat duluan sekarang" · reset context |
 | **Setting** | edit all behaviour knobs, `active_hours`, `chat_schedule`, switch character, **Auto (model decides)**, **Restart bot** |
 | **Jadwal** | today's resolved chat slots (dynamic minutes) and which one is next |
 | **Kuota** | tokens per provider today, photo/TTS budget, ElevenLabs quota |

@@ -6,7 +6,7 @@ import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelay
 import { describeImage, transcribeAudio } from "./vision.mjs";
 import { synthesize, toSpeakable } from "./voice.mjs";
 import { stripAudioTags, detectInjection } from "./guard.mjs";
-import { applyDeltas, normalize } from "./mood.mjs";
+import { applyDeltas, normalize, isMoodLocked } from "./mood.mjs";
 import { generateImage, randomSticker, saveUserSticker } from "./image.mjs";
 import {
   phoneFromJid,
@@ -377,7 +377,7 @@ async function respond(sock, jid, p) {
     pstate.drySince = 0;
     pstate.dryCount = 0;
     chat.coldUntil = 0;
-    chat.mood = applyDeltas(normalize(chat.mood), {
+    if (!isMoodLocked(chat)) chat.mood = applyDeltas(normalize(chat.mood), {
       valence: worried ? 0.02 : 0.2,
       patience: worried ? 0.05 : 0.18,
       affection: 0.06,
