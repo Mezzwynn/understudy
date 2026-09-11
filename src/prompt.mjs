@@ -42,6 +42,7 @@ export function loadPersona(name = config.persona) {  const file = path.join(PER
     voice_tags: meta.voice_tags || "",
     voice_style: meta.voice_style || "",
     active_hours: meta.active_hours || "",
+    work_hours: meta.work_hours || "",
     chat_schedule: meta.chat_schedule || "",
     appearance: meta.appearance || "",
     card: raw,
@@ -101,6 +102,8 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     "# Yang ada di kepalamu sekarang (jangan pernah diucapin atau dijelasin)",
     "",
     `Sekarang: ${fmtTime()}`,
+    persona.work_hours ? `Jam kerja kamu: ${persona.work_hours} (di luar itu kamu bebas)` : "",
+    config.userWorkHours ? `Jam kerja dia: ${config.userWorkHours}` : "",
     `Pesan terakhir dari dia: ${fmtAgo(chat.lastInteraction)}`,
     "",
     "## Kamu lagi chat sama SIAPA",
@@ -253,24 +256,40 @@ function pickSparks(n = 2) {
   return out;
 }
 
+/** Is `date` inside a range spec like "13-21" or "21-2" (crosses midnight)? */
+function inHourRange(spec, date = new Date()) {
+  if (!spec) return false;
+  const h = date.getHours();
+  for (const part of String(spec).split(",")) {
+    const m = part.trim().match(/^(\d{1,2})\s*-\s*(\d{1,2})$/);
+    if (!m) continue;
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (a <= b ? h >= a && h < b : h >= a || h < b) return true;
+  }
+  return false;
+}
+
 /**
  * Natural, time-appropriate check-ins (what a real person actually asks).
- * During work hours we avoid "lagi ngapain" — they're obviously working.
+ * During the other person's work hours we avoid "lagi ngapain".
  */
-function daypartInfo(date = new Date()) {
+function daypartInfo(date = new Date(), persona = {}) {
   const h = date.getHours();
   const dow = date.getDay();
   const weekend = dow === 0 || dow === 6;
-  const workHours = !weekend && h >= 9 && h < 17;
+  const workHours = !weekend && inHourRange(config.userWorkHours, date);
+  const herAtWork = inHourRange(persona.work_hours, date);
+  let base;
   if (h >= 4 && h < 11)
-    return { name: "pagi", workHours, examples: ["udah sarapan?", "udah bangun?", "jangan skip makan pagi", "udah berangkat?"] };
-  if (h >= 11 && h < 15)
-    return { name: "siang", workHours, examples: ["udah makan siang?", "istirahat dulu", "jangan skip makan siang"] };
-  if (h >= 15 && h < 19)
-    return { name: "sore", workHours, examples: ["udah kelar kerjaan?", "udah pulang?", "minum air dulu", "makan dulu sebelum lanjut"] };
-  if (h >= 19 && h < 23)
-    return { name: "malam", workHours, examples: ["udah makan malem?", "udah di rumah?", "istirahat yang bener"] };
-  return { name: "subuh", workHours, examples: ["belum tidur?", "udah tidur?", "jangan begadang", "tidur ya"] };
+    base = { name: "pagi", examples: ["udah sarapan?", "udah bangun?", "jangan skip makan pagi", "udah berangkat?"] };
+  else if (h >= 11 && h < 15)
+    base = { name: "siang", examples: ["udah makan siang?", "istirahat dulu", "jangan skip makan siang"] };
+  else if (h >= 15 && h < 19)
+    base = { name: "sore", examples: ["udah kelar kerjaan?", "udah pulang?", "minum air dulu", "makan dulu sebelum lanjut"] };
+  else if (h >= 19 && h < 23)
+    base = { name: "malam", examples: ["udah makan malem?", "udah di rumah?", "istirahat yang bener"] };
+  else base = { name: "subuh", examples: ["belum tidur?", "udah tidur?", "jangan begadang", "tidur ya"] };
+  return { ...base, weekend, workHours, herAtWork };
 }
 
 export function buildProactiveMessages(chat, persona, { displayName } = {}) {
@@ -280,7 +299,7 @@ export function buildProactiveMessages(chat, persona, { displayName } = {}) {
     content: h.content,
   }));
 
-  const dp = daypartInfo();
+  const dp = daypartInfo(new Date(), persona);
   const facts = (chat.memory?.facts || []).slice(-4).join(" | ") || "(belum ada)";
   const banned =
     'DILARANG (kaku, semua bot nulis begini): "still working?", "busy?", "u there?", "u awake?", "how is work", "guess u are busy", "hey" doang.';
@@ -290,6 +309,9 @@ export function buildProactiveMessages(chat, persona, { displayName } = {}) {
   const useCheckin = Math.random() < 0.45;
   const common = [
     `[Kamu lagi buka chat sendiri. Nggak ada notif baru. Sekarang ${fmtTime()} (${dp.name}).`,
+    dp.herAtWork
+      ? "Sekarang JAM KERJA kamu" + (persona.work_hours ? ` (${persona.work_hours})` : "") + " — kalau nyletuk, nyambungin ke kerjaan/klien/lembur."
+      : "Sekarang di luar jam kerja kamu — lagi bebas.",
     `Pesan terakhir di chat ini ${fmtAgo(chat.lastInteraction)}.`,
     "Baca history dulu biar nyambung, dan sadar jam sekarang.",
     banned,

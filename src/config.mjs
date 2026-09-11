@@ -48,8 +48,8 @@ export function envGet(key, fallback = "") {
 }
 
 export const config = {
-  botName: envGet("BOT_NAME", "Character"),
-  persona: envGet("PERSONA", "character"),
+  botName: envGet("BOT_NAME", "Alya"),
+  persona: envGet("PERSONA", "example"),
   // what the character calls the user by default (per-contact override: rp contacts set)
   defaultNick: envGet("DEFAULT_NICK", ""),
 
@@ -67,7 +67,7 @@ export const config = {
     .filter(Boolean),
 
   // WhatsApp LIDs (new anonymous ids) mapped to real numbers, e.g.
-  // LID_MAP=123456789012345:+6281234567890
+  // LID_MAP=215341758152901:+6285111046991
   lidMap: (() => {
     const out = {};
     for (const pair of envGet("LID_MAP", "").split(",")) {
@@ -133,6 +133,9 @@ export const config = {
   // Optional vision/audio via Gemini
   geminiApiKey: envGet("GEMINI_API_KEY", ""),
   visionModel: envGet("VISION_MODEL", "gemini-2.5-flash"),
+
+  // jam kerja user (biar pertanyaan "udah makan?" dll pas waktunya)
+  userWorkHours: envGet("USER_WORK_HOURS", "9-17"),
 
   // Show as "online" only during her active hours
   presence: envGet("PRESENCE", "true") === "true",

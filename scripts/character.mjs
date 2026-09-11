@@ -68,6 +68,7 @@ voice_eleven:
 voice_tags: [tag1] [tag2] [tag3] [tag4] [tag5]
 voice_style: <1-2 kalimat gaya suaranya>
 active_hours: <jam dia biasa online, format 11-14,17-19,21-2>
+work_hours: <jam kerjanya, mis. 9-17 atau 13-21; kosongkan kalau nggak kerja>
 chat_schedule: <10 jam dia biasa chat duluan, format 11,12,13,17,18,19,20,22,23,0>
 appearance: <deskripsi penampilan untuk generate foto>
 ---

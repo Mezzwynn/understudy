@@ -8,6 +8,7 @@ voice: Aoede
 voice_eleven:
 voice_tags: [dryly] [pause] [sighs] [quietly] [flatly]
 active_hours: 11-14,17-19,21-2
+work_hours: 9-17
 chat_schedule: 9,12,15,18,21
 voice_style:
 appearance: deskripsi penampilan singkat, dipakai untuk generate foto
