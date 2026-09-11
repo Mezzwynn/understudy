@@ -20,6 +20,25 @@ export function setEnv(key, value) {
   fs.writeFileSync(ENV_FILE, text, { mode: 0o600 });
 }
 
+/**
+ * Read .env straight from disk. config.mjs caches the file at import time, so
+ * after setEnv() the in-memory copy is stale — this keeps the UI honest.
+ */
+export function readEnvFile() {
+  const out = {};
+  if (!fs.existsSync(ENV_FILE)) return out;
+  for (const raw of fs.readFileSync(ENV_FILE, "utf8").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const i = line.indexOf("=");
+    if (i === -1) continue;
+    let v = line.slice(i + 1).trim();
+    if (!v.startsWith('"') && !v.startsWith("'")) v = v.replace(/\s+#.*$/, "").trim();
+    out[line.slice(0, i).trim()] = v;
+  }
+  return out;
+}
+
 export const KNOBS = [
   { key: "VOICE_CHANCE", label: "Balas pakai voice note", kind: "float", def: 0.15, hint: "0 = nggak pernah" },
   { key: "VOICE_MIRROR_CHANCE", label: "Balas VN kalau dikirim VN", kind: "float", def: 0.7 },
@@ -40,10 +59,16 @@ export const KNOBS = [
 ];
 
 export function currentValues() {
+  const file = readEnvFile();
   const out = {};
   for (const k of KNOBS) {
-    const raw = envGet(k.key, "");
-    out[k.key] = raw === "" ? k.def : k.kind === "text" ? raw : Number(raw);
+    const raw = file[k.key] !== undefined ? file[k.key] : envGet(k.key, "");
+    if (k.kind === "text") {
+      out[k.key] = raw === "" ? k.def : raw;
+      continue;
+    }
+    const n = Number(raw);
+    out[k.key] = raw === "" || !Number.isFinite(n) ? k.def : n;
   }
   return out;
 }

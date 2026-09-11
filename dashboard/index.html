@@ -175,11 +175,14 @@ function renderSettings(){
         </div>
         <div class="row" style="margin-top:12px">
           <button class="act primary" id="btn-save-settings">Simpan setting</button>
+          <button class="act primary" id="btn-save-restart">Simpan &amp; Restart</button>
           <button class="act" id="btn-auto">Auto (model yang atur)</button>
           <button class="act danger" id="btn-restart">Restart bot</button>
         </div>
+        <div class="muted" id="save-hint" style="margin-top:8px"></div>
       </div>`;
-    $("#btn-save-settings").onclick = saveSettings;
+    $("#btn-save-settings").onclick = () => saveSettings(false);
+    $("#btn-save-restart").onclick = () => saveSettings(true);
     $("#btn-auto").onclick = async () => {
       toast("model sedang memilih…");
       const r = await api("/api/auto",{apply:true});
@@ -191,7 +194,7 @@ function renderSettings(){
   }
 }
 
-async function saveSettings(){
+async function saveSettings(andRestart){
   const values = {};
   document.querySelectorAll(".knob").forEach(i=>{
     const v=i.value.trim();
@@ -202,8 +205,15 @@ async function saveSettings(){
   const slug = $("#set-persona").value;
   if(slug !== DATA.bot.persona.slug) await api("/api/persona",{slug});
   await api("/api/settings",{values, activeHours, chatSchedule});
-  toast("disimpan — jalankan Restart biar kebaca");
-  SETTINGS_LOADED=false; refresh(true);
+  // re-render from the file so we can see what was actually persisted
+  SETTINGS_LOADED = false;
+  toast(andRestart ? "disimpan, merestart…" : "tersimpan");
+  await refresh(true);
+  const hint = $("#save-hint");
+  if(hint) hint.innerHTML = andRestart
+    ? "✓ tersimpan &amp; direstart — tunggu ~10 detik."
+    : "✓ tersimpan ke .env. <b>Klik “Simpan &amp; Restart”</b> (atau Restart bot) biar bot yang jalan baca nilai barunya.";
+  if(andRestart) await api("/api/restart",{});
 }
 
 function renderSchedule(){

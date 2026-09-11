@@ -222,7 +222,7 @@ export function startDashboard() {
           if (typeof body.activeHours === "string") setPersonaField(slug, "active_hours", body.activeHours);
           if (typeof body.chatSchedule === "string") setPersonaField(slug, "chat_schedule", body.chatSchedule);
           log("dashboard: settings updated");
-          return json(res, 200, { ok: true });
+          return json(res, 200, { ok: true, needsRestart: true });
         }
 
         if (url.pathname === "/api/auto") {
