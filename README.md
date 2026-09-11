@@ -22,6 +22,8 @@ understudy: u first.
 git clone <Mezzwynn> understudy
 cd understudy
 ./install.sh                 # deps + .env + media tools
+```
+```bash
 
 rp setup                     # 1. connect an AI model (API key only)
 rp start                     # 2. link WhatsApp (scan the QR)
