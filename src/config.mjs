@@ -83,7 +83,15 @@ export const config = {
   minTypingMs: num(envGet("MIN_TYPING_MS", "900"), 900),
   maxTypingMs: num(envGet("MAX_TYPING_MS", "4500"), 4500),
   debounceMs: num(envGet("DEBOUNCE_MS", "1800"), 1800),
+  // batching cap: never wait longer than this since the FIRST message of a burst
+  debounceMaxMs: num(envGet("DEBOUNCE_MAX_MS", "12000"), 12000),
   replyDelayMs: num(envGet("REPLY_DELAY_MS", "0"), 0),
+  // reading + pre-typing (the pause before "typing…" even appears)
+  readMinMs: num(envGet("READ_MIN_MS", "600"), 600),
+  readMaxMs: num(envGet("READ_MAX_MS", "4000"), 4000),
+  pretypeMinMs: num(envGet("PRETYPE_MIN_MS", "1500"), 1500),
+  pretypeMaxMs: num(envGet("PRETYPE_MAX_MS", "9000"), 9000),
+  typingPauseChance: num(envGet("TYPING_PAUSE_CHANCE", "0.25"), 0.25),
   markRead: envGet("MARK_READ", "true") === "true",
   readDelayMinMs: num(envGet("READ_DELAY_MIN_MS", "2500"), 2500),
   readDelayMaxMs: num(envGet("READ_DELAY_MAX_MS", "90000"), 90000),

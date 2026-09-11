@@ -2,7 +2,7 @@ import { config, log } from "./config.mjs";
 import { loadChat, saveChat, loadState, saveState } from "./store.mjs";
 import { generateReply, generateDryReply } from "./engine.mjs";
 import { loadPersona } from "./prompt.mjs";
-import { splitBubbles, typingDelayFor, readingDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst, maybeLongDelay } from "./texting.mjs";
+import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst, maybeLongDelay } from "./texting.mjs";
 import { describeImage, transcribeAudio } from "./vision.mjs";
 import { synthesize, toSpeakable } from "./voice.mjs";
 import { stripAudioTags } from "./guard.mjs";
@@ -115,7 +115,7 @@ function enqueue(jid, fn) {
 function schedule(sock, jid, item) {
   let p = pending.get(jid);
   if (!p) {
-    p = { parts: [], keys: [], pushName: "", msg: null };
+    p = { parts: [], keys: [], pushName: "", msg: null, firstAt: Date.now() };
     pending.set(jid, p);
   }
   p.parts.push(item.text);
@@ -123,11 +123,15 @@ function schedule(sock, jid, item) {
   if (item.pushName) p.pushName = item.pushName;
   if (item.msg) p.msg = item.msg;
 
+  // wait for them to stop typing… but never longer than DEBOUNCE_MAX_MS since
+  // the first message of the burst (a chatty user shouldn't delay her forever)
   clearTimeout(p.timer);
+  const capLeft = p.firstAt + config.debounceMaxMs - Date.now();
+  const wait = Math.max(0, Math.min(config.debounceMs, capLeft));
   p.timer = setTimeout(() => {
     pending.delete(jid);
     enqueue(jid, () => respond(sock, jid, p));
-  }, config.debounceMs);
+  }, wait);
 }
 
 /* ------------------------------- respond ------------------------------- */
@@ -233,6 +237,7 @@ async function respond(sock, jid, p) {
   if (!chat.profile.number || config.lidMap[chat.profile.number]) chat.profile.number = number;
   const push = (p.pushName || "").trim();
   if (!chat.profile.name && push) chat.profile.name = push;
+  if (!chat.profile.nick && config.defaultNick) chat.profile.nick = config.defaultNick;
 
   const persona = loadPersona(chat.persona || undefined);
   const isMedia = incoming.startsWith("[");
@@ -290,7 +295,6 @@ async function respond(sock, jid, p) {
   // read receipts are not instant
   scheduleRead(sock, p.keys);
   await subscribePresence(sock, jid);
-
   // sometimes she just reads it and doesn't reply
   if (shouldSkip(chat, incoming)) {
     chat.stats.skips = (chat.stats.skips || 0) + 1;
@@ -320,9 +324,12 @@ async function respond(sock, jid, p) {
 
   // she has opened the chat now, so the ticks go blue before she types
   if (config.markRead && p.keys.length) await markRead(sock, p.keys);
-  await presence(sock, jid, "composing");
-  if (config.replyDelayMs) await sleep(config.replyDelayMs);
+  // …she reads it first…
   await sleep(readingDelayFor(incoming));
+  if (config.replyDelayMs) await sleep(config.replyDelayMs);
+  // …then a pause before she actually starts typing (the indicator appears late)
+  await sleep(pretypeDelayFor());
+  await presence(sock, jid, "composing");
 
   // sometimes she gets distracted for a while before answering
   const distracted = maybeLongDelay();
@@ -461,7 +468,14 @@ async function respond(sock, jid, p) {
       config.quoteChance > 0 && p.msg && Math.random() < config.quoteChance ? p.msg : undefined;
     for (let i = 0; i < bubbles.length; i++) {
       await presence(sock, jid, "composing");
-      await sleep(typingDelayFor(bubbles[i]));
+      const plan = typingPlan(bubbles[i]);
+      await sleep(plan.first);
+      if (plan.gap) {
+        await presence(sock, jid, "paused");
+        await sleep(plan.gap);
+        await presence(sock, jid, "composing");
+        await sleep(plan.rest);
+      }
       try {
         await sendText(sock, jid, bubbles[i], i === 0 ? quoted : undefined);
         chat.stats.outbound = (chat.stats.outbound || 0) + 1;

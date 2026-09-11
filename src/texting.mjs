@@ -55,9 +55,28 @@ export function typingDelayFor(text) {
   return Math.round(Math.min(config.maxTypingMs, Math.max(config.minTypingMs, base)));
 }
 
-/** How long it takes to read an incoming message. */
+/** How long she spends reading an incoming message before anything happens. */
 export function readingDelayFor(text) {
-  return Math.round(Math.min(3500, 400 + text.length * rand(8, 18)));
+  const v = config.readMinMs + text.length * rand(6, 16);
+  return Math.round(Math.min(config.readMaxMs, Math.max(config.readMinMs, v)));
+}
+
+/** The pause after reading, before the "typing…" indicator appears. */
+export function pretypeDelayFor() {
+  return Math.round(rand(config.pretypeMinMs, config.pretypeMaxMs));
+}
+
+/**
+ * Split a typing delay so she sometimes stops typing for a moment and resumes —
+ * exactly what people do when they think mid-sentence.
+ * Returns { first, gap, rest } (gap = 0 when no pause happens).
+ */
+export function typingPlan(text) {
+  const total = typingDelayFor(text);
+  if (Math.random() >= config.typingPauseChance) return { first: total, gap: 0, rest: 0 };
+  const first = Math.round(total * rand(0.25, 0.6));
+  const gap = Math.round(600 + Math.random() * 2600);
+  return { first, gap, rest: Math.max(250, total - first) };
 }
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
