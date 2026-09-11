@@ -593,7 +593,15 @@ async function respond(sock, jid, p) {
             try {
               await sock.sendMessage(jid, { delete: sent.key });
               const c = loadChat(jid);
-              c.history.push({ role: "system", content: `(kamu hapus pesan: "${original}")`, ts: Date.now() });
+              // rewrite the entry: the message is gone, they never read it
+              for (let i = c.history.length - 1; i >= 0; i--) {
+                const h = c.history[i];
+                if (h.role === "assistant" && typeof h.content === "string" && h.content.includes(original)) {
+                  h.content = `[pesan ini kamu hapus sebelum dia baca] "${original}"`;
+                  h.deleted = true;
+                  break;
+                }
+              }
               saveChat(c);
               log(`deleted own message → ${jid}`);
               if (Math.random() < config.deleteCoverChance) {

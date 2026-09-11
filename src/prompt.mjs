@@ -103,6 +103,15 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
   const who = profile.name || displayName || "";
   const since = profile.since ? new Date(profile.since).toLocaleDateString("id-ID") : "—";
 
+  // did she delete her own last message? then she must know they never read it
+  const hist = chat.history || [];
+  let lastAssistantDeleted = false;
+  for (let i = hist.length - 1; i >= 0; i--) {
+    if (hist[i].role !== "assistant") continue;
+    lastAssistantDeleted = Boolean(hist[i].deleted);
+    break;
+  }
+
   // nickname is a privilege: it disappears when she is cold, sulking or hurt
   const pstate = chat.proactive?.state || "idle";
   const sulking = pstate === "dry" || pstate === "silent";
@@ -160,6 +169,14 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
           "# KONTEKS PENTING",
           "Dia baru minta maaf. Kamu MASIH dingin — jangan langsung manis atau lebay.",
           "Bales pendek, boleh ketus dikit, biar dia yang berusaha. Baru luluh pelan-pelan.",
+        ]
+      : []),
+    ...(lastAssistantDeleted
+      ? [
+          "",
+          "# CATATAN",
+          "Pesan terakhir kamu SUDAH KAMU HAPUS sebelum dia membacanya. Di chat dia cuma lihat “pesan ini telah dihapus”.",
+          "Jadi anggap dia TIDAK pernah membaca isinya. Kalau dia menyinggung soal itu, bersikap seperti orang yang baru menghapus pesannya: malu, gengsi, ngeles, atau bilang gak jadi.",
         ]
       : []),
     ...(voice
