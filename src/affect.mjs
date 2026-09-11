@@ -77,3 +77,48 @@ export async function analyzeAffect(session, incoming, reply, persona) {
   }
   return parsed;
 }
+
+/**
+ * Ask the model what her mood should be right now, given the recent chat and
+ * the character. Used by the dashboard's "Auto" mood button.
+ */
+export async function suggestMood(session, persona) {
+  const mem = session.memory || {};
+  const recent = (session.history || [])
+    .slice(-12)
+    .map((h) => `${h.role === "user" ? "them" : persona.name}: ${h.content}`)
+    .join("\n");
+  const system =
+    "You set the current emotional state of a roleplay character. " +
+    "Given the character, the recent conversation and the current numbers, return ONLY JSON: " +
+    '{"mood":{"valence":0.0,"energy":0.6,"arousal":0.4,"affection":0.5,"patience":0.6,"playfulness":0.5},"reason":"max 12 words"}. ' +
+    "valence is -1..1 (sad..happy); the rest are 0..1. " +
+    "These are ABSOLUTE values, not deltas. Be true to the character and to what just happened " +
+    "(a fight => low valence/patience; a sweet moment => higher affection; late night => low energy).";
+  const user = `CHARACTER:\n${persona.card.slice(0, 3000)}\n\nCURRENT: ${snapshot(session.mood)}\nRELATIONSHIP: ${
+    mem.relationship || "unknown"
+  }\n\nRECENT CHAT:\n${recent || "(nothing yet)"}`;
+  const raw = await llmChat(
+    [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    { json: true, temperature: 0.3, maxTokens: 1200, provider: trackerProvider() },
+  );
+  const s = raw.indexOf("{");
+  const e = raw.lastIndexOf("}");
+  if (s === -1 || e === -1) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(raw.slice(s, e + 1));
+  } catch {
+    return null;
+  }
+  const mood = {};
+  for (const k of KEYS) {
+    const n = Number(parsed.mood?.[k]);
+    if (Number.isFinite(n)) mood[k] = k === "valence" ? Math.max(-1, Math.min(1, n)) : Math.max(0, Math.min(1, n));
+  }
+  if (!Object.keys(mood).length) return null;
+  return { mood, reason: String(parsed.reason || "").slice(0, 120) };
+}
