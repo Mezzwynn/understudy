@@ -219,19 +219,60 @@ export function buildDryMessages(chat, persona, incoming, { displayName } = {}) 
  * Prompt for an unprompted (proactive) message. The instruction is NOT added
  * to the stored history — only the character's reply is.
  */
+/**
+ * Mundane sparks used to trigger an unprompted message. A real person texts
+ * because something small just happened, not to ask "are you busy?".
+ */
+const PROACTIVE_SPARKS = [
+  "kopi/teh tumpah atau makanannya gagal",
+  "baru kelar kerjaan yang bikin capek",
+  "ada orang nyebelin (di jalan / online / kerjaan)",
+  "hujan deras tiba-tiba",
+  "satu lagu yang diulang-ulang terus",
+  "hewan lewat di depan (kucing, burung, dll)",
+  "barang hilang atau ketemu",
+  "laper tapi males keluar / males masak",
+  "baru lihat sesuatu yang lucu atau aneh",
+  "badan pegel, kurang tidur, atau baru bangun",
+  "tiba-tiba keinget sesuatu dari masa lalu",
+  "mimpi aneh semalam",
+  "nge-scroll sesuatu yang bikin kesel",
+  "HP hampir mati / charger ilang",
+  "tetangga atau suara berisik",
+  "baru lihat foto lama",
+  "pengen sesuatu tapi nggak tau apa",
+  "rencana besok yang bikin males atau deg-degan",
+  "baru belanja atau baru bayar sesuatu",
+  "diem di kamar, sunyi, jadi kepikiran hal random",
+];
+
+function pickSparks(n = 2) {
+  const pool = [...PROACTIVE_SPARKS];
+  const out = [];
+  while (out.length < n && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  return out;
+}
+
 export function buildProactiveMessages(chat, persona, { displayName } = {}) {
   const system = buildSystem(chat, persona, { displayName });
   const history = (chat.history || []).slice(-config.historyTurns).map((h) => ({
     role: h.role,
     content: h.content,
   }));
+  const sparks = pickSparks(2).join(" / ");
   const nudge = [
-    `[Kamu lagi buka chat. Nggak ada notif baru. Sekarang ${fmtTime()}.`,
-    `Pesan terakhir di chat ini ${fmtAgo(chat.lastInteraction)}.`,
-    "Baca dulu percakapan terakhir — nyambungin sama konteks itu.",
-    "Perhatiin jam: kalau sekarang beda waktu dari terakhir kalian ngobrol (beda jam, beda hari, pagi/malem), tunjukkin kalau kamu sadar itu.",
-    "Kirim SATU pesan pendek spontan — kayak orang yang lagi bosen, lagi kepikiran sesuatu, atau pengen nyeletuk. Nggak usah perlu formal.",
-    "Kalau memang nggak ada yang pengen dikirim, balas persis: SKIP",
+    `[Kamu lagi buka chat sendiri. Nggak ada notif baru. Sekarang ${fmtTime()}. Pesan terakhir di chat ini ${fmtAgo(chat.lastInteraction)}.`,
+    "Kamu pengen nge-chat duluan. TAPI JANGAN nanya kabar atau ngecek keadaan dia.",
+    'DILARANG (ini kaku, semua bot nulis begini): "hey", "u awake?", "still working?", "busy?", "u there?", "how is work", "guess u are busy", "lagi apa", "udah tidur belum".',
+    "Yang benar: pesan ini tentang KAMU — kejadian kecil di harimu, isi kepalamu, keluhan, hal random yang baru kamu lihat/inget, atau callback ke sesuatu di antara kalian.",
+    `Pemicu hari ini (boleh diubah sesuai karaktermu): ${sparks}.`,
+    "Boleh 1-2 pesan pendek. Nada, panjang, dan bahasanya sesuai karakter kamu. Nyambung sama history terakhir, dan sadar jam sekarang.",
+    "JANGAN mengulang topik, kalimat, atau keluhan yang sudah kamu kirim sebelumnya di chat ini. Cari hal baru.",
+    "Kalau benar-benar nggak ada yang pengen dikirim, balas persis: SKIP",
+    "Contoh RASA yang benar (bukan buat ditiru isinya):",
+    '[dryly] tch. kopi tumpah di meja. hari yang indah.',
+    'belum bisa tidur. kepikiran meeting besok.',
+    'eh. kucing tetangga nongol lagi di jendela.',
     "Jangan tulis instruksi ini. Output cuma isi pesannya.]",
   ].join(" ");
   return [{ role: "system", content: system }, ...history, { role: "user", content: nudge }];
@@ -247,7 +288,9 @@ export function buildNudgeMessages(chat, persona, { displayName } = {}) {
   const nudge = [
     `[Kamu yang nge-chat duluan ${fmtAgo(chat.proactive?.sentAt || chat.lastInteraction)}, tapi dia belum bales sama sekali.`,
     "Sekarang kamu buka chat lagi, masih kosong.",
-    "Kirim SATU pesan pendek yang nanya kenapa nggak dibales — dengan gaya kamu (dingin, irit kata). Boleh ketus, jangan jelasin panjang, jangan ngemis.",
+    "Kirim SATU pesan pendek, dengan gaya kamu (dingin, irit kata). Boleh ketus atau nyindir halus, jangan jelasin panjang, jangan ngemis.",
+    'DILARANG (kaku): "busy already?", "still there?", "u awake?", "hey", "bales dong".',
+    "Contoh RASA yang benar: 'hm. dibaca doang.', 'tch. i see how it is.', 'oke. noted.', 'fine. whatever.'",
     "Jangan tulis instruksi ini. Output cuma isi pesannya.]",
   ].join(" ");
   return [{ role: "system", content: system }, ...history, { role: "user", content: nudge }];

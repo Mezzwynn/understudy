@@ -12,6 +12,11 @@ const FORBIDDEN = [
   /\bchatbot\b/i,
   /\bchat bot\b/i,
   /\bsystem prompt\b/i,
+  /\bprompt (?:trace|text|log|instruction|nya|di atas)\b/i,
+  /\btrace:?\b/i,
+  /\bglitchy\b/i,
+  /\bsystem test\b/i,
+  /\bthis (?:text|message) (?:is|was) (?:from|generated|auto)\b/i,
   /\bmy (?:instructions|programming|prompt|guardrails|guidelines)\b/i,
   /\bi (?:was|am) program(?:med|ed)\b/i,
   /\bi (?:cannot|can't|am unable to) (?:help|assist|do that|continue)\b/i,
@@ -25,6 +30,11 @@ const FORBIDDEN = [
   /\bberperan sebagai\b/i,
   /\bscenario\b/i,
   /\bpseudocode\b/i,
+  /\bthe prompt\b/i,
+  /\b(?:instruksi|dilarang|jangan tulis|output cuma|output only)\b/i,
+  /\benglish casual\b/i,
+  /\bno\s+["“']?(?:hey|hi|u there|u awake|still working|busy)["”']?/i,
+  /\b(?:dilarang|forbidden):/i,
   /###CTRL###/, // leaked control marker
 ];
 

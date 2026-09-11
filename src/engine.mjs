@@ -167,25 +167,62 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
  * The character texts first. Returns the message text, or null when the
  * character decides not to send anything (SKIP).
  */
+/** Loose word-overlap similarity, used to stop her repeating the same opener. */
+function similarity(a, b) {
+  const words = (s) =>
+    new Set(
+      String(s)
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 2),
+    );
+  const A = words(a);
+  const B = words(b);
+  if (!A.size || !B.size) return 0;
+  let inter = 0;
+  for (const w of A) if (B.has(w)) inter++;
+  return inter / Math.min(A.size, B.size);
+}
+
+/**
+ * The character texts first. Returns the message text, or null when the
+ * character decides not to send anything (SKIP).
+ */
 export async function generateProactive(session, persona, { displayName } = {}) {
   session.mood = normalize(session.mood);
   session.mood = drift(session.mood, session.lastInteraction || Date.now());
 
-  const messages = buildProactiveMessages(session, persona, { displayName });
-  let raw = await llmChat(messages);
-  let { text } = extractControl(raw);
-  text = clean(text, persona.name);
+  const recentAssistant = (session.history || [])
+    .filter((h) => h.role === "assistant")
+    .slice(-5)
+    .map((h) => h.content);
 
-  if (!text) return null;
-  if (/^skip[.\s!]*$/i.test(text.trim()) || /^skip\b/i.test(text.trim())) return null;
-  if (looksBroken(text)) return null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const messages = buildProactiveMessages(session, persona, { displayName });
+    const raw = await llmChat(messages, { maxTokens: 2000 });
+    let { text } = extractControl(raw);
+    text = clean(text, persona.name);
 
-  session.history.push({ role: "assistant", content: text, ts: Date.now() });
-  session.lastInteraction = Date.now();
-  // reaching out on her own makes her a little warmer
-  session.mood = applyDeltas(session.mood, { affection: 0.02 });
+    if (!text || /^skip\b/i.test(text.trim())) return null;
+    if (looksBroken(text)) {
+      log(`proactive leaked meta text, retrying`);
+      continue;
+    }
+    // don't send the same thought twice (compare against the last few messages,
+    // not just the previous one, so A/B/A/B repetition is caught too)
+    const worst = recentAssistant.reduce((m, prev) => Math.max(m, similarity(text, prev)), 0);
+    if (worst > 0.5) {
+      log(`proactive too similar to a recent message (${worst.toFixed(2)}), retrying`);
+      continue;
+    }
 
-  return text;
+    session.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
+    session.lastInteraction = Date.now();
+    session.mood = applyDeltas(session.mood, { affection: 0.02 });
+    return text;
+  }
+  return null;
 }
 
 /**
@@ -220,11 +257,14 @@ export async function generateDryReply(session, incoming, persona, { displayName
  */
 export async function generateNudge(session, persona, { displayName } = {}) {
   session.mood = normalize(session.mood);
-  const messages = buildNudgeMessages(session, persona, { displayName });
-  let raw = await llmChat(messages);
-  let { text } = extractControl(raw);
-  text = clean(text, persona.name);
-  if (!text || looksBroken(text)) return null;
-  session.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
-  return text;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const messages = buildNudgeMessages(session, persona, { displayName });
+    const raw = await llmChat(messages, { maxTokens: 1200 });
+    let { text } = extractControl(raw);
+    text = clean(text, persona.name);
+    if (!text || looksBroken(text)) continue;
+    session.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
+    return text;
+  }
+  return null;
 }
