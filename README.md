@@ -130,7 +130,7 @@ rp dash          # prints the URL and opens it
 
 | Tab | What you can do |
 |---|---|
-| **Kontak** | see every contact with mood bars and sulk state, edit nickname / per-contact character, **"chat duluan sekarang"**, reset context |
+| **Kontak** | mood bars + sulk state, **mood editor (manual sliders / Auto = the model reads the chat and sets it / Netral)**, **trusted toggle**, nickname & per-contact character, **"chat duluan sekarang"**, reset context |
 | **Setting** | edit all behaviour knobs, `active_hours`, `chat_schedule`, switch character, **Auto (model decides)**, **Restart bot** |
 | **Jadwal** | today's resolved chat slots (dynamic minutes) and which one is next |
 | **Kuota** | tokens per provider today, photo/TTS budget, ElevenLabs quota |
@@ -291,3 +291,36 @@ rp                  the CLI (symlink it anywhere)
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Trusted vs stranger
+
+Two tiers, so a shared bot number does not treat the whole internet like a best friend.
+
+```env
+TRUSTED=628123456789           # comma separated, E.164. "*" = everyone
+TRUST_STRANGERS=false          # true = old behaviour (everyone trusted)
+BASELINE_TRUSTED=0.30,0.60,0.45,0.68,0.60,0.50
+```
+
+| | trusted | stranger |
+|---|---|---|
+| resting mood | warm (`Warm`) | flat and guarded (`Reserved`) |
+| pet names | yes, mood-gated | **never** — not even if the model tries |
+| voice notes / stickers / photos | yes | no |
+| soft window (melting, then pulling back) | yes | no |
+| promises & check-ups ("did you eat?") | yes | no |
+| messages first (proactive) | yes | no |
+
+New contacts start untrusted. Anyone listed in `TRUSTED=` is upgraded on their next
+message (never downgraded automatically) — or flip it per contact from the dashboard.
+
+**Why the resting mood matters:** it is where she drifts back to when nothing is
+happening, so it defines what "normal" feels like for that person. A stranger rests at
+`affection 0.30` (below the pet-name gate), so warmth has to be *earned*. Put it too high
+and every contact starts out soft — which throws away the melting, the sulking and the
+"don't call me that" moments.
+
+```bash
+rp restart      # one instance only: stop.sh also cleans up stray processes
+rp status       # warns if more than one instance is alive (double replies!)
+```

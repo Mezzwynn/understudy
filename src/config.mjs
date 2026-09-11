@@ -50,8 +50,23 @@ export function envGet(key, fallback = "") {
 export const config = {
   botName: envGet("BOT_NAME", "Alya"),
   persona: envGet("PERSONA", "example"),
-  // what the character calls the user by default (per-contact override: rp contacts set)
+  // What the character calls the user by default. Only applies to TRUSTED
+  // contacts, so strangers never get the pet name.
   defaultNick: envGet("DEFAULT_NICK", ""),
+
+  // Numbers that get the FULL character: warm baseline, pet names, voice notes,
+  // stickers, soft window, proactive messages. Everyone else gets the reserved
+  // "stranger" treatment. E.164, comma separated. "*" = everyone trusted.
+  trusted: envGet("TRUSTED", "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+  // Set true if you want every contact treated as trusted (old behaviour).
+  trustStrangers: envGet("TRUST_STRANGERS", "false") === "true",
+  // Resting mood for trusted contacts: valence,energy,arousal,affection,patience,playfulness
+  baselineTrusted: envGet("BASELINE_TRUSTED", "0.30,0.60,0.45,0.68,0.60,0.50")
+    .split(",")
+    .map((s) => Number(s.trim())),
 
   // Numbers allowed to talk to the bot (E.164, no spaces). Empty = allow everyone.
   allow: envGet("ALLOW", "")

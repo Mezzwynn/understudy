@@ -13,6 +13,9 @@ export function defaultChat(jid) {
   return {
     jid,
     createdAt: now,
+    // Full character (warm, media, proactive) or reserved stranger treatment?
+    // New contacts start untrusted. Trusted numbers come from TRUSTED= in .env.
+    trusted: false,
     lastInteraction: now,
     lastReplyAt: 0,
     lastProactiveAt: 0,
@@ -47,6 +50,11 @@ export function defaultChat(jid) {
     mood: null, // initialised from mood.mjs baseline
     stats: { inbound: 0, outbound: 0 },
   };
+}
+
+/** Is this contact allowed the full character? */
+export function isTrusted(chat) {
+  return chat?.trusted === true;
 }
 
 export function loadChat(jid) {

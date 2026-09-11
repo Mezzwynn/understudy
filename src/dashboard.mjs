@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { ROOT, PERSONA_DIR, config, envGet, STARTED_AT, log } from "./config.mjs";
 import { listChats, loadChat, saveChat, loadState } from "./store.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
-import { normalize, cohere, label as moodLabel, newMood, KEYS as MOOD_KEYS } from "./mood.mjs";
+import { normalize, cohere, label as moodLabel, newMood, baselineFor, KEYS as MOOD_KEYS } from "./mood.mjs";
 import { suggestMood } from "./affect.mjs";
 import { isConnected, getSock } from "./whatsapp.mjs";
 import { dueSlot } from "./proactive.mjs";
@@ -148,6 +148,7 @@ async function summary() {
       ? Object.fromEntries(["valence", "energy", "arousal", "affection", "patience", "playfulness"].map((k) => [k, Number(c.mood[k].toFixed(2))]))
       : null,
     state: c.proactive?.state || "idle",
+    trusted: c.trusted === true,
     moodLabel: c.mood ? moodLabel(normalize(c.mood)) : "",
     dryCount: c.proactive?.dryCount || 0,
     commitments: (c.commitments || []).filter((x) => !x.done).map((x) => ({ what: x.what, due: x.due })),
@@ -251,6 +252,21 @@ export function startDashboard() {
           if (meta.name) setEnv("BOT_NAME", meta.name);
           log(`dashboard: persona → ${body.slug}`);
           return json(res, 200, { ok: true });
+        }
+
+        if (url.pathname === "/api/trust") {
+          const chat = loadChat(body.jid);
+          chat.trusted = body.trusted === true;
+          if (!chat.trusted) {
+            // losing trust also drops the pet name and any warmth she gave them
+            chat.profile.nick = "";
+            chat.softUntil = 0;
+            chat.trusted = false;
+          }
+          chat.mood = newMood(baselineFor(chat));
+          saveChat(chat);
+          log(`dashboard: trusted=${chat.trusted} for ${body.jid}`);
+          return json(res, 200, { ok: true, trusted: chat.trusted, mood: chat.mood });
         }
 
         if (url.pathname === "/api/mood") {

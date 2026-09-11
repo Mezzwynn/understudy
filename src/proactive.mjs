@@ -130,6 +130,8 @@ export function dueSlot(spec, now = Date.now(), { jitterMin = 0, graceMin = 20, 
 /** May she start a conversation right now? */
 export function initiateEligible(chat, now = Date.now()) {
   const p = chat.proactive || {};
+  // she only ever messages first the people she actually knows
+  if (chat.trusted !== true) return false;
   if (p.state && p.state !== "idle") return false;
   if (mins(now - (chat.lastInteraction || 0)) < config.proactiveIdleMin) return false;
   if (mins(now - (chat.lastProactiveAt || 0)) < config.proactiveGapMin) return false;

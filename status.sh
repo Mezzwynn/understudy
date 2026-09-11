@@ -3,15 +3,14 @@
 cd "$(dirname "$0")" || exit 1
 PIDFILE="data/rp.pid"
 
-if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-  echo "status: RUNNING (pid $(cat "$PIDFILE"))"
+count="$(pgrep -cf '^node src/index\.mjs' 2>/dev/null || echo 0)"
+if [ "$count" = "0" ]; then
+  echo "status: STOPPED"
+elif [ "$count" = "1" ]; then
+  echo "status: RUNNING (pid $(pgrep -f '^node src/index\.mjs' | head -1))"
 else
-  PID="$(pgrep -f "node src/index.mjs" 2>/dev/null | head -1)"
-  if [ -n "$PID" ]; then
-    echo "status: RUNNING (pid $PID, no pidfile)"
-  else
-    echo "status: STOPPED"
-  fi
+  echo "status: RUNNING — $count INSTANCE (harus dibersihin: rp restart)"
+  pgrep -af '^node src/index\.mjs'
 fi
 
 echo "number: $(grep -a 'connected as' rp.log 2>/dev/null | tail -1 | sed 's/.*as //')"

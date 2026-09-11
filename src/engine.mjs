@@ -3,7 +3,7 @@ import { embed } from "./embed.mjs";
 import { buildMessages, buildProactiveMessages, buildNudgeMessages, buildDryMessages, buildFollowupMessages, buildCheckupMessages } from "./prompt.mjs";
 import { recallMemory, addMemory } from "./store.mjs";
 import { extractControl, clean, looksBroken, deflection, stripAudioTags } from "./guard.mjs";
-import { drift, applyDeltas, heuristicNudge, normalize } from "./mood.mjs";
+import { drift, applyDeltas, heuristicNudge, normalize, baselineFor } from "./mood.mjs";
 import { analyzeAffect } from "./affect.mjs";
 import { config, log } from "./config.mjs";
 
@@ -79,11 +79,14 @@ function applyControl(chat, control, incoming = "") {
     else log(`ignored invented name "${n}" (keeping "${chat.profile.name}")`);
   }
   if (typeof control.nick === "string" && control.nick.trim()) {
-    chat.profile.nick = control.nick.trim().slice(0, 40);
+    // strangers do not get a pet name, no matter what the model thinks
+    if (chat.trusted === true) chat.profile.nick = control.nick.trim().slice(0, 40);
+    else log(`ignored nick "${control.nick.trim()}" (untrusted contact)`);
   }
 
   // a promise to follow up later ("nanti aku kabarin kalau udah selesai")
-  if (config.commitments && control.followup && typeof control.followup === "object") {
+  // she only makes promises to people she knows
+  if (config.commitments && chat.trusted === true && control.followup && typeof control.followup === "object") {
     const what = String(control.followup.what || "").trim().slice(0, 160);
     if (what) {
       const parsed = control.followup.due ? Date.parse(control.followup.due) : NaN;
@@ -156,7 +159,7 @@ async function maybeSummarize(chat) {
  */
 export async function generateReply(chat, incoming, persona, { displayName, voice, startedIt, thawed, injection, worried } = {}) {
   chat.mood = normalize(chat.mood);
-  chat.mood = drift(chat.mood, chat.lastInteraction || Date.now());
+  chat.mood = drift(chat.mood, chat.lastInteraction || Date.now(), Date.now(), baselineFor(chat));
 
   // semantic recall: find what they said about this topic before, even far back
   let recalled = [];
@@ -238,7 +241,8 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
         (Number(d.valence) || 0) >= 0.08 ||
         thawed;
       const now = Date.now();
-      if (strong && now >= (chat.softUntil || 0) && Math.random() < config.softTriggerChance) {
+      // the soft window is a reward for someone she knows — strangers never get it
+      if (chat.trusted === true && strong && now >= (chat.softUntil || 0) && Math.random() < config.softTriggerChance) {
         const span = Math.max(1, config.softMaxMin - config.softMinMin);
         const mins = config.softMinMin + Math.random() * span;
         chat.softUntil = now + mins * 60000;
@@ -275,8 +279,9 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
     }
   }
 
-  // she just told them to do something (eat / sleep / workout) -> check later
-  if (config.instructionFollowup) {
+  // she just told them to do something (eat / sleep / workout) -> check later.
+  // only for people she actually knows; she does not mother strangers.
+  if (config.instructionFollowup && chat.trusted === true) {
     const label = detectInstruction(stripAudioTags(text));
     const alreadyPending = (chat.instructions || []).some((i) => !i.done && i.label === label);
     if (label && !alreadyPending) {
@@ -326,7 +331,7 @@ function similarity(a, b) {
  */
 export async function generateProactive(session, persona, { displayName } = {}) {
   session.mood = normalize(session.mood);
-  session.mood = drift(session.mood, session.lastInteraction || Date.now());
+  session.mood = drift(session.mood, session.lastInteraction || Date.now(), Date.now(), baselineFor(session));
 
   const recentAssistant = (session.history || [])
     .filter((h) => h.role === "assistant")
@@ -391,7 +396,7 @@ export async function generateDryReply(session, incoming, persona, { displayName
  */
 export async function generateCheckup(session, persona, instruction, { displayName } = {}) {
   session.mood = normalize(session.mood);
-  session.mood = drift(session.mood, session.lastInteraction || Date.now());
+  session.mood = drift(session.mood, session.lastInteraction || Date.now(), Date.now(), baselineFor(session));
   const messages = buildCheckupMessages(session, persona, instruction, { displayName });
   for (let attempt = 0; attempt < 2; attempt++) {
     const raw = await llmChat(messages, { maxTokens: 1500 });
@@ -409,7 +414,7 @@ export async function generateCheckup(session, persona, instruction, { displayNa
  */
 export async function generateFollowup(session, persona, commitment, { displayName } = {}) {
   session.mood = normalize(session.mood);
-  session.mood = drift(session.mood, session.lastInteraction || Date.now());
+  session.mood = drift(session.mood, session.lastInteraction || Date.now(), Date.now(), baselineFor(session));
   const messages = buildFollowupMessages(session, persona, commitment, { displayName });
   for (let attempt = 0; attempt < 2; attempt++) {
     const raw = await llmChat(messages, { maxTokens: 1500 });

@@ -124,22 +124,38 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
   const sulking = pstate === "dry" || pstate === "silent";
   const softLeftMin = chat.softUntil ? Math.round((chat.softUntil - Date.now()) / 60000) : 0;
   const soft = softLeftMin > 0 && !sulking;
+  const trusted = chat.trusted === true;
   const warm =
+    trusted &&
     !sulking &&
     (soft ||
       (mood.affection >= config.nickAffectionMin &&
         mood.valence >= config.nickValenceMin &&
         mood.patience >= config.nickPatienceMin));
   const nickPct = Math.round(config.nickChance * 100);
-  const nickLine = profile.nick
-    ? warm
+  const nickLine = !trusted
+    ? "Kamu manggil dia: — (kamu belum kenal dia, jadi JANGAN pakai panggilan sayang apa pun)"
+    : profile.nick
+      ? warm
       ? `Kamu manggil dia: ${profile.nick}. Pakai sesekali saja (kira-kira ${nickPct}% pesan), bukan tiap pesan.` +
         (config.nickAcceptWarm
           ? `\nKalau DIA yang manggil kamu dengan nama sayang (${profile.nick}, sayang, baby, dll): terima dengan malu-malu atau ngeles — jangan ketus menolak, kecuali kamu memang lagi kesel.`
           : "")
       : `Kamu manggil dia: ${profile.nick} — TAPI SEKARANG JANGAN PAKAI itu. Kamu lagi dingin/kesel. Panggil \"you\"/\"kamu\" aja.` +
         `\nKalau dia manggil kamu dengan nama sayang, kamu boleh nolak ketus (\"don't call me that\").`
-    : "Kamu manggil dia: —";
+      : "Kamu manggil dia: —";
+
+  // Someone she has never met: cold, short, no flirting, nothing personal.
+  const strangerBlock = [
+    "## Ini orang yang BELUM kamu kenal",
+    "- Kamu dingin dan irit. Jawab pendek, datar. Jangan ramah berlebihan, jangan sok akrab.",
+    "- JANGAN pakai panggilan sayang. Jangan flirting, jangan menggoda, jangan genit.",
+    "- Jangan janji apa-apa, jangan ngajak ketemuan, jangan tanya-tanya soal hidupnya.",
+    "- Jangan khawatirin dia. Jangan nyuruh dia makan/tidur. Itu bukan urusanmu.",
+    "- Jangan cerita hal pribadi soal kamu. Kamu nggak wajib menghibur dia.",
+    "- Kalau dia cuma iseng atau nyari perhatian, jawab seadanya. Boleh banget cuma \"hm.\" atau \"ya udah.\"",
+    "- Kamu baru boleh agak terbuka kalau dia beneran sopan DAN obrolannya nyambung — tapi tetap pelan, jangan langsung hangat.",
+  ].join("\n");
 
   const state = [
     "# Yang ada di kepalamu sekarang (jangan pernah diucapin atau dijelasin)",
@@ -156,6 +172,7 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     `Nama: ${who || "belum tau namanya"}`,
     who ? "Pakai nama itu. JANGAN pernah manggil dia dengan nama lain, dan jangan mengarang nama." : "",
     nickLine,
+    trusted ? "" : strangerBlock,
     `Nomor: ${profile.number || "—"}`,
     `Chat pertama: ${since}`,
     profile.notes ? `Catatan soal dia: ${profile.notes}` : "",

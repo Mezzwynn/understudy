@@ -8,7 +8,7 @@
  */
 import fs from "node:fs";
 import { listChats, loadChat, saveChat, defaultChat } from "../src/store.mjs";
-import { newMood } from "../src/mood.mjs";
+import { newMood , baselineFor } from "../src/mood.mjs";
 
 const [id, ...flags] = process.argv.slice(2);
 if (!id) {
@@ -38,7 +38,7 @@ for (const jid of targets) {
   chat.lastSkipAt = 0;
   // stop any sulking / "waiting for a reply" state
   chat.proactive = { state: "idle", sentAt: 0, nudgedAt: 0, drySince: 0, dryCount: 0, lastDry: "", lastSlot: "" };
-  if (resetMood) chat.mood = newMood();
+  if (resetMood) chat.mood = newMood(baselineFor(chat));
   if (resetMemory) chat.memory = defaultChat(jid).memory;
   saveChat(chat);
   console.log(`reset ${jid}${resetMood ? " (mood)" : ""}${resetMemory ? " (memory)" : ""}`);

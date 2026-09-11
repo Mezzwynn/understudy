@@ -21,14 +21,49 @@ export const BASELINE = {
 
 export const KEYS = Object.keys(BASELINE);
 
+/**
+ * Where she drifts back to when nothing is happening — this decides what
+ * "normal" feels like for a given person.
+ *
+ *   stranger → reserved: flat, dry, not warm, no pet names (affection < 0.45)
+ *   trusted  → warm, but the pride/teasing still comes from the persona card,
+ *              not from the mood numbers
+ */
+export const STRANGER_BASELINE = {
+  valence: 0.0,
+  energy: 0.55,
+  arousal: 0.4,
+  affection: 0.3,
+  patience: 0.55,
+  playfulness: 0.3,
+};
+
+function anchorFromEnv() {
+  const out = { ...STRANGER_BASELINE };
+  const arr = config.baselineTrusted || [];
+  KEYS.forEach((k, i) => {
+    if (Number.isFinite(arr[i])) out[k] = arr[i];
+  });
+  return out;
+}
+
+export const TRUSTED_BASELINE = anchorFromEnv();
+
+/** Which resting point applies to this chat? */
+export function baselineFor(chat) {
+  if (!chat) return STRANGER_BASELINE;
+  if (chat.baseline && typeof chat.baseline === "object") return { ...STRANGER_BASELINE, ...chat.baseline };
+  return chat.trusted || config.trustStrangers ? TRUSTED_BASELINE : STRANGER_BASELINE;
+}
+
 const clamp = (k, v) => {
   const n = Number(v);
   if (!Number.isFinite(n)) return BASELINE[k];
   return k === "valence" ? Math.max(-1, Math.min(1, n)) : Math.max(0, Math.min(1, n));
 };
 
-export function newMood() {
-  return { ...BASELINE, updatedAt: Date.now() };
+export function newMood(anchor = STRANGER_BASELINE) {
+  return { ...STRANGER_BASELINE, ...anchor, updatedAt: Date.now() };
 }
 
 export function normalize(mood) {
@@ -90,8 +125,9 @@ function circadian(date = new Date()) {
  * Drift the mood based on how long it has been since the last interaction.
  * Long silences pull energy/affection down a bit; time of day shifts the target.
  */
-export function drift(mood, lastInteraction = Date.now(), now = Date.now()) {
-  const m = normalize(mood);
+export function drift(mood, lastInteraction = Date.now(), now = Date.now(), anchor = BASELINE) {
+  const empty = !mood || !Number.isFinite(Number(mood.valence));
+  const m = empty ? newMood(anchor) : normalize(mood);
   const mins = Math.max(0, (now - lastInteraction) / 60000);
   const c = circadian(new Date(now));
 
@@ -103,7 +139,7 @@ export function drift(mood, lastInteraction = Date.now(), now = Date.now()) {
   const alpha = Math.min(0.25, 0.01 + (mins / 60) * 0.2);
 
   for (const k of KEYS) {
-    let target = BASELINE[k] + (c[k] || 0);
+    let target = anchor[k] + (c[k] || 0);
     if (k === "affection") target -= silence;
     if (k === "valence") target -= silence * 0.4;
     if (k === "energy") target += 0;
@@ -172,6 +208,8 @@ export function label(s) {
   if (ar >= 0.7 && v >= 0.3) return "Wound up";
   if (v >= 0.45) return "Happy";
   if (v <= -0.05) return "Slightly annoyed";
+  if (af < 0.45 && pl < 0.5 && p >= 0.45) return "Reserved";
+  if (af >= 0.6 && v >= 0.25) return "Warm";
   return "Neutral";
 }
 

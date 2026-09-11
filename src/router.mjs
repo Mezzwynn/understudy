@@ -310,7 +310,18 @@ async function respond(sock, jid, p) {
   if (!chat.profile.number || config.lidMap[chat.profile.number]) chat.profile.number = number;
   const push = (p.pushName || "").trim();
   if (!chat.profile.name && push) chat.profile.name = push;
-  if (!chat.profile.nick && config.defaultNick) chat.profile.nick = config.defaultNick;
+  // trust: only numbers listed in TRUSTED get the full character. Never
+  // downgrade someone who already earned it (the dashboard can revoke).
+  if (!chat.trusted && config.trusted.length) {
+    const bare = number.replace(/^\+/, "");
+    if (config.trusted.includes("*") || config.trusted.includes(number) || config.trusted.includes(bare)) {
+      chat.trusted = true;
+      log(`trusted → ${number}`);
+    }
+  }
+  const trusted = chat.trusted === true;
+  // the pet name is only for people she actually knows
+  if (!chat.profile.nick && config.defaultNick && trusted) chat.profile.nick = config.defaultNick;
 
   const persona = loadPersona(chat.persona || undefined);
   const isMedia = incoming.startsWith("[");
@@ -436,6 +447,7 @@ async function respond(sock, jid, p) {
   const incomingVoice = /^\[voice note/i.test(incoming);
   const mirrorVoice = incomingVoice && Math.random() < config.voiceMirrorChance;
   const wantVoice =
+    trusted &&
     !asksText &&
     (asksVoice ||
       mirrorVoice ||
@@ -492,6 +504,7 @@ async function respond(sock, jid, p) {
   }
   let sentMedia = false;
   if (
+    trusted &&
     (wantsPhoto || Math.random() < config.photoChance) &&
     (chat.stats.photoCount || 0) < config.photoDailyMax &&
     takePhotoBudget()
@@ -520,7 +533,7 @@ async function respond(sock, jid, p) {
 
   // ── sticker: can be the whole reply, or an addition to text/voice ──
   const stickerRoll =
-    config.stickerChance > 0 && Math.random() < Math.min(0.95, config.stickerChance * mm.sticker);
+    trusted && config.stickerChance > 0 && Math.random() < Math.min(0.95, config.stickerChance * mm.sticker);
   const stickerAlone = stickerRoll && !sentMedia && Math.random() < config.stickerOnlyChance;
   const stickerPick = stickerRoll
     ? randomSticker({
