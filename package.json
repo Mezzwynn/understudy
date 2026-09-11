@@ -1,0 +1,36 @@
+{
+  "name": "understudy",
+  "version": "1.0.0",
+  "description": "Standalone WhatsApp roleplay agent — strong persona that never breaks character, live mood, human texting habits, media in/out.",
+  "type": "module",
+  "license": "MIT",
+  "main": "src/index.mjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "whatsapp",
+    "roleplay",
+    "chatbot",
+    "persona",
+    "baileys",
+    "ai-companion"
+  ],
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node scripts/selftest.mjs",
+    "turing": "node scripts/turing.mjs",
+    "bench": "node scripts/bench.mjs",
+    "persona": "node scripts/persona.mjs",
+    "contacts": "node scripts/contacts.mjs",
+    "mood": "node scripts/mood.mjs",
+    "voice": "node scripts/voice.mjs",
+    "sticker": "node scripts/sticker.mjs"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "6.7.24",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

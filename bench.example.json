@@ -1,0 +1,70 @@
+[
+  {
+    "label": "deepseek-chat",
+    "baseUrl": "https://api.deepseek.com/v1",
+    "model": "deepseek-chat",
+    "apiKeyEnv": "DEEPSEEK_API_KEY"
+  },
+  {
+    "label": "gemini-2.5-flash",
+    "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+    "model": "gemini-2.5-flash",
+    "apiKeyEnv": "GEMINI_API_KEY"
+  },
+
+  {
+    "label": "hermes-3-405b",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "model": "nousresearch/hermes-3-llama-3.1-405b",
+    "apiKeyEnv": "OPENROUTER_API_KEY"
+  },
+  {
+    "label": "hermes-4-70b",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "model": "nousresearch/hermes-4-70b",
+    "apiKeyEnv": "OPENROUTER_API_KEY"
+  },
+  {
+    "label": "rocinante-12b",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "model": "thedrummer/rocinante-12b",
+    "apiKeyEnv": "OPENROUTER_API_KEY"
+  },
+  {
+    "label": "unslopnemo-12b",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "model": "thedrummer/unslopnemo-12b",
+    "apiKeyEnv": "OPENROUTER_API_KEY"
+  },
+  {
+    "label": "euryale-70b",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "model": "sao10k/l3.1-euryale-70b",
+    "apiKeyEnv": "OPENROUTER_API_KEY"
+  },
+  {
+    "label": "mistral-nemo-12b",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "model": "mistralai/mistral-nemo",
+    "apiKeyEnv": "OPENROUTER_API_KEY"
+  },
+
+  {
+    "label": "claude-sonnet",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "model": "anthropic/claude-sonnet-4.5",
+    "apiKeyEnv": "OPENROUTER_API_KEY"
+  },
+  {
+    "label": "gpt-4.1",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "model": "openai/gpt-4.1",
+    "apiKeyEnv": "OPENROUTER_API_KEY"
+  },
+  {
+    "label": "qwen-2.5-72b",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "model": "qwen/qwen-2.5-72b-instruct",
+    "apiKeyEnv": "OPENROUTER_API_KEY"
+  }
+]

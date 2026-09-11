@@ -1,0 +1,119 @@
+import fs from "node:fs";
+import path from "node:path";
+import { CHATS_DIR, DATA_DIR, STATE_FILE } from "./config.mjs";
+
+const safe = (jid) => jid.replace(/[^a-zA-Z0-9._@+-]/g, "_");
+
+function fileFor(jid) {
+  return path.join(CHATS_DIR, `${safe(jid)}.json`);
+}
+
+export function defaultChat(jid) {
+  const now = Date.now();
+  return {
+    jid,
+    createdAt: now,
+    lastInteraction: now,
+    lastReplyAt: 0,
+    lastProactiveAt: 0,
+    coldUntil: 0,
+    // proactive / sulking state machine
+    proactive: { state: "idle", sentAt: 0, nudgedAt: 0, drySince: 0, dryCount: 0, lastDry: "", lastSlot: "" },
+    // who this person is (per contact, never shared)
+    profile: {
+      name: "", // WhatsApp display name
+      nick: "", // what the character calls them
+      number: "",
+      since: now,
+      notes: "",
+    },
+    // optional per-contact character override (persona slug)
+    persona: "",
+    history: [],
+    memory: {
+      summary: "",
+      relationship: "",
+      facts: [],
+      jokes: [],
+      plans: [],
+      boundaries: [],
+    },
+    mood: null, // initialised from mood.mjs baseline
+    stats: { inbound: 0, outbound: 0 },
+  };
+}
+
+export function loadChat(jid) {
+  const f = fileFor(jid);
+  if (!fs.existsSync(f)) return defaultChat(jid);
+  try {
+    const parsed = JSON.parse(fs.readFileSync(f, "utf8"));
+    const base = defaultChat(jid);
+    return {
+      ...base,
+      ...parsed,
+      profile: { ...base.profile, ...(parsed.profile || {}) },
+      proactive: { ...base.proactive, ...(parsed.proactive || {}) },
+      memory: { ...base.memory, ...(parsed.memory || {}) },
+    };
+  } catch {
+    return defaultChat(jid);
+  }
+}
+
+export function saveChat(chat) {
+  fs.mkdirSync(CHATS_DIR, { recursive: true });
+  fs.writeFileSync(fileFor(chat.jid), JSON.stringify(chat, null, 2));
+}
+
+export function listChats() {
+  if (!fs.existsSync(CHATS_DIR)) return [];
+  return fs
+    .readdirSync(CHATS_DIR)
+    .filter((f) => f.endsWith(".json"))
+    .map((f) => {
+      try {
+        return JSON.parse(fs.readFileSync(path.join(CHATS_DIR, f), "utf8"));
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+/* ---------- global state (active persona etc.) ---------- */
+
+export function loadState() {
+  try {
+    return JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+export function saveState(state) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+}
+
+/** Accumulate LLM token usage per provider, per day (for `rp status`). */
+export function recordUsage(label, tokensIn, tokensOut) {
+  if (!tokensIn && !tokensOut) return;
+  try {
+    const st = loadState();
+    const day = new Date().toISOString().slice(0, 10);
+    if (st.usageDay !== day) {
+      st.usageDay = day;
+      st.usage = {};
+    }
+    st.usage = st.usage || {};
+    const u = st.usage[label] || { calls: 0, in: 0, out: 0 };
+    u.calls += 1;
+    u.in += tokensIn || 0;
+    u.out += tokensOut || 0;
+    st.usage[label] = u;
+    saveState(st);
+  } catch {
+    /* never break a reply because of stats */
+  }
+}

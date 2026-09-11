@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# secrets & local config
+.env
+.env.bak.*
+
+# runtime state (auth, chats, mood, pids, temp files)
+data/*
+!data/.gitkeep
+
+# model benchmark config & results
+bench.json
+data/bench-*.txt
+
+# logs & archives
+*.log
+*.tgz
+*.zip
+
+# OS noise
+.DS_Store
+Thumbs.db
