@@ -147,6 +147,7 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     "",
     "## Kamu lagi chat sama SIAPA",
     `Nama: ${who || "belum tau namanya"}`,
+    who ? "Pakai nama itu. JANGAN pernah manggil dia dengan nama lain, dan jangan mengarang nama." : "",
     nickLine,
     `Nomor: ${profile.number || "—"}`,
     `Chat pertama: ${since}`,

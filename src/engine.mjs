@@ -37,7 +37,7 @@ function pushFact(list, fact) {
   if (list.length > 40) list.splice(0, list.length - 40);
 }
 
-function applyControl(chat, control) {
+function applyControl(chat, control, incoming = "") {
   if (!control || typeof control !== "object") return;
   if (control.mood && typeof control.mood === "object") {
     const deltas = {};
@@ -71,7 +71,12 @@ function applyControl(chat, control) {
     mem.relationship = control.relationship.trim().slice(0, 200);
   }
   if (typeof control.name === "string" && control.name.trim()) {
-    chat.profile.name = control.name.trim().slice(0, 60);
+    const n = control.name.trim().slice(0, 60);
+    // never let the tracker invent a name: it may only be set when the person
+    // actually wrote it themselves (or when we have no name yet)
+    const saidIt = incoming.toLowerCase().includes(n.toLowerCase());
+    if (saidIt || !chat.profile.name) chat.profile.name = n;
+    else log(`ignored invented name "${n}" (keeping "${chat.profile.name}")`);
   }
   if (typeof control.nick === "string" && control.nick.trim()) {
     chat.profile.nick = control.nick.trim().slice(0, 40);
@@ -207,12 +212,12 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
   if (!text) text = deflection(persona.name, persona.deflection);
 
   // Inline control line from the roleplay model (if it used one).
-  applyControl(chat, control);
+  applyControl(chat, control, incoming);
 
   // Reliable affect tracking: a small JSON call updates mood + memory.
   try {
     const affect = await analyzeAffect(chat, incoming, text, persona);
-    if (affect) applyControl(chat, affect);
+    if (affect) applyControl(chat, affect, incoming);
     else {
       const nudge = heuristicNudge(incoming);
       if (Object.keys(nudge).length) chat.mood = applyDeltas(chat.mood, nudge);
