@@ -159,6 +159,9 @@ export const config = {
   ttsModel: envGet("TTS_MODEL", "gemini-2.5-flash-preview-tts"),
   voiceChance: num(envGet("VOICE_CHANCE", "0.15"), 0.15),
   voiceMaxChars: num(envGet("VOICE_MAX_CHARS", "240"), 240),
+  // combinations: a short text before the voice note, or two voice notes in a row
+  textThenVoiceChance: num(envGet("TEXT_THEN_VOICE_CHANCE", "0.2"), 0.2),
+  voiceSplitChance: num(envGet("VOICE_SPLIT_CHANCE", "0.25"), 0.25),
 
   // Voice notes out (ElevenLabs, preferred when configured)
   voiceMirrorChance: num(envGet("VOICE_MIRROR_CHANCE", "0.7"), 0.7),
@@ -177,6 +180,8 @@ export const config = {
   photoDailyMax: num(envGet("PHOTO_DAILY_MAX", "6"), 6),
   photoGlobalDailyMax: num(envGet("PHOTO_GLOBAL_DAILY_MAX", "30"), 30),
   stickerChance: num(envGet("STICKER_CHANCE", "0.08"), 0.08),
+  // chance the sticker is the whole reply instead of an addition to text/voice
+  stickerOnlyChance: num(envGet("STICKER_ONLY_CHANCE", "0.4"), 0.4),
 
   debug: envGet("DEBUG", "false") === "true",
 };

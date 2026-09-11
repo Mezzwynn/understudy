@@ -42,6 +42,8 @@ export function readEnvFile() {
 export const KNOBS = [
   { key: "VOICE_CHANCE", label: "Balas pakai voice note", kind: "float", def: 0.15, hint: "0 = nggak pernah" },
   { key: "VOICE_MIRROR_CHANCE", label: "Balas VN kalau dikirim VN", kind: "float", def: 0.7 },
+  { key: "TEXT_THEN_VOICE_CHANCE", label: "Teks dulu, lalu voice note", kind: "float", def: 0.2 },
+  { key: "VOICE_SPLIT_CHANCE", label: "Voice note dipecah jadi 2", kind: "float", def: 0.25 },
   { key: "REACTION_CHANCE", label: "Cuma kasih reaction emoji", kind: "float", def: 0.12 },
   { key: "QUOTE_CHANCE", label: "Balas sambil nge-quote pesan", kind: "float", def: 0.2 },
   { key: "SKIP_CHANCE", label: "Dibaca tapi nggak dibales (ping pendek)", kind: "float", def: 0.06 },
@@ -57,6 +59,7 @@ export const KNOBS = [
   { key: "TYPING_PAUSE_CHANCE", label: "Peluang berhenti ngetik sebentar", kind: "float", def: 0.25 },
   { key: "PHOTO_CHANCE", label: "Kirim foto/selfie sendiri", kind: "float", def: 0.03 },
   { key: "STICKER_CHANCE", label: "Kirim stiker", kind: "float", def: 0.08 },
+  { key: "STICKER_ONLY_CHANCE", label: "Stiker jadi balasan tunggal (bukan tambahan)", kind: "float", def: 0.4 },
   { key: "NUDGE_AFTER_MIN", label: "Dia nanya kalau nggak dibales (menit)", kind: "int", def: 8 },
   { key: "DRY_AFTER_MIN", label: "Masuk mode ngambek (menit)", kind: "int", def: 5 },
   { key: "DRY_SILENT_AFTER", label: "Diam total setelah N balasan ngambek", kind: "int", def: 4 },

@@ -425,40 +425,80 @@ async function respond(sock, jid, p) {
     }
   }
 
-  // sticker: occasionally, from the local pack
-  if (!sentMedia && config.stickerChance > 0 && Math.random() < config.stickerChance) {
-    const st = randomSticker();
-    if (st) {
-      try {
-        await sendSticker(sock, jid, st);
-        chat.stats.outbound = (chat.stats.outbound || 0) + 1;
-        sentMedia = true;
-        log(`sticker → ${jid}`);
-      } catch (err) {
-        log(`sticker send failed: ${err.message}`);
-      }
+  // ── sticker: can be the whole reply, or an addition to text/voice ──
+  const stickerRoll = config.stickerChance > 0 && Math.random() < config.stickerChance;
+  const stickerAlone = stickerRoll && !sentMedia && Math.random() < config.stickerOnlyChance;
+  const stickerBuf = stickerRoll ? randomSticker() : null;
+
+  if (stickerAlone && stickerBuf) {
+    await presence(sock, jid, "composing");
+    await sleep(600 + Math.random() * 1500);
+    try {
+      await sendSticker(sock, jid, stickerBuf);
+      chat.stats.outbound = (chat.stats.outbound || 0) + 1;
+      chat.lastReplyAt = Date.now();
+      sentMedia = true;
+      log(`sticker (sendiri) → ${jid}`);
+    } catch (err) {
+      log(`sticker send failed: ${err.message}`);
     }
   }
 
-  // a voice note (written for speech, with ElevenLabs v3 audio tags)
+  // ── voice note(s): the whole reply, split in two, or text-then-voice ──
   if (!sentMedia && wantVoice) {
     const speakable = toSpeakable(replyText);
-    if (speakable.length >= 12 && speakable.length <= config.voiceMaxChars) {
-      const ogg = await synthesize(replyText, persona, { ignoreBudget: asksVoice });
-      if (ogg) {
+    if (speakable.length >= 12) {
+      const sentences = speakable.split(/(?<=[.!?…])\s+/).filter(Boolean);
+      let opening = null;
+      let chunks = [speakable];
+
+      if (sentences.length >= 2 && Math.random() < config.textThenVoiceChance) {
+        opening = sentences[0];
+        chunks = [sentences.slice(1).join(" ")];
+      } else if (sentences.length >= 2 && Math.random() < config.voiceSplitChance) {
+        const mid = Math.ceil(sentences.length / 2);
+        const a = sentences.slice(0, mid).join(" ");
+        const b = sentences.slice(mid).join(" ");
+        if (a.length >= 8 && b.length >= 8) chunks = [a, b];
+      }
+
+      // short text first ("iya aku juga" …) then the voice note
+      if (opening && opening.length <= 120) {
+        await presence(sock, jid, "composing");
+        await sleep(typingDelayFor(opening));
+        try {
+          await sendText(sock, jid, opening);
+          chat.stats.outbound = (chat.stats.outbound || 0) + 1;
+          if (config.debug) log(`→ ${jid} (teks sebelum VN): ${opening}`);
+        } catch (err) {
+          log(`send failed: ${err.message}`);
+        }
+      }
+
+      let sentAnyVoice = false;
+      for (let vi = 0; vi < chunks.length; vi++) {
+        const chunk = chunks[vi];
+        if (chunk.length < 8) continue;
+        const ogg = await synthesize(chunk, persona, { ignoreBudget: asksVoice });
+        if (!ogg) continue;
         await presence(sock, jid, "recording");
-        await sleep(Math.min(9000, 1200 + speakable.length * 55));
+        await sleep(Math.min(12000, 1200 + chunk.length * 55));
         try {
           await sendVoice(sock, jid, ogg);
           chat.stats.outbound = (chat.stats.outbound || 0) + 1;
           chat.stats.voice = (chat.stats.voice || 0) + 1;
           chat.lastReplyAt = Date.now();
-          sentMedia = true;
-          log(`voice note ${(ogg.length / 1024).toFixed(0)}kb → ${jid}`);
+          sentAnyVoice = true;
+          log(
+            `voice note ${(ogg.length / 1024).toFixed(0)}kb → ${jid}` +
+              (chunks.length > 1 ? ` (${vi + 1}/${chunks.length})` : ""),
+          );
         } catch (err) {
           log(`voice send failed: ${err.message}`);
         }
+        if (vi < chunks.length - 1) await sleep(400 + Math.random() * 900);
       }
+      if (opening || sentAnyVoice) sentMedia = true;
     }
   }
 
@@ -498,6 +538,20 @@ async function respond(sock, jid, p) {
       } catch (err) {
         log(`correction send failed: ${err.message}`);
       }
+    }
+  }
+
+  // ── sticker as an addition (text/voice already sent) ──
+  if (stickerBuf && !stickerAlone) {
+    await presence(sock, jid, "composing");
+    await sleep(500 + Math.random() * 1200);
+    try {
+      await sendSticker(sock, jid, stickerBuf);
+      chat.stats.outbound = (chat.stats.outbound || 0) + 1;
+      chat.lastReplyAt = Date.now();
+      log(`sticker (+pesan) → ${jid}`);
+    } catch (err) {
+      log(`sticker send failed: ${err.message}`);
     }
   }
 
