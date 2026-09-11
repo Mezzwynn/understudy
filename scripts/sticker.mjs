@@ -18,22 +18,49 @@ const args = process.argv.slice(2);
 
 // import stickers from the WhatsApp sticker folder (they are usually owned by
 // another app, so copies made by us are the only ones we can read)
+const TRASH_DIR = path.join(ROOT, "assets", "stickers", ".trash");
+
+// always move, never delete: a sticker you cannot read today may be readable
+// again later (different owner/app), and losing them is not recoverable.
 if (args[0] === "--clean" || args[0] === "clean") {
   const dir = path.join(ROOT, "assets", "stickers");
   const files = fs.readdirSync(dir).filter((f) => f.endsWith(".webp"));
   const good = new Set(readableStickers());
-  let removed = 0;
+  fs.mkdirSync(TRASH_DIR, { recursive: true });
+  let moved = 0;
   for (const f of files) {
     if (good.has(f)) continue;
     try {
-      fs.rmSync(path.join(dir, f), { force: true });
-      removed++;
+      fs.renameSync(path.join(dir, f), path.join(TRASH_DIR, f));
+      moved++;
     } catch {
       /* ignore */
     }
   }
-  console.log(`✓ buang ${removed} stiker yang tidak bisa dibaca`);
+  console.log(`✓ pindahkan ${moved} stiker yang tidak bisa dibaca → assets/stickers/.trash/`);
   console.log(`  tersisa: ${readableStickers().length} stiker siap pakai`);
+  console.log("  (balikin kapan saja: rp sticker --restore)");
+  process.exit(0);
+}
+
+if (args[0] === "--restore" || args[0] === "restore") {
+  if (!fs.existsSync(TRASH_DIR)) {
+    console.log("tidak ada .trash — belum pernah ada yang dipindahkan");
+    process.exit(0);
+  }
+  const dir = path.join(ROOT, "assets", "stickers");
+  let back = 0;
+  for (const f of fs.readdirSync(TRASH_DIR)) {
+    if (!f.endsWith(".webp")) continue;
+    try {
+      fs.renameSync(path.join(TRASH_DIR, f), path.join(dir, f));
+      back++;
+    } catch {
+      /* ignore */
+    }
+  }
+  console.log(`✓ dikembalikan ${back} stiker dari .trash`);
+  console.log(`  total yang bisa dipakai: ${readableStickers().length}`);
   process.exit(0);
 }
 
