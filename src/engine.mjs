@@ -221,18 +221,28 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
     // she melts for a while, then pulls back (tsundere). Nothing lasts.
     if (config.softMode) {
       const d = affect?.mood || {};
+      // the tracker can stay negative while she is furious, so also count the
+      // other person actually being warm — that is what melts a real person
+      const sweetSignal =
+        /(sayang|cinta|kangen|love you|love u|miss you|miss u|makasih|thank you|thanks|maaf|sorry|sori|peluk|cium|manis banget)/i.test(
+          incoming,
+        );
       const strong =
-        (Number(d.affection) || 0) >= 0.08 || (Number(d.valence) || 0) >= 0.08 || thawed;
+        sweetSignal ||
+        (Number(d.affection) || 0) >= 0.08 ||
+        (Number(d.valence) || 0) >= 0.08 ||
+        thawed;
       const now = Date.now();
       if (strong && now >= (chat.softUntil || 0) && Math.random() < config.softTriggerChance) {
         const span = Math.max(1, config.softMaxMin - config.softMinMin);
         const mins = config.softMinMin + Math.random() * span;
         chat.softUntil = now + mins * 60000;
+        const deep = chat.mood.valence < -0.5;
         chat.mood = applyDeltas(chat.mood, {
-          affection: 0.15,
-          valence: 0.08,
-          playfulness: 0.1,
-          patience: 0.1,
+          valence: deep ? 0.22 : 0.14,
+          affection: 0.18,
+          playfulness: 0.12,
+          patience: 0.18,
         });
         log(`soft window open (~${Math.round(mins)} min)`);
       }
