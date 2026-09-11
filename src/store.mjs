@@ -72,7 +72,8 @@ export function saveChat(chat) {
 export function listChats() {  if (!fs.existsSync(CHATS_DIR)) return [];
   return fs
     .readdirSync(CHATS_DIR)
-    .filter((f) => f.endsWith(".json"))
+    // skip the semantic-memory sidecar files (<jid>.memory.json)
+    .filter((f) => f.endsWith(".json") && !f.endsWith(".memory.json"))
     .map((f) => {
       try {
         return JSON.parse(fs.readFileSync(path.join(CHATS_DIR, f), "utf8"));
