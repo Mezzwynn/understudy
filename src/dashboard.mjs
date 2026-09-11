@@ -148,6 +148,8 @@ async function summary() {
     state: c.proactive?.state || "idle",
     dryCount: c.proactive?.dryCount || 0,
     commitments: (c.commitments || []).filter((x) => !x.done).map((x) => ({ what: x.what, due: x.due })),
+    softMinutes:
+      c.softUntil && c.softUntil > Date.now() ? Math.round((c.softUntil - Date.now()) / 60000) : 0,
     lastInteraction: c.lastInteraction || 0,
     lastProactiveAt: c.lastProactiveAt || 0,
   }));

@@ -125,6 +125,7 @@ function renderContacts(){
         <h2 style="margin:0">${esc(c.name||c.number)}</h2>
         <span class="badge">${esc(c.number)}</span>
         <span class="badge ${badgeCls}">${c.state}${c.state==="dry"?` (${c.dryCount})`:""}</span>
+        ${c.softMinutes?`<span class="badge" style="border-color:#6b4a7a;color:#e3b6ff">soft ${c.softMinutes}m</span>`:""}
         <span class="grow"></span>
         <span class="muted">${c.inbound}/${c.outbound} · ${ago(c.lastInteraction)}</span>
       </div>

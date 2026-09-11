@@ -22,7 +22,9 @@ export function defaultChat(jid) {
     // promises to follow up later: "nanti aku kabarin kalau udah selesai"
     commitments: [],
     // things she told THEM to do (eat, sleep, workout) — she checks up on those
-    instructions: [],
+  instructions: [],
+  // temporary soft window: she melts for a while, then pulls back
+  softUntil: 0,
     // who this person is (per contact, never shared)
     profile: {
       name: "", // WhatsApp display name

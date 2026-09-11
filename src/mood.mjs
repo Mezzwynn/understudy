@@ -105,7 +105,15 @@ export function applyDeltas(mood, deltas = {}) {
   const m = normalize(mood);
   for (const [k, v] of Object.entries(deltas)) {
     if (!KEYS.includes(k)) continue;
-    m[k] = clamp(k, m[k] + Number(v || 0));
+    let d = Number(v || 0);
+    // diminishing returns near the extremes: strong feelings stay possible,
+    // but repeated pushes cannot pin her at -1 / +1 forever
+    if (k === "valence") {
+      if (m[k] <= -0.5 && d < 0) d *= 0.45;
+      if (m[k] >= 0.6 && d > 0) d *= 0.5;
+    } else if (m[k] <= 0.15 && d < 0) d *= 0.6;
+    else if (m[k] >= 0.85 && d > 0) d *= 0.6;
+    m[k] = clamp(k, m[k] + d);
   }
   return cohere(m);
 }
@@ -114,8 +122,13 @@ export function applyDeltas(mood, deltas = {}) {
  * Keep the dimensions psychologically plausible — a person cannot be furious
  * and delighted at the same time. Called after every mood change.
  */
+/**
+ * Strong feelings are possible, but the resting range is less extreme: this
+ * keeps -1 / +1 from becoming a permanent state.
+ */
 export function cohere(input) {
   const m = normalize(input);
+  m.valence = Math.max(-0.85, Math.min(0.9, m.valence));
   if (m.valence <= -0.5) m.playfulness = Math.min(m.playfulness, 0.35);
   else if (m.valence <= -0.25) m.playfulness = Math.min(m.playfulness, 0.55);
   if (m.patience <= 0.15) {

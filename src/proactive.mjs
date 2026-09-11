@@ -160,6 +160,38 @@ function escalateKind(chat, now) {
   return null;
 }
 
+const SOFT_RETRACT = [
+  "forget what i said.",
+  "whatever. nothing.",
+  "don't get used to it.",
+  "ignore that.",
+  "hm. never mind.",
+];
+
+/** The soft window ended — she pulls back, and sometimes retracts it out loud. */
+async function checkSoft(sock) {
+  if (!config.softMode) return;
+  const now = Date.now();
+  for (const chat of listChats()) {
+    if (!chat.softUntil || chat.softUntil > now) continue;
+    chat.softUntil = 0;
+    chat.mood = applyDeltas(normalize(chat.mood), {
+      affection: -0.18,
+      valence: -0.06,
+      playfulness: -0.1,
+    });
+    saveChat(chat);
+    log("soft window closed — pulling back");
+    if (!inQuietHours() && Math.random() < config.softRetractChance) {
+      const line = SOFT_RETRACT[Math.floor(Math.random() * SOFT_RETRACT.length)];
+      await deliver(sock, chat, line);
+      saveChat(chat);
+      log(`retract → ${chat.jid}: ${line}`);
+    }
+    return;
+  }
+}
+
 /** She told them to eat/sleep/workout — a few minutes later she checks. */
 async function checkInstructions(sock) {
   if (!config.instructionFollowup || inQuietHours()) return;
@@ -352,6 +384,7 @@ export function startProactive() {  if (!config.proactive) {
     if (!sock) return;
     (async () => {
       await updatePresence(sock);
+      await checkSoft(sock);
       await checkInstructions(sock);
       await followUps(sock);
       await escalate(sock);

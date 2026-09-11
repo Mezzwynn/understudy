@@ -122,8 +122,12 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
   // nickname is a privilege: it disappears when she is cold, sulking or hurt
   const pstate = chat.proactive?.state || "idle";
   const sulking = pstate === "dry" || pstate === "silent";
+  const softLeftMin = chat.softUntil ? Math.round((chat.softUntil - Date.now()) / 60000) : 0;
+  const soft = softLeftMin > 0 && !sulking;
   const warm =
-    !sulking && mood.affection >= 0.45 && mood.valence >= -0.05 && mood.patience >= 0.35;
+    !sulking &&
+    (soft ||
+      (mood.affection >= 0.45 && mood.valence >= -0.05 && mood.patience >= 0.35));
   const nickLine = profile.nick
     ? warm
       ? `Kamu manggil dia: ${profile.nick} (boleh dipakai, tapi jangan tiap pesan)`
@@ -135,6 +139,9 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     "",
     `Sekarang: ${fmtTime()}`,
     persona.work_hours ? `Jam kerja kamu: ${persona.work_hours} (di luar itu kamu bebas)` : "",
+    soft
+      ? `Kamu lagi MELUNAK — tapi cuma sementara (kira-kira ${softLeftMin} menit lagi). Boleh lebih lembut/hangat sekarang, tapi jangan lebay dan jangan ngumumin. Kamu tahu ini bakal lewat, dan itu bikin kamu agak risih.`
+      : "",
     config.userWorkHours ? `Jam kerja dia: ${config.userWorkHours}` : "",
     `Pesan terakhir dari dia: ${fmtAgo(chat.lastInteraction)}`,
     "",

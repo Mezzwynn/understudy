@@ -217,6 +217,26 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
       const nudge = heuristicNudge(incoming);
       if (Object.keys(nudge).length) chat.mood = applyDeltas(chat.mood, nudge);
     }
+
+    // she melts for a while, then pulls back (tsundere). Nothing lasts.
+    if (config.softMode) {
+      const d = affect?.mood || {};
+      const strong =
+        (Number(d.affection) || 0) >= 0.08 || (Number(d.valence) || 0) >= 0.08 || thawed;
+      const now = Date.now();
+      if (strong && now >= (chat.softUntil || 0) && Math.random() < config.softTriggerChance) {
+        const span = Math.max(1, config.softMaxMin - config.softMinMin);
+        const mins = config.softMinMin + Math.random() * span;
+        chat.softUntil = now + mins * 60000;
+        chat.mood = applyDeltas(chat.mood, {
+          affection: 0.15,
+          valence: 0.08,
+          playfulness: 0.1,
+          patience: 0.1,
+        });
+        log(`soft window open (~${Math.round(mins)} min)`);
+      }
+    }
   } catch (err) {
     log(`affect tracker failed: ${err.message}`);
     const nudge = heuristicNudge(incoming);

@@ -178,6 +178,12 @@ export const config = {
   instructionFollowup: envGet("INSTRUCTION_FOLLOWUP", "true") === "true",
   instructionMinMin: num(envGet("INSTRUCTION_MIN_MIN", "6"), 6),
   instructionMaxMin: num(envGet("INSTRUCTION_MAX_MIN", "35"), 35),
+  // temporary softness: she melts, then pulls back (tsundere)
+  softMode: envGet("SOFT_MODE", "true") === "true",
+  softMinMin: num(envGet("SOFT_MIN_MIN", "8"), 8),
+  softMaxMin: num(envGet("SOFT_MAX_MIN", "45"), 45),
+  softTriggerChance: num(envGet("SOFT_TRIGGER_CHANCE", "0.55"), 0.55),
+  softRetractChance: num(envGet("SOFT_RETRACT_CHANCE", "0.35"), 0.35),
 
   // ── semantic memory (embeddings) ────────────────────────
   memoryEmbeddings: envGet("MEMORY_EMBEDDINGS", "true") === "true",
