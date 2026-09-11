@@ -21,7 +21,7 @@ understudy: u first.
 ```bash
 git clone <Mezzwynn> understudy
 cd understudy
-./install.sh                 # deps + .env + media tools
+./install.sh                 
 ```
 ```bash
 
