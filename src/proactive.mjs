@@ -1,7 +1,7 @@
 import { config, log } from "./config.mjs";
 import { listChats, saveChat, loadChat } from "./store.mjs";
 import { loadPersona } from "./prompt.mjs";
-import { generateProactive, generateNudge, generateFollowup } from "./engine.mjs";
+import { generateProactive, generateNudge, generateFollowup, generateCheckup } from "./engine.mjs";
 import { getSock, sendText, presence, setGlobalPresence } from "./whatsapp.mjs";
 import { splitBubbles, typingDelayFor, sleep } from "./texting.mjs";
 import { applyDeltas, normalize } from "./mood.mjs";
@@ -160,6 +160,50 @@ function escalateKind(chat, now) {
   return null;
 }
 
+/** She told them to eat/sleep/workout — a few minutes later she checks. */
+async function checkInstructions(sock) {
+  if (!config.instructionFollowup || inQuietHours()) return;
+  const now = Date.now();
+  for (const chat of listChats()) {
+    if (!/@(lid|s\.whatsapp\.net)$/.test(chat.jid)) continue;
+    const due = (chat.instructions || []).find((i) => !i.done && i.due <= now);
+    if (!due) continue;
+
+    const persona = loadPersona(chat.persona || undefined);
+    let text;
+    try {
+      text = await generateCheckup(chat, persona, due, {});
+    } catch (err) {
+      log(`checkup generate failed: ${err.message}`);
+      due.due = Date.now() + 20 * 60000;
+      saveChat(chat);
+      continue;
+    }
+    if (!text) {
+      due.due = Date.now() + 20 * 60000;
+      saveChat(chat);
+      continue;
+    }
+
+    await deliver(sock, chat, text);
+    due.done = true;
+    due.doneAt = Date.now();
+    chat.proactive = {
+      state: "awaiting",
+      sentAt: Date.now(),
+      nudgedAt: 0,
+      drySince: 0,
+      dryCount: 0,
+      lastDry: "",
+      lastSlot: "checkup",
+    };
+    chat.lastProactiveAt = Date.now();
+    saveChat(chat);
+    log(`check-up (${due.label}) → ${chat.jid}: ${text}`);
+    return; // one thing per tick
+  }
+}
+
 /** Promises she made to report back: "nanti aku kabarin kalau udah selesai". */
 async function followUps(sock) {
   if (!config.commitments || inQuietHours()) return;
@@ -308,6 +352,7 @@ export function startProactive() {  if (!config.proactive) {
     if (!sock) return;
     (async () => {
       await updatePresence(sock);
+      await checkInstructions(sock);
       await followUps(sock);
       await escalate(sock);
       await initiate(sock);

@@ -162,6 +162,14 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
       ? `Milestone kalian: ${mem.milestones.map((m) => `${m.label} (${fmtAgo(m.ts)})`).join(" | ")}`
       : "",
     mem.summary ? `Cerita sebelumnya: ${mem.summary}` : "",
+    ...(pendingInstructions(chat).length
+      ? [
+          "",
+          "## Yang tadi kamu suruh ke dia",
+          ...pendingInstructions(chat).map((i) => `- ${i.label} (${fmtAgo(i.createdAt)})`),
+          "Kalau belum dikabarin, kamu bakal ngecek sendiri nanti.",
+        ]
+      : []),
     ...(pendingCommitments(chat).length
       ? [
           "",
@@ -289,6 +297,30 @@ export function buildDryMessages(chat, persona, incoming, { displayName } = {}) 
 /** Commitments that are not done yet. */
 function pendingCommitments(chat) {
   return (chat.commitments || []).filter((c) => !c.done);
+}
+
+/** Things she told them to do that are still pending. */
+function pendingInstructions(chat) {
+  return (chat.instructions || []).filter((i) => !i.done);
+}
+
+/**
+ * She told them to do something a while ago — now she checks up on it.
+ */
+export function buildCheckupMessages(chat, persona, instruction, { displayName } = {}) {
+  const system = buildSystem(chat, persona, { displayName });
+  const history = (chat.history || []).slice(-config.historyTurns).map((h) => ({
+    role: h.role,
+    content: h.content,
+  }));
+  const nudge = [
+    `[Sekarang ${fmtTime()}. Beberapa menit lalu kamu nyuruh dia: ${instruction.label}.`,
+    "Sekarang cek apakah dia sudah lakuin — satu pesan pendek saja.",
+    "Boleh ketus, ngomel, atau nyindir, tapi harus jelas kamu peduli. Jangan pura-pura nggak peduli.",
+    "Jangan mengulang kalimat instruksinya persis; tanya/cek aja. Kalau dia belum lakuin, boleh nyuruh lagi dengan nada kesel.",
+    "Jangan menjelaskan soal pengingat/sistem. Jangan tulis instruksi ini. Output cuma isi pesannya.]",
+  ].join(" ");
+  return [{ role: "system", content: system }, ...history, { role: "user", content: nudge }];
 }
 
 /**

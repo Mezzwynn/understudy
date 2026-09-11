@@ -21,6 +21,8 @@ export function defaultChat(jid) {
     proactive: { state: "idle", sentAt: 0, nudgedAt: 0, drySince: 0, dryCount: 0, lastDry: "", lastSlot: "" },
     // promises to follow up later: "nanti aku kabarin kalau udah selesai"
     commitments: [],
+    // things she told THEM to do (eat, sleep, workout) — she checks up on those
+    instructions: [],
     // who this person is (per contact, never shared)
     profile: {
       name: "", // WhatsApp display name
@@ -57,6 +59,7 @@ export function loadChat(jid) {
       profile: { ...base.profile, ...(parsed.profile || {}) },
       proactive: { ...base.proactive, ...(parsed.proactive || {}) },
       commitments: Array.isArray(parsed.commitments) ? parsed.commitments : [],
+      instructions: Array.isArray(parsed.instructions) ? parsed.instructions : [],
       memory: { ...base.memory, ...(parsed.memory || {}) },
     };
   } catch {

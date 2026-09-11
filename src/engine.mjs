@@ -1,11 +1,33 @@
 import { chat as llmChat } from "./llm.mjs";
 import { embed } from "./embed.mjs";
-import { buildMessages, buildProactiveMessages, buildNudgeMessages, buildDryMessages, buildFollowupMessages } from "./prompt.mjs";
+import { buildMessages, buildProactiveMessages, buildNudgeMessages, buildDryMessages, buildFollowupMessages, buildCheckupMessages } from "./prompt.mjs";
 import { recallMemory, addMemory } from "./store.mjs";
 import { extractControl, clean, looksBroken, deflection, stripAudioTags } from "./guard.mjs";
 import { drift, applyDeltas, heuristicNudge, normalize } from "./mood.mjs";
 import { analyzeAffect } from "./affect.mjs";
 import { config, log } from "./config.mjs";
+
+/** Topics she nags about — health/safety stuff a caring person keeps checking. */
+const TOPIC_RE = {
+  makan: /(makan|sarapan|breakfast|lunch|dinner|eat|ate|food|laper|lapar)/i,
+  "tidur/istirahat": /(tidur|bobo|istirahat|sleep|slept|rest|nap|ngantuk)/i,
+  minum: /(minum|air|water|drink|hydrat|dehidrasi)/i,
+  "olahraga/gerak": /(olahraga|workout|gym|jalan kaki|stretch|gerak badan|exercise)/i,
+  mandi: /(mandi|shower)/i,
+  obat: /(obat|vitamin|medicine|meds|sakit)/i,
+  pulang: /(pulang|udah di rumah|go home|home yet)/i,
+};
+
+// only treat it as an instruction to THEM (not her talking about herself)
+const INSTRUCTION_CUE =
+  /\b(kamu|km|kmu|u|you|lu)\b|jangan lupa|don'?t forget|go (?:eat|sleep|rest|shower|home)|makan dulu|tidur (?:dulu|ya|sana)|minum dulu|istirahat dulu|take a break|go rest/i;
+
+function detectInstruction(text) {
+  const t = String(text || "");
+  if (!INSTRUCTION_CUE.test(t)) return null;
+  for (const [label, re] of Object.entries(TOPIC_RE)) if (re.test(t)) return label;
+  return null;
+}
 
 function pushFact(list, fact) {
   const f = String(fact).trim();
@@ -206,6 +228,32 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
   chat.stats.inbound = (chat.stats.inbound || 0) + 1;
   chat.lastInteraction = Date.now();
 
+  // they acknowledged something she told them to do -> no need to nag
+  for (const ins of chat.instructions || []) {
+    if (!ins.done && TOPIC_RE[ins.label]?.test(incoming)) {
+      ins.done = true;
+      ins.doneAt = Date.now();
+    }
+  }
+
+  // she just told them to do something (eat / sleep / workout) -> check later
+  if (config.instructionFollowup) {
+    const label = detectInstruction(stripAudioTags(text));
+    const alreadyPending = (chat.instructions || []).some((i) => !i.done && i.label === label);
+    if (label && !alreadyPending) {
+      chat.instructions = chat.instructions || [];
+      const span = Math.max(1, config.instructionMaxMin - config.instructionMinMin);
+      chat.instructions.push({
+        label,
+        due: Date.now() + (config.instructionMinMin + Math.random() * span) * 60000,
+        createdAt: Date.now(),
+        done: false,
+      });
+      if (chat.instructions.length > 10) chat.instructions = chat.instructions.slice(-10);
+      log(`instruction recorded: "${label}"`);
+    }
+  }
+
   await maybeSummarize(chat);
 
   return text;
@@ -297,6 +345,24 @@ export async function generateDryReply(session, incoming, persona, { displayName
     log(`dry reply failed: ${err.message}`);
     return null;
   }
+}
+
+/**
+ * She just told them to do something — now she checks whether they did it.
+ */
+export async function generateCheckup(session, persona, instruction, { displayName } = {}) {
+  session.mood = normalize(session.mood);
+  session.mood = drift(session.mood, session.lastInteraction || Date.now());
+  const messages = buildCheckupMessages(session, persona, instruction, { displayName });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const raw = await llmChat(messages, { maxTokens: 1500 });
+    let { text } = extractControl(raw);
+    text = clean(text, persona.name);
+    if (!text || looksBroken(text)) continue;
+    session.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
+    return text;
+  }
+  return null;
 }
 
 /**

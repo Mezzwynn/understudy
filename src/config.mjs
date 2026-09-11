@@ -174,6 +174,10 @@ export const config = {
   commitments: envGet("COMMITMENTS", "true") === "true",
   commitmentMinMin: num(envGet("COMMITMENT_MIN_MIN", "90"), 90),
   commitmentMaxMin: num(envGet("COMMITMENT_MAX_MIN", "480"), 480),
+  // she told them to do something (eat / sleep / workout) -> check later
+  instructionFollowup: envGet("INSTRUCTION_FOLLOWUP", "true") === "true",
+  instructionMinMin: num(envGet("INSTRUCTION_MIN_MIN", "6"), 6),
+  instructionMaxMin: num(envGet("INSTRUCTION_MAX_MIN", "35"), 35),
 
   // ── semantic memory (embeddings) ────────────────────────
   memoryEmbeddings: envGet("MEMORY_EMBEDDINGS", "true") === "true",
