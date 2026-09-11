@@ -261,12 +261,16 @@ export function startDashboard() {
             // losing trust also drops the pet name and any warmth she gave them
             chat.profile.nick = "";
             chat.softUntil = 0;
-            chat.trusted = false;
+            chat.commitments = [];
+            chat.instructions = [];
+          } else if (!chat.profile.nick && config.defaultNick) {
+            // gaining trust back restores the default pet name
+            chat.profile.nick = config.defaultNick;
           }
           chat.mood = newMood(baselineFor(chat));
           saveChat(chat);
           log(`dashboard: trusted=${chat.trusted} for ${body.jid}`);
-          return json(res, 200, { ok: true, trusted: chat.trusted, mood: chat.mood });
+          return json(res, 200, { ok: true, trusted: chat.trusted, mood: chat.mood, nick: chat.profile.nick });
         }
 
         if (url.pathname === "/api/mood") {
