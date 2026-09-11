@@ -32,6 +32,13 @@ case "$cmd" in
   stop)     ./stop.sh ;;
   restart)  ./restart.sh ;;
   status|st) ./status.sh ;;
+  dash|dashboard)
+    PORT="$(grep -E '^DASHBOARD_PORT=' .env 2>/dev/null | cut -d= -f2)"
+    PORT="${PORT:-8787}"
+    URL="http://127.0.0.1:$PORT/"
+    echo "Dashboard: $URL"
+    if command -v termux-open >/dev/null 2>&1; then termux-open "$URL" >/dev/null 2>&1 || true; fi
+    ;;
   log|logs|tail)
     echo "following $US_DIR/rp.log — Ctrl+C to exit"
     tail -n "${1:-30}" -f rp.log ;;

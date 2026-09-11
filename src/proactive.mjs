@@ -1,5 +1,5 @@
 import { config, log } from "./config.mjs";
-import { listChats, saveChat } from "./store.mjs";
+import { listChats, saveChat, loadChat } from "./store.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { generateProactive, generateNudge } from "./engine.mjs";
 import { getSock, sendText, presence, setGlobalPresence } from "./whatsapp.mjs";
@@ -252,8 +252,7 @@ async function initiate(sock) {
   }
 }
 
-export function startProactive() {
-  if (!config.proactive) {
+export function startProactive() {  if (!config.proactive) {
     log("proactive: off");
     return;
   }
@@ -278,6 +277,39 @@ export function startProactive() {
       `; idle >${config.proactiveIdleMin} min, min gap ${config.proactiveGapMin} min; ` +
       `nudge after ${config.nudgeAfterMin} min, dry after ${config.dryAfterMin} min; quiet ${config.quietStart}-${config.quietEnd})`,
   );
+}
+
+/** Force her to text first right now (dashboard button / testing). */
+export async function forceProactiveNow(jid) {
+  const sock = getSock();
+  if (!sock) return { ok: false, reason: "WhatsApp belum tersambung" };
+  const chats = jid ? [loadChat(jid)] : listChats().filter((c) => /@(lid|s\.whatsapp\.net)$/.test(c.jid));
+  for (const chat of chats) {
+    if (!/@(lid|s\.whatsapp\.net)$/.test(chat.jid)) continue;
+    const persona = loadPersona(chat.persona || undefined);
+    let text;
+    try {
+      text = await generateProactive(chat, persona, {});
+    } catch (err) {
+      return { ok: false, reason: err.message };
+    }
+    if (!text) return { ok: false, reason: "model memilih SKIP (nggak ada yang mau dikirim)" };
+    await deliver(sock, chat, text);
+    chat.proactive = {
+      state: "awaiting",
+      sentAt: Date.now(),
+      nudgedAt: 0,
+      drySince: 0,
+      dryCount: 0,
+      lastDry: "",
+      lastSlot: "manual",
+    };
+    chat.lastProactiveAt = Date.now();
+    saveChat(chat);
+    log(`proactive (manual) → ${chat.jid}: ${text}`);
+    return { ok: true, text };
+  }
+  return { ok: false, reason: "tidak ada kontak" };
 }
 
 export { DRY_REPLIES, escalateKind };

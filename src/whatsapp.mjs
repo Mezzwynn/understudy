@@ -16,7 +16,9 @@ import { AUTH_DIR, DATA_DIR, log } from "./config.mjs";
 
 const silent = pino({ level: "silent" });
 let currentSock = null;
+let connected = false;
 export const getSock = () => currentSock;
+export const isConnected = () => connected;
 
 const fullJid = (jid) => {
   if (!jid) return jid;
@@ -137,6 +139,7 @@ export async function startWhatsApp({ onMessage, onReady } = {}) {
 
       if (connection === "open") {
         attempts = 0;
+        connected = true;
         try {
           fs.rmSync(path.join(DATA_DIR, "qr.png"), { force: true });
         } catch {
@@ -147,6 +150,7 @@ export async function startWhatsApp({ onMessage, onReady } = {}) {
       }
 
       if (connection === "close") {
+        connected = false;
         const code = lastDisconnect?.error?.output?.statusCode;
         const loggedOut = code === DisconnectReason.loggedOut;
         if (loggedOut) {

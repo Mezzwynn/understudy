@@ -118,6 +118,35 @@ photos, stickers, sulk timings, and how long a silence is before she texts first
 
 ---
 
+## 5 · Dashboard (`rp dash`)
+
+A tiny local web UI (no dependencies, bound to `127.0.0.1`) so you can manage
+everything from the phone instead of the CLI:
+
+```bash
+rp dash          # prints the URL and opens it
+# or open http://127.0.0.1:8787 manually
+```
+
+| Tab | What you can do |
+|---|---|
+| **Kontak** | see every contact with mood bars and sulk state, edit nickname / per-contact character, **"chat duluan sekarang"**, reset context |
+| **Setting** | edit all behaviour knobs, `active_hours`, `chat_schedule`, switch character, **Auto (model decides)**, **Restart bot** |
+| **Jadwal** | today's resolved chat slots (dynamic minutes) and which one is next |
+| **Kuota** | tokens per provider today, photo/TTS budget, ElevenLabs quota |
+| **Log** | last 60 log lines |
+
+Want it from another device? Set in `.env`:
+
+```ini
+DASHBOARD_HOST=0.0.0.0
+DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=...
+```
+
+> After changing settings, hit **Restart bot** (or `rp restart`) so they take effect.
+
+---
+
 ## Features
 
 **Character**

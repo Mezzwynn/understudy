@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+export const STARTED_AT = Date.now();
 export const DATA_DIR = path.join(ROOT, "data");
 export const AUTH_DIR = path.join(DATA_DIR, "auth");
 export const CHATS_DIR = path.join(DATA_DIR, "chats");
@@ -47,8 +48,8 @@ export function envGet(key, fallback = "") {
 }
 
 export const config = {
-  botName: envGet("BOT_NAME", "Alya"),
-  persona: envGet("PERSONA", "example"),
+  botName: envGet("BOT_NAME", "Character"),
+  persona: envGet("PERSONA", "character"),
   // what the character calls the user by default (per-contact override: rp contacts set)
   defaultNick: envGet("DEFAULT_NICK", ""),
 
@@ -66,7 +67,7 @@ export const config = {
     .filter(Boolean),
 
   // WhatsApp LIDs (new anonymous ids) mapped to real numbers, e.g.
-  // LID_MAP=215341758152901:+6285111046991
+  // LID_MAP=123456789012345:+6281234567890
   lidMap: (() => {
     const out = {};
     for (const pair of envGet("LID_MAP", "").split(",")) {
@@ -135,6 +136,12 @@ export const config = {
 
   // Show as "online" only during her active hours
   presence: envGet("PRESENCE", "true") === "true",
+
+  // Local web dashboard
+  dashboard: envGet("DASHBOARD", "true") === "true",
+  dashboardPort: num(envGet("DASHBOARD_PORT", "8787"), 8787),
+  dashboardHost: envGet("DASHBOARD_HOST", "127.0.0.1"),
+  dashboardToken: envGet("DASHBOARD_TOKEN", ""),
 
   // Voice notes out (Gemini TTS -> Ogg/Opus PTT)
   ttsProvider: envGet("TTS_PROVIDER", "auto"), // auto | elevenlabs | gemini

@@ -3,6 +3,7 @@ import { startWhatsApp } from "./whatsapp.mjs";
 import { onMessage } from "./router.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { startProactive } from "./proactive.mjs";
+import { startDashboard } from "./dashboard.mjs";
 
 ensureDirs();
 
@@ -29,6 +30,7 @@ await startWhatsApp({
 });
 
 if (config.proactive) startProactive();
+startDashboard();
 
 process.on("SIGINT", () => {
   console.log("\nbye.");
