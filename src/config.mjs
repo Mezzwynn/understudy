@@ -140,7 +140,7 @@ export const config = {
 
   // Optional vision/audio via Gemini
   geminiApiKey: envGet("GEMINI_API_KEY", ""),
-  visionModel: envGet("VISION_MODEL", "gemini-2.5-flash"),
+  visionModel: envGet("VISION_MODEL", "gemini-flash-latest"),
 
   // jam kerja user (biar pertanyaan "udah makan?" dll pas waktunya)
   userWorkHours: envGet("USER_WORK_HOURS", "9-17"),

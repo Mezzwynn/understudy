@@ -233,6 +233,26 @@ function detectMilestones(chat, incoming) {
   if (/^\[dia ngirim foto/i.test(incoming)) recordMilestone(chat, "first_photo", "Dia kirim foto pertama kali");
 }
 
+/** Which vibes would fit this reply? Used to choose a sticker that matches. */
+function stickerVibe(text, mood) {
+  const t = String(text || "").toLowerCase();
+  const want = [];
+  if (/(wkwk|haha|hihi|lucu|geli|receh|anjir|njir)/.test(t)) want.push("lucu", "ketawa");
+  if (/(males|capek|cape|bosen|rebahan|ngantuk|insomnia)/.test(t)) want.push("males", "capek", "santai");
+  if (/(kesel|marah|bete|nyebelin|jangan|terserah|dih|ah|yaudah)/.test(t)) want.push("kesel", "sinis", "cuek");
+  if (/(sayang|kangen|miss|manja|love|geli|sayang)/.test(t)) want.push("sayang", "manja", "kangen");
+  if (/(hmm|hah|bingung|gimana|maksudnya|apaansi)/.test(t)) want.push("bingung", "cuek");
+  if (/(takut|kaget|panik|gatau|ga tau)/.test(t)) want.push("panik", "kaget", "bingung");
+  if (/(sedih|nangis|hiks|huhu|galau)/.test(t)) want.push("sedih", "nangis");
+  if (mood) {
+    if (mood.playfulness > 0.65) want.push("lucu", "ketawa");
+    if (mood.valence < -0.2 || mood.patience < 0.3) want.push("kesel", "sinis");
+    if (mood.affection > 0.7) want.push("sayang", "manja");
+    if (mood.energy < 0.35) want.push("capek", "males");
+  }
+  return [...new Set(want)];
+}
+
 const DELETE_COVERS = ["nothing.", "lupa.", "gak jadi.", "eh salah.", "nothing, forget it."];
 
 // health/safety signals always break through sulking
@@ -502,17 +522,23 @@ async function respond(sock, jid, p) {
   const stickerRoll =
     config.stickerChance > 0 && Math.random() < Math.min(0.95, config.stickerChance * mm.sticker);
   const stickerAlone = stickerRoll && !sentMedia && Math.random() < config.stickerOnlyChance;
-  const stickerBuf = stickerRoll ? randomSticker() : null;
+  const stickerPick = stickerRoll
+    ? randomSticker({
+        want: stickerVibe(chatText, chat.mood),
+        avoid: chat.lastSticker ? [chat.lastSticker] : [],
+      })
+    : null;
 
-  if (stickerAlone && stickerBuf) {
+  if (stickerAlone && stickerPick) {
     await presence(sock, jid, "composing");
     await sleep(600 + Math.random() * 1500);
     try {
-      await sendSticker(sock, jid, stickerBuf);
+      await sendSticker(sock, jid, stickerPick.buffer);
       chat.stats.outbound = (chat.stats.outbound || 0) + 1;
       chat.lastReplyAt = Date.now();
+      chat.lastSticker = stickerPick.name;
       sentMedia = true;
-      log(`sticker (sendiri) → ${jid}`);
+      log(`sticker (sendiri) → ${jid}: ${stickerPick.name} [${stickerPick.tags.join(",")}]`);
     } catch (err) {
       log(`sticker send failed: ${err.message}`);
     }
@@ -654,14 +680,15 @@ async function respond(sock, jid, p) {
   }
 
   // ── sticker as an addition (text/voice already sent) ──
-  if (stickerBuf && !stickerAlone) {
+  if (stickerPick && !stickerAlone) {
     await presence(sock, jid, "composing");
     await sleep(500 + Math.random() * 1200);
     try {
-      await sendSticker(sock, jid, stickerBuf);
+      await sendSticker(sock, jid, stickerPick.buffer);
       chat.stats.outbound = (chat.stats.outbound || 0) + 1;
       chat.lastReplyAt = Date.now();
-      log(`sticker (+pesan) → ${jid}`);
+      chat.lastSticker = stickerPick.name;
+      log(`sticker (+pesan) → ${jid}: ${stickerPick.name} [${stickerPick.tags.join(",")}]`);
     } catch (err) {
       log(`sticker send failed: ${err.message}`);
     }

@@ -12,7 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ROOT } from "../src/config.mjs";
-import { generateImage, toSticker, syncStickers, readableStickers } from "../src/image.mjs";
+import { generateImage, toSticker, syncStickers, readableStickers, tagStickers } from "../src/image.mjs";
 
 const args = process.argv.slice(2);
 
@@ -61,6 +61,16 @@ if (args[0] === "--restore" || args[0] === "restore") {
   }
   console.log(`✓ dikembalikan ${back} stiker dari .trash`);
   console.log(`  total yang bisa dipakai: ${readableStickers().length}`);
+  process.exit(0);
+}
+
+if (args[0] === "--tag" || args[0] === "tag") {
+  const force = args.includes("--force");
+  const { done, skipped, total } = await tagStickers({
+    force,
+    onProgress: (f, info, n) => console.log(`  ${String(n).padStart(2)}. ${f} → ${info.tags.join(", ")}`),
+  });
+  console.log(`\n✓ selesai: ${done} stiker baru dikasih tag, ${skipped} sudah ada, total ${total}`);
   process.exit(0);
 }
 

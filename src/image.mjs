@@ -10,6 +10,93 @@ import { config, DATA_DIR, ROOT, envGet, log } from "./config.mjs";
 
 const TMP = path.join(DATA_DIR, "tmp");
 const STICKER_DIR = path.join(ROOT, "assets", "stickers");
+const TAGS_FILE = path.join(STICKER_DIR, "tags.json");
+
+/** filename -> { tags: [...], desc: "..." } */
+export function loadStickerTags() {
+  try {
+    return JSON.parse(fs.readFileSync(TAGS_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+export function saveStickerTags(obj) {
+  fs.writeFileSync(TAGS_FILE, JSON.stringify(obj, null, 1));
+}
+
+const TAG_VOCAB =
+  "kesel, marah, sedih, nangis, malu, panik, sayang, manja, kangen, lucu, ketawa, capek, males, bingung, kaget, bangga, cuek, sinis, minta, nolak, semangat, santai";
+
+/** Ask Gemini what a sticker expresses. */
+export async function describeSticker(buffer) {
+  if (!config.geminiApiKey) return null;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.visionModel}:generateContent?key=${config.geminiApiKey}`;
+  const body = {
+    contents: [
+      {
+        parts: [
+          {
+            text:
+              `This is a WhatsApp sticker. Answer with its emotion/vibe only. ` +
+              `Pick 1-3 tags from this list (lowercase): ${TAG_VOCAB}. ` +
+              `Reply with ONLY JSON: {"tags":["..."],"desc":"max 6 words"}`,
+          },
+          { inline_data: { mime_type: "image/webp", data: buffer.toString("base64") } },
+        ],
+      },
+    ],
+  };
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`${res.status}: ${text.slice(0, 120)}`);
+    const json = JSON.parse(text);
+    const out = (json.candidates?.[0]?.content?.parts || []).map((p) => p.text).filter(Boolean).join(" ");
+    const s = out.indexOf("{");
+    const e = out.lastIndexOf("}");
+    if (s === -1 || e === -1) throw new Error("no json");
+    const parsed = JSON.parse(out.slice(s, e + 1));
+    const tags = (parsed.tags || []).map((t) => String(t).toLowerCase().trim()).filter(Boolean).slice(0, 4);
+    if (!tags.length) throw new Error("no tags");
+    return { tags, desc: String(parsed.desc || "").slice(0, 60) };
+  } catch (err) {
+    log(`sticker tag failed: ${err.message}`);
+    return null;
+  }
+}
+
+/** Tag every sticker that does not have tags yet. */
+export async function tagStickers({ force = false, onProgress } = {}) {
+  const tags = loadStickerTags();
+  const files = fs.readdirSync(STICKER_DIR).filter((f) => f.endsWith(".webp"));
+  let done = 0;
+  let skipped = 0;
+  for (const f of files) {
+    if (!force && tags[f]?.tags?.length) {
+      skipped++;
+      continue;
+    }
+    let buf;
+    try {
+      buf = fs.readFileSync(path.join(STICKER_DIR, f));
+    } catch {
+      continue;
+    }
+    const info = await describeSticker(buf);
+    if (info) {
+      tags[f] = info;
+      saveStickerTags(tags);
+      done++;
+      onProgress?.(f, info, done);
+    }
+  }
+  return { done, skipped, total: files.length };
+}
 
 /** Remember a sticker someone sent us, so she can send it back later. */
 export function saveUserSticker(buffer) {
@@ -45,25 +132,46 @@ export function saveUserSticker(buffer) {
 }
 
 /** Random sticker from assets/stickers. Prefers ones the user sent, sometimes. */
-export function randomSticker() {
+export function randomStickerLegacy() {
+  const files = readableStickers();
+  if (!files.length) return null;
+  const pick = files[Math.floor(Math.random() * files.length)];
   try {
-    const all = fs.readdirSync(STICKER_DIR).filter((f) => f.endsWith(".webp"));
-    if (!all.length) return null;
-    const fromUser = all.filter((f) => f.startsWith("user-"));
-    const preferred =
-      fromUser.length && Math.random() < config.preferUserSticker ? fromUser : all;
-    // some files can be unreadable (owned by another app) — try a few, not just one
-    const pool = [...preferred].sort(() => Math.random() - 0.5);
-    const fallback = [...all].sort(() => Math.random() - 0.5);
-    for (const name of [...pool, ...fallback]) {
-      try {
-        return fs.readFileSync(path.join(STICKER_DIR, name));
-      } catch {
-        /* unreadable — try the next one */
-      }
-    }
-    log("no readable sticker in assets/stickers (fix with: rp stickers sync)");
+    return { buffer: fs.readFileSync(path.join(STICKER_DIR, pick)), name: pick };
+  } catch {
     return null;
+  }
+}
+
+/**
+ * Pick a sticker that fits: tag overlap with `want`, never the one we just sent.
+ * Returns { buffer, name } or null.
+ */
+export function randomSticker({ want = [], avoid = [] } = {}) {
+  const files = readableStickers();
+  if (!files.length) return null;
+  const tags = loadStickerTags();
+  const wanted = new Set(want.filter(Boolean).map((t) => String(t).toLowerCase()));
+
+  const scored = files.map((f) => ({
+    f,
+    score: (tags[f]?.tags || []).filter((t) => wanted.has(String(t).toLowerCase())).length,
+  }));
+  const best = Math.max(0, ...scored.map((s) => s.score));
+  let pool = best > 0 ? scored.filter((s) => s.score === best).map((s) => s.f) : files;
+
+  // soft preference for stickers the user sent her
+  const fromUser = pool.filter((f) => f.startsWith("user-"));
+  if (fromUser.length && Math.random() < config.preferUserSticker) pool = fromUser;
+
+  // don't send the same sticker twice in a row
+  let candidates = pool.filter((f) => !avoid.includes(f));
+  if (!candidates.length) candidates = pool.length > 1 ? pool.filter((f) => f !== avoid[0]) : pool;
+  if (!candidates.length) candidates = files;
+
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  try {
+    return { buffer: fs.readFileSync(path.join(STICKER_DIR, pick)), name: pick, tags: tags[pick]?.tags || [] };
   } catch {
     return null;
   }
