@@ -102,7 +102,7 @@ function factsWithAge(mem) {
   );
 }
 
-export function buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled } = {}) {
+export function buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled, worried } = {}) {
   const mood = chat.mood;
   const mem = chat.memory || {};
   const profile = chat.profile || {};
@@ -194,6 +194,14 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
           "Bales pendek, boleh ketus dikit, biar dia yang berusaha. Baru luluh pelan-pelan.",
         ]
       : []),
+    ...(worried
+      ? [
+          "",
+          "# KONTEKS PENTING",
+          "Dia lagi nggak sehat atau ada masalah serius. Kamu TETAP peduli — gengsi, mood, atau ngambek nggak boleh bikin kamu cuek.",
+          "Bales boleh ketus, tapi kelihatan pedulinya: tanya keadaannya, suruh istirahat/makan/minum, atau ngomel karena dia nggak bilang dari tadi.",
+        ]
+      : []),
     ...(lastAssistantDeleted
       ? [
           "",
@@ -259,8 +267,8 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
   return [loadEngine().trim(), "---", persona.card.trim(), "---", state].join("\n\n");
 }
 
-export function buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled } = {}) {
-  const system = buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled });
+export function buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled, worried } = {}) {
+  const system = buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled, worried });
   const history = (chat.history || []).slice(-config.historyTurns).map((h) => ({
     role: h.role,
     content: h.content,

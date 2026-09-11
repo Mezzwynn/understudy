@@ -235,6 +235,10 @@ function detectMilestones(chat, incoming) {
 
 const DELETE_COVERS = ["nothing.", "lupa.", "gak jadi.", "eh salah.", "nothing, forget it."];
 
+// health/safety signals always break through sulking
+const HEALTH_CUE =
+  /(sakit|pusing|demam|panas dingin|mual|muntah|gak enak badan|nggak enak badan|lemes|lemas|sesak|darah|dirawat|rumah sakit|opname|kecelakaan|kena musibah|jatuh|belum makan|belum tidur|insomnia|ga bisa tidur|gak bisa tidur|overdosis|nyeri)/i;
+
 export function isGenuineApology(text) {
   if (!APOLOGY.test(text)) return false;
   return text.replace(/\s/g, "").length >= 8; // bare "maaf" is not enough
@@ -299,10 +303,12 @@ async function respond(sock, jid, p) {
   // sulking chain: dry (contextual short replies) -> silent (no reply at all)
   const pstate = (chat.proactive ||= { state: "idle", sentAt: 0, nudgedAt: 0, drySince: 0, dryCount: 0, lastDry: "", lastSlot: "" });
   let thawed = false;
+  const worried = HEALTH_CUE.test(incoming);
   if (pstate.state === "dry" || pstate.state === "silent") {
     const apology = isGenuineApology(incoming);
     const soft = SOFTEN.test(incoming);
-    const thawOk = pstate.state === "silent" ? apology : apology || soft;
+    // health issues break through pride: she stays cold-ish but clearly cares
+    const thawOk = pstate.state === "silent" ? apology || worried : apology || soft || worried;
 
     if (!thawOk) {
       if (pstate.state === "silent") {
@@ -340,16 +346,22 @@ async function respond(sock, jid, p) {
     pstate.drySince = 0;
     pstate.dryCount = 0;
     chat.coldUntil = 0;
-    chat.mood = applyDeltas(normalize(chat.mood), { valence: 0.2, patience: 0.18, affection: 0.06, arousal: -0.05 });
+    chat.mood = applyDeltas(normalize(chat.mood), {
+      valence: worried ? 0.02 : 0.2,
+      patience: worried ? 0.05 : 0.18,
+      affection: 0.06,
+      arousal: worried ? 0.12 : -0.05,
+    });
     thawed = true;
-    log(`thawing after apology → ${jid}`);
+    log(worried ? `thawing (health scare) → ${jid}` : `thawing after apology → ${jid}`);
   }
 
   // read receipts are not instant
   scheduleRead(sock, p.keys);
   await subscribePresence(sock, jid);
   // sometimes she just reads it and doesn't reply
-  if (shouldSkip(chat, incoming)) {
+  // never leave a health message on read
+  if (!worried && shouldSkip(chat, incoming)) {
     chat.stats.skips = (chat.stats.skips || 0) + 1;
     chat.lastSkipAt = Date.now();
     saveChat(chat);
@@ -424,6 +436,7 @@ async function respond(sock, jid, p) {
       startedIt,
       thawed,
       injection,
+      worried,
     });
   } catch (err) {
     log(`generate failed: ${err.stack || err.message}`);

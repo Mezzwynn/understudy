@@ -149,7 +149,7 @@ async function maybeSummarize(chat) {
 /**
  * Produce one in-character reply and update the chat state.
  */
-export async function generateReply(chat, incoming, persona, { displayName, voice, startedIt, thawed, injection } = {}) {
+export async function generateReply(chat, incoming, persona, { displayName, voice, startedIt, thawed, injection, worried } = {}) {
   chat.mood = normalize(chat.mood);
   chat.mood = drift(chat.mood, chat.lastInteraction || Date.now());
 
@@ -171,7 +171,7 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
     log(`recall failed: ${err.message}`);
   }
 
-  const messages = buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled });
+  const messages = buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled, worried });
 
   let raw = await llmChat(messages);
   if (config.debug) log(`RAW:\n${raw}`);
