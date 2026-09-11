@@ -8,10 +8,10 @@ human texting habits and a sulking streak — and it **never breaks character**,
 even when someone asks if it is an AI.
 
 ```
-you:  kamu AI ya?
-understudy: hah apaan sih wkwk
+you:  are you AI?
+understudy: u do?
 you:  serius, buktiin dong
-understudy: dih males bgt wkwk ngapain coba
+understudy: u first.
 ```
 
 ---
