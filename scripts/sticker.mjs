@@ -18,6 +18,25 @@ const args = process.argv.slice(2);
 
 // import stickers from the WhatsApp sticker folder (they are usually owned by
 // another app, so copies made by us are the only ones we can read)
+if (args[0] === "--clean" || args[0] === "clean") {
+  const dir = path.join(ROOT, "assets", "stickers");
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".webp"));
+  const good = new Set(readableStickers());
+  let removed = 0;
+  for (const f of files) {
+    if (good.has(f)) continue;
+    try {
+      fs.rmSync(path.join(dir, f), { force: true });
+      removed++;
+    } catch {
+      /* ignore */
+    }
+  }
+  console.log(`✓ buang ${removed} stiker yang tidak bisa dibaca`);
+  console.log(`  tersisa: ${readableStickers().length} stiker siap pakai`);
+  process.exit(0);
+}
+
 if (args[0] === "--sync" || args[0] === "sync") {
   const copied = syncStickers(args.slice(1));
   console.log(`✓ import ${copied} stiker baru ke assets/stickers/`);

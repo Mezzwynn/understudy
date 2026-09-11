@@ -108,7 +108,9 @@ const stickerOk = readableStickers().length;
 if (!stickerTotal) warn("belum ada stiker — taruh .webp di assets/stickers/ atau: rp sticker --sync");
 else if (!stickerOk) bad(`0/${stickerTotal} stiker bisa dibaca — jalankan: rp sticker --sync`);
 else if (stickerOk < stickerTotal)
-  warn(`${stickerOk}/${stickerTotal} stiker bisa dibaca (sisanya milik app lain) — jalankan: rp sticker --sync`);
+  warn(
+    `${stickerOk}/${stickerTotal} stiker bisa dibaca — ${stickerTotal - stickerOk} milik app lain dan tidak terpakai (rp sticker --clean untuk buang)`,
+  );
 else ok(`${stickerOk} stiker siap dipakai`);
 const st = loadState();
 ok(`pemakaian hari ini: foto ${st.photoCount || 0}/${config.photoGlobalDailyMax} · TTS ${st.elChars || 0} karakter`);
