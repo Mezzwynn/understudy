@@ -19,6 +19,8 @@ export function defaultChat(jid) {
     coldUntil: 0,
     // proactive / sulking state machine
     proactive: { state: "idle", sentAt: 0, nudgedAt: 0, drySince: 0, dryCount: 0, lastDry: "", lastSlot: "" },
+    // promises to follow up later: "nanti aku kabarin kalau udah selesai"
+    commitments: [],
     // who this person is (per contact, never shared)
     profile: {
       name: "", // WhatsApp display name
@@ -54,6 +56,7 @@ export function loadChat(jid) {
       ...parsed,
       profile: { ...base.profile, ...(parsed.profile || {}) },
       proactive: { ...base.proactive, ...(parsed.proactive || {}) },
+      commitments: Array.isArray(parsed.commitments) ? parsed.commitments : [],
       memory: { ...base.memory, ...(parsed.memory || {}) },
     };
   } catch {

@@ -129,6 +129,7 @@ function renderContacts(){
         <span class="muted">${c.inbound}/${c.outbound} · ${ago(c.lastInteraction)}</span>
       </div>
       ${bars}
+      ${(c.commitments&&c.commitments.length)?`<div class="muted" style="margin-top:6px">Janji: ${c.commitments.map(x=>`“${esc(x.what)}” (${new Date(x.due).toLocaleString("id-ID",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})})`).join(" · ")}</div>`:""}
       <div class="row" style="margin-top:8px">
         <div style="flex:1;min-width:120px"><label>Panggilan</label><input data-jid="${esc(c.jid)}" class="nick" value="${esc(c.nick)}" placeholder="mis. sayang"></div>
         <div style="flex:1;min-width:120px"><label>Karakter (slug, opsional)</label><input data-jid="${esc(c.jid)}" class="persona" value="${esc(c.persona)}" placeholder="(default)"></div>

@@ -147,6 +147,7 @@ async function summary() {
       : null,
     state: c.proactive?.state || "idle",
     dryCount: c.proactive?.dryCount || 0,
+    commitments: (c.commitments || []).filter((x) => !x.done).map((x) => ({ what: x.what, due: x.due })),
     lastInteraction: c.lastInteraction || 0,
     lastProactiveAt: c.lastProactiveAt || 0,
   }));

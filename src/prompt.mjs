@@ -74,6 +74,13 @@ function fmtAgo(ts) {
   return `${Math.round(h / 24)} days ago`;
 }
 
+function fmtDue(ts) {
+  if (!ts) return "kapan saja";
+  const d = new Date(ts);
+  if (d.getTime() <= Date.now()) return "sudah waktunya";
+  return d.toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
 function listOrNone(title, arr) {
   if (!arr || !arr.length) return `${title}: —`;
   return `${title}:\n` + arr.map((x) => `- ${x}`).join("\n");
@@ -155,6 +162,14 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
       ? `Milestone kalian: ${mem.milestones.map((m) => `${m.label} (${fmtAgo(m.ts)})`).join(" | ")}`
       : "",
     mem.summary ? `Cerita sebelumnya: ${mem.summary}` : "",
+    ...(pendingCommitments(chat).length
+      ? [
+          "",
+          "## Janji kamu yang belum ditepati",
+          ...pendingCommitments(chat).map((c) => `- ${c.what} (${fmtDue(c.due)})`),
+          "Kalau waktunya sudah lewat, kamu bakal mengabarinya sendiri — jangan lupa.",
+        ]
+      : []),
     ...(startedIt
       ? [
           "",
@@ -269,6 +284,32 @@ export function buildDryMessages(chat, persona, incoming, { displayName } = {}) 
     { role: "user", content: incoming },
     { role: "system", content: nudge },
   ];
+}
+
+/** Commitments that are not done yet. */
+function pendingCommitments(chat) {
+  return (chat.commitments || []).filter((c) => !c.done);
+}
+
+/**
+ * The moment arrived for something she promised to report back on.
+ */
+export function buildFollowupMessages(chat, persona, commitment, { displayName } = {}) {
+  const system = buildSystem(chat, persona, { displayName });
+  const history = (chat.history || []).slice(-config.historyTurns).map((h) => ({
+    role: h.role,
+    content: h.content,
+  }));
+  const nudge = [
+    `[Sekarang ${fmtTime()}. Kamu janji mau kabarin dia soal ini: "${commitment.what}".`,
+    commitment.for === "them"
+      ? "Dia yang minta dikabarin, dan sekarang waktunya."
+      : "Kamu sendiri yang bilang mau kabarin, dan sekarang waktunya.",
+    "Kirim SATU pesan singkat sekarang — nada, panjang, dan bahasa sesuai karakter kamu.",
+    "Kalau hasilnya belum ada, bilang apa adanya dengan gaya kamu (jangan bohong, jangan lebay).",
+    "Jangan menjelaskan soal janji/jadwal/sistem. Jangan tulis instruksi ini. Output cuma isi pesannya.]",
+  ].join(" ");
+  return [{ role: "system", content: system }, ...history, { role: "user", content: nudge }];
 }
 
 /**

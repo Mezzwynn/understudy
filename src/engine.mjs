@@ -1,6 +1,6 @@
 import { chat as llmChat } from "./llm.mjs";
 import { embed } from "./embed.mjs";
-import { buildMessages, buildProactiveMessages, buildNudgeMessages, buildDryMessages } from "./prompt.mjs";
+import { buildMessages, buildProactiveMessages, buildNudgeMessages, buildDryMessages, buildFollowupMessages } from "./prompt.mjs";
 import { recallMemory, addMemory } from "./store.mjs";
 import { extractControl, clean, looksBroken, deflection, stripAudioTags } from "./guard.mjs";
 import { drift, applyDeltas, heuristicNudge, normalize } from "./mood.mjs";
@@ -53,6 +53,26 @@ function applyControl(chat, control) {
   }
   if (typeof control.nick === "string" && control.nick.trim()) {
     chat.profile.nick = control.nick.trim().slice(0, 40);
+  }
+
+  // a promise to follow up later ("nanti aku kabarin kalau udah selesai")
+  if (config.commitments && control.followup && typeof control.followup === "object") {
+    const what = String(control.followup.what || "").trim().slice(0, 160);
+    if (what) {
+      const parsed = control.followup.due ? Date.parse(control.followup.due) : NaN;
+      const span = Math.max(1, config.commitmentMaxMin - config.commitmentMinMin);
+      const due = Number.isFinite(parsed)
+        ? parsed
+        : Date.now() + (config.commitmentMinMin + Math.random() * span) * 60000;
+      chat.commitments = chat.commitments || [];
+      const dup = chat.commitments.some((c) => !c.done && c.what.toLowerCase() === what.toLowerCase());
+      if (!dup) {
+        const entry = { what, due, for: control.followup.for === "them" ? "them" : "me", createdAt: Date.now(), done: false };
+        chat.commitments.push(entry);
+        if (chat.commitments.length > 10) chat.commitments = chat.commitments.slice(-10);
+        log(`commitment recorded: "${what}" (jatuh tempo ${new Date(due).toISOString()})`);
+      }
+    }
   }
   if (typeof control.summary === "string" && control.summary.trim()) {
     mem.summary = control.summary.trim().slice(0, 1200);
@@ -277,6 +297,24 @@ export async function generateDryReply(session, incoming, persona, { displayName
     log(`dry reply failed: ${err.message}`);
     return null;
   }
+}
+
+/**
+ * The time came for something she promised to report back on.
+ */
+export async function generateFollowup(session, persona, commitment, { displayName } = {}) {
+  session.mood = normalize(session.mood);
+  session.mood = drift(session.mood, session.lastInteraction || Date.now());
+  const messages = buildFollowupMessages(session, persona, commitment, { displayName });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const raw = await llmChat(messages, { maxTokens: 1500 });
+    let { text } = extractControl(raw);
+    text = clean(text, persona.name);
+    if (!text || looksBroken(text)) continue;
+    session.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
+    return text;
+  }
+  return null;
 }
 
 /**

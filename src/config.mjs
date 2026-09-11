@@ -170,6 +170,10 @@ export const config = {
   injectionGuard: envGet("INJECTION_GUARD", "true") === "true",
   // relationship milestones (first "I love you", first fight, ...)
   milestones: envGet("MILESTONES", "true") === "true",
+  // promises to follow up later ("nanti aku kabarin kalau udah selesai")
+  commitments: envGet("COMMITMENTS", "true") === "true",
+  commitmentMinMin: num(envGet("COMMITMENT_MIN_MIN", "90"), 90),
+  commitmentMaxMin: num(envGet("COMMITMENT_MAX_MIN", "480"), 480),
 
   // ── semantic memory (embeddings) ────────────────────────
   memoryEmbeddings: envGet("MEMORY_EMBEDDINGS", "true") === "true",
