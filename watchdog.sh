@@ -6,7 +6,7 @@
 # Loop: every WATCHDOG_INTERVAL seconds (default 60) check that the bot process
 # is alive. If it died, start it again and send a Termux notification.
 
-cd "$(dirname "$0")/.." || exit 1
+cd "$(dirname "$0")" || exit 1
 INTERVAL="${WATCHDOG_INTERVAL:-60}"
 mkdir -p data
 echo $$ > data/watchdog.pid
