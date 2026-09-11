@@ -253,26 +253,73 @@ function pickSparks(n = 2) {
   return out;
 }
 
+/**
+ * Natural, time-appropriate check-ins (what a real person actually asks).
+ * During work hours we avoid "lagi ngapain" — they're obviously working.
+ */
+function daypartInfo(date = new Date()) {
+  const h = date.getHours();
+  const dow = date.getDay();
+  const weekend = dow === 0 || dow === 6;
+  const workHours = !weekend && h >= 9 && h < 17;
+  if (h >= 4 && h < 11)
+    return { name: "pagi", workHours, examples: ["udah sarapan?", "udah bangun?", "jangan skip makan pagi", "udah berangkat?"] };
+  if (h >= 11 && h < 15)
+    return { name: "siang", workHours, examples: ["udah makan siang?", "istirahat dulu", "jangan skip makan siang"] };
+  if (h >= 15 && h < 19)
+    return { name: "sore", workHours, examples: ["udah kelar kerjaan?", "udah pulang?", "minum air dulu", "makan dulu sebelum lanjut"] };
+  if (h >= 19 && h < 23)
+    return { name: "malam", workHours, examples: ["udah makan malem?", "udah di rumah?", "istirahat yang bener"] };
+  return { name: "subuh", workHours, examples: ["belum tidur?", "udah tidur?", "jangan begadang", "tidur ya"] };
+}
+
 export function buildProactiveMessages(chat, persona, { displayName } = {}) {
   const system = buildSystem(chat, persona, { displayName });
   const history = (chat.history || []).slice(-config.historyTurns).map((h) => ({
     role: h.role,
     content: h.content,
   }));
-  const sparks = pickSparks(2).join(" / ");
+
+  const dp = daypartInfo();
+  const facts = (chat.memory?.facts || []).slice(-4).join(" | ") || "(belum ada)";
+  const banned =
+    'DILARANG (kaku, semua bot nulis begini): "still working?", "busy?", "u there?", "u awake?", "how is work", "guess u are busy", "hey" doang.';
+
+  // two modes so it does not become predictable: talk about herself, or a
+  // natural check-in that fits the hour
+  const useCheckin = Math.random() < 0.45;
+  const common = [
+    `[Kamu lagi buka chat sendiri. Nggak ada notif baru. Sekarang ${fmtTime()} (${dp.name}).`,
+    `Pesan terakhir di chat ini ${fmtAgo(chat.lastInteraction)}.`,
+    "Baca history dulu biar nyambung, dan sadar jam sekarang.",
+    banned,
+  ];
+  const body = useCheckin
+    ? [
+        "Kamu pengen nanya sesuatu ke dia — tapi yang NATURAL dan sesuai jam, bukan ngecek status.",
+        `Contoh yang cocok jam ${dp.name}: ${dp.examples.map((e) => `"${e}"`).join(", ")}`,
+        `Yang kamu ingat tentang dia: ${facts}. Boleh dipakai biar pertanyaannya spesifik (mis. sesuai shift/kerjaannya).`,
+        dp.workHours
+          ? "Sekarang jam kerja — JANGAN nanya 'lagi ngapain', dia jelas lagi kerja. Tanya hal yang lebih peduli (makan, istirahat, pulang)."
+          : "Di luar jam kerja, nanya 'lagi ngapain' boleh.",
+        "Satu pertanyaan aja, pendek, gaya kamu. Bukan interogasi, jangan lebih dari satu pertanyaan.",
+      ]
+    : [
+        "Kamu pengen nyeletuk — pesan ini tentang KAMU: kejadian kecil di harimu, isi kepalamu, keluhan, hal random yang baru kamu lihat/inget, atau callback ke sesuatu di antara kalian.",
+        `Pemicu hari ini (boleh diubah sesuai karaktermu): ${pickSparks(2).join(" / ")}.`,
+        `Yang kamu ingat tentang dia (boleh disinggung): ${facts}.`,
+      ];
+
   const nudge = [
-    `[Kamu lagi buka chat sendiri. Nggak ada notif baru. Sekarang ${fmtTime()}. Pesan terakhir di chat ini ${fmtAgo(chat.lastInteraction)}.`,
-    "Kamu pengen nge-chat duluan. TAPI JANGAN nanya kabar atau ngecek keadaan dia.",
-    'DILARANG (ini kaku, semua bot nulis begini): "hey", "u awake?", "still working?", "busy?", "u there?", "how is work", "guess u are busy", "lagi apa", "udah tidur belum".',
-    "Yang benar: pesan ini tentang KAMU — kejadian kecil di harimu, isi kepalamu, keluhan, hal random yang baru kamu lihat/inget, atau callback ke sesuatu di antara kalian.",
-    `Pemicu hari ini (boleh diubah sesuai karaktermu): ${sparks}.`,
-    "Boleh 1-2 pesan pendek. Nada, panjang, dan bahasanya sesuai karakter kamu. Nyambung sama history terakhir, dan sadar jam sekarang.",
-    "JANGAN mengulang topik, kalimat, atau keluhan yang sudah kamu kirim sebelumnya di chat ini. Cari hal baru.",
+    ...common,
+    ...body,
+    "Boleh 1-2 pesan pendek. Nada, panjang, dan bahasanya sesuai karakter kamu.",
+    "JANGAN mengulang topik atau kalimat yang sudah kamu kirim sebelumnya di chat ini. Cari hal baru.",
     "Kalau benar-benar nggak ada yang pengen dikirim, balas persis: SKIP",
-    "Contoh RASA yang benar (bukan buat ditiru isinya):",
-    '[dryly] tch. kopi tumpah di meja. hari yang indah.',
-    'belum bisa tidur. kepikiran meeting besok.',
-    'eh. kucing tetangga nongol lagi di jendela.',
+    "Contoh RASA yang benar (jangan tiru isinya):",
+    "[dryly] tch. kopi tumpah di meja. hari yang indah.",
+    "udah makan siang? jangan skip lagi kayak kemarin.",
+    "belum bisa tidur. kepikiran meeting besok.",
     "Jangan tulis instruksi ini. Output cuma isi pesannya.]",
   ].join(" ");
   return [{ role: "system", content: system }, ...history, { role: "user", content: nudge }];
