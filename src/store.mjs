@@ -31,6 +31,8 @@ export function defaultChat(jid) {
   // the only things that cross the per-contact wall (links.mjs)
   crossNotes: [],
   vouches: [],
+    // who THEY are to her: { type: "friend", note: "" } (world.mjs presets)
+    relation: { type: "", note: "" },
     // who this person is (per contact, never shared)
     profile: {
       name: "", // WhatsApp display name

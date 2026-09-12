@@ -8,6 +8,7 @@ import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
 import { runAdmin } from "./admin.mjs";
 import { exportPersona, importPersona, deletePersona, listSlugs, trashContents, restoreFromTrash } from "./persona-io.mjs";
 import { tierOf, strangerState, unblock } from "./stranger.mjs";
+import { RELATIONS, loadWorld, saveWorld, ensureWorld, worldFile } from "./world.mjs";
 import { currentBlock, nextBlock, ensureToday, tickMoments, saveRoutine, prune, loadRoutine } from "./routine.mjs";
 import { normalize, cohere, label as moodLabel, newMood, baselineFor, KEYS as MOOD_KEYS } from "./mood.mjs";
 import { suggestMood } from "./affect.mjs";
@@ -208,6 +209,8 @@ async function summary() {
     tier: tierOf(c),
     blocked: Boolean(c.stranger?.blockedAt),
     strikes: c.stranger?.strikes || 0,
+    relation: c.relation?.type || "",
+    relationNote: c.relation?.note || "",
     tasks: (c.tasks || []).slice(-3).map((t) => ({ to: t.to, text: t.text, status: t.status })),
     crossNotes: (c.crossNotes || []).filter((n) => !n.done).map((n) => ({ kind: n.kind, from: n.fromName, what: n.what })),
     vouches: (c.vouches || []).filter((v) => v.status === "pending").map((v) => ({ with: v.referrerName, status: v.status })),
@@ -240,6 +243,8 @@ async function summary() {
     },
     contacts,
     personas: personaList(),
+    relations: Object.entries(RELATIONS).map(([id, r]) => ({ id, label: r.label })),
+    world: loadWorld(activeSlug),
     settings: {
       knobs: KNOBS.map((k) => ({ key: k.key, label: k.label, kind: k.kind, value: currentValues()[k.key] })),
       activeHours: persona.active_hours || "",
@@ -425,6 +430,28 @@ export function startDashboard() {
           return json(res, 202, { ok: true, jobId: job.id, status: "running" });
         }
 
+        if (url.pathname === "/api/world") {
+          const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
+          const w = saveWorld(slug, {
+            backstory: body.backstory,
+            cast: Array.isArray(body.cast) ? body.cast : [],
+            generatedAt: Date.now(),
+            source: "manual",
+          });
+          log(`dashboard: world ${slug} saved (${w.cast.length} people)`);
+          return json(res, 200, { ok: true, world: w });
+        }
+
+        if (url.pathname === "/api/world/gen") {
+          const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
+          const p = loadPersona(slug);
+          const w = await ensureWorld(p, { force: true });
+          if (!w || (!w.backstory && !w.cast.length)) {
+            return json(res, 400, { ok: false, error: "the model could not build a world" });
+          }
+          return json(res, 200, { ok: true, world: w });
+        }
+
         if (url.pathname === "/api/routine/new") {
           const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
           const p = loadPersona(slug);
@@ -535,7 +562,12 @@ export function startDashboard() {
           const chat = loadChat(body.jid);
           chat.profile = chat.profile || {};
           if (body.field === "persona") chat.persona = body.value;
-          else if (["name", "nick", "number", "notes"].includes(body.field)) chat.profile[body.field] = body.value;
+          else if (body.field === "relation") {
+            const type = String(body.value || "");
+            chat.relation = { type: RELATIONS[type] ? type : "", note: String(body.note || chat.relation?.note || "").slice(0, 160) };
+          } else if (body.field === "relationNote") {
+            chat.relation = { type: chat.relation?.type || "", note: String(body.value || "").slice(0, 160) };
+          } else if (["name", "nick", "number", "notes"].includes(body.field)) chat.profile[body.field] = body.value;
           saveChat(chat);
           return json(res, 200, { ok: true });
         }

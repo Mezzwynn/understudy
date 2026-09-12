@@ -25,6 +25,7 @@ import { PERSONA_DIR, config, log } from "./config.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
 import { KNOBS, applyValues, currentValues } from "../scripts/_settings.mjs";
 import { ensureToday, tickMoments, saveRoutine, prune, loadRoutine, KINDS } from "./routine.mjs";
+import { RELATIONS, loadWorld, saveWorld } from "./world.mjs";
 
 const KNOB_KEYS = new Set(KNOBS.map((k) => k.key));
 
@@ -55,6 +56,8 @@ export const ACTION_TYPES = [
   "new_routine",
   "inject_routine",
   "set_contact",
+  "set_relation",
+  "set_world",
   "switch_persona",
 ];
 
@@ -80,6 +83,15 @@ Actions you may use (nothing else exists):
 - {"type":"inject_routine","slug":"fiona","theme":"...","blocks":[{"start":"09:00","end":"11:00","what":"...","place":"..."}],"moments":[{"at":"10:30","kind":"annoyed","what":"...","intensity":0.6,"share":true}]}
    kind ∈ ${KINDS.join("|")}. Use this when the owner wants to define her day themselves.
 - {"type":"set_contact","jid":"...","field":"nick","value":"..."} — field: nick or persona
+- {"type":"set_relation","jid":"...","relation":"friend","note":"optional"} — who this person is to her.
+   (the field is "relation", NOT "type" — "type" is the action name)
+   types: partner, spouse, ex, friend, bestfriend, sibling, parent, child, relative, coworker, boss,
+   subordinate, client, mentor, student, neighbor, rival, stranger. This changes her tone (polite,
+   loose, respectful, careful) for that contact.
+- {"type":"set_world","slug":"fiona","backstory":"...","cast":[{"name":"...","relation":"...","vibe":"...","notes":"..."}],"removeCast":["name"]}
+   her history and the people around her. "cast" entries are MERGED by name (existing people are
+   updated, new ones added) — it never wipes the rest. Omit "cast" to keep them all. Use "removeCast"
+   to delete someone. Omit "backstory" to keep the current one.
 - {"type":"switch_persona","slug":"fiona"} — make another character the active one
 
 Requests you must refuse (state the reason plainly in "say", send no action):
@@ -343,6 +355,60 @@ function validate(action, { personas = [] } = {}) {
         saveChat(chat);
         return { jid, field, value };
       },
+    };
+  }
+
+  if (t === "set_relation") {
+    const jid = String(action.jid || "");
+    if (!/@/.test(jid)) return { refuse: "invalid contact jid" };
+    const type = String(action.relation ?? action.relationType ?? "");
+    if (type && !RELATIONS[type]) return { refuse: `unknown relation "${type}"` };
+    const note = String(action.note || "").slice(0, 160);
+    return {
+      describe: `contact ${jid}: relation → ${type || "(cleared)"}${note ? ` (${note})` : ""}`,
+      reload: true,
+      apply: async () => {
+        const { loadChat, saveChat } = await import("./store.mjs");
+        const c = loadChat(jid);
+        c.relation = { type, note };
+        saveChat(c);
+        return { jid, type, note };
+      },
+    };
+  }
+
+  if (t === "set_world") {
+    const slug = String(action.slug || config.persona).replace(/[^\w.-]/g, "");
+    const card = readCard(slug);
+    if (!card) return { refuse: `character "${slug}" does not exist` };
+    const current = loadWorld(slug);
+    const backstory = action.backstory !== undefined ? String(action.backstory) : current.backstory;
+    const cleanEntry = (c) => ({
+      name: String(c?.name || "").trim(),
+      relation: String(c?.relation || "").trim(),
+      vibe: String(c?.vibe || "").trim(),
+      notes: String(c?.notes || "").trim(),
+      canon: c?.canon === true,
+    });
+    // merge by name: never wipe the people already there just because the model
+    // only mentioned one new person
+    let cast = [...(current.cast || [])];
+    if (Array.isArray(action.cast)) {
+      for (const raw of action.cast.map(cleanEntry).filter((c) => c.name)) {
+        const i = cast.findIndex((c) => c.name.toLowerCase() === raw.name.toLowerCase());
+        if (i >= 0) cast[i] = { ...cast[i], ...raw };
+        else cast.push(raw);
+      }
+    }
+    if (Array.isArray(action.removeCast)) {
+      const drop = action.removeCast.map((n) => String(n || "").trim().toLowerCase()).filter(Boolean);
+      cast = cast.filter((c) => !drop.includes(c.name.toLowerCase()));
+    }
+    if (!backstory && !cast.length) return { refuse: "nothing to save" };
+    return {
+      describe: `world ${slug}: backstory ${String(backstory).length} chars, cast ${cast.length}`,
+      reload: true,
+      apply: () => ({ slug, ...saveWorld(slug, { backstory, cast, source: "agent" }) }),
     };
   }
 

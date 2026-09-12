@@ -297,6 +297,7 @@ function contactCard(c){
           <h2 class="cname" style="margin:0">${esc(c.name||c.number)}</h2>
           <span class="badge ${badge}">${c.state}${c.state==="dry"?` (${c.dryCount})`:""}</span>
           ${c.softMinutes?`<span class="badge soft">soft ${c.softMinutes}m</span>`:""}
+          ${c.relation?`<span class="badge">${esc((DATA.relations||[]).find(r=>r.id===c.relation)?.label||c.relation)}</span>`:""}
         </div>
         <div class="tiny" style="margin-top:2px">${esc(c.number)}${c.nick?` · called “${esc(c.nick)}”`:""}</div>
       </div>
@@ -322,6 +323,12 @@ function contactCard(c){
           <input class="f-nick" data-jid="${esc(c.jid)}" value="${esc(c.nick)}" placeholder="mis. sayang"></div>
         <div><label>Character (slug, optional)</label>
           <input class="f-persona" data-jid="${esc(c.jid)}" value="${esc(c.persona)}" placeholder="(default)"></div>
+        <div><label>Who they are to her</label>
+          <select class="f-relation" data-jid="${esc(c.jid)}">
+            ${(DATA.relations||[]).map(r=>`<option value="${esc(r.id)}" ${r.id===(c.relation||"")?"selected":""}>${esc(r.label)}</option>`).join("")}
+          </select></div>
+        <div><label>Relationship note (optional)</label>
+          <input class="f-relation-note" data-jid="${esc(c.jid)}" value="${esc(c.relationNote||"")}" placeholder="e.g. we met at work"></div>
       </div>
       <div class="btns">
         <button class="act primary" data-act="save" data-jid="${esc(c.jid)}" >Save</button>
@@ -404,6 +411,7 @@ async function renderCharacter(force){
       </div>
     </div>
 
+    ${worldPanel(DATA.world)}
     ${routinePanel(DATA.routine)}
   `;
   $("#char-picker").onchange = (e)=>{
@@ -436,6 +444,37 @@ async function renderCharacter(force){
     CHAR_SLUG = r.switchedTo || (DATA.personas[0]&&DATA.personas[0].slug) || null;
     DATA.personaCard = null; await refresh(true);
   };
+  $("#btn-world-save").onclick = async ()=>{
+    const w = collectWorld();
+    await api("/api/world",{ slug: CHAR_SLUG, backstory: w.backstory, cast: w.cast });
+    toast("World saved");
+    await refresh(true);
+  };
+  $("#btn-world-gen").onclick = async ()=>{
+    if(!confirm("Generate a new backstory and cast? The current one is replaced.")) return;
+    toast("Building her world…");
+    const r = await api("/api/world/gen",{ slug: CHAR_SLUG });
+    toast(r.ok ? "World generated" : ("Failed: "+(r.error||"")));
+    DATA.personaCard = null;
+    await refresh(true);
+  };
+  $("#btn-world-add").onclick = ()=>{
+    const box = $("#world-cast");
+    if($(".empty", box)) box.innerHTML = "";
+    const i = $$("#world-cast .world-row").length;
+    box.insertAdjacentHTML("beforeend", `<div class="world-row" data-i="${i}" style="border:1px solid var(--line);border-radius:10px;padding:9px;margin-bottom:8px">
+      <div class="row"><span class="tiny">#${i+1}</span><span class="grow"></span>
+        <button class="act" data-world-remove="${i}" style="padding:3px 9px">Remove</button></div>
+      <div class="grid" style="margin-top:6px">
+        ${CAST_FIELDS.map(([k,label,ph])=>`<div><label>${esc(label)}</label>
+          <input class="world-field" data-k="${k}" value="" placeholder="${esc(ph)}"></div>`).join("")}
+      </div></div>`);
+  };
+  $("#world-cast").onclick = (e)=>{
+    const b = e.target.closest("[data-world-remove]");
+    if(!b) return;
+    b.closest(".world-row")?.remove();
+  };
   const rb = $("#btn-routine-new");
   if(rb) rb.onclick = async ()=>{
     if(charDirty && !confirm("You have unsaved card changes. Generate a new routine anyway? (unsaved edits may be lost)")) return;
@@ -444,6 +483,46 @@ async function renderCharacter(force){
     toast(r.ok ? ("New routine: "+r.routine.theme) : ("Failed: "+(r.error||"")));
     await refresh(true);
   };
+}
+
+const CAST_FIELDS = [["name","Name","e.g. Sari"],["relation","Who they are","older sister"],["vibe","What they are like","loud, nosy, kind"],["notes","Detail that keeps them consistent","calls her Fio to annoy her"]];
+function worldPanel(w){
+  const cast = (w && w.cast) || [];
+  const rows = cast.map((c,i)=>`
+    <div class="world-row" data-i="${i}" style="border:1px solid var(--line);border-radius:10px;padding:9px;margin-bottom:8px">
+      <div class="row"><span class="tiny">#${i+1}</span><span class="grow"></span>
+        <button class="act" data-world-remove="${i}" style="padding:3px 9px">Remove</button></div>
+      <div class="grid" style="margin-top:6px">
+        ${CAST_FIELDS.map(([k,label,ph])=>`<div><label>${esc(label)}</label>
+          <input class="world-field" data-k="${k}" value="${esc(c[k]||"")}" placeholder="${esc(ph)}"></div>`).join("")}
+      </div>
+    </div>`).join("");
+  return `<div class="card">
+    <div class="row"><h2 style="margin:0">Backstory &amp; the people around her</h2><span class="grow"></span>
+      <button class="act" id="btn-world-gen">Generate</button>
+    </div>
+    <div class="hint" style="margin-top:6px">Her history and the people she actually deals with (family, companion, coworkers). Canon characters get theirs from the source material; original characters get one invented from the card. Shared in the export file.</div>
+    <div style="margin-top:11px">
+      <label>Backstory</label>
+      <textarea id="world-backstory" rows="7">${esc((w&&w.backstory)||"")}</textarea>
+    </div>
+    <div class="row" style="margin-top:12px"><b style="font-size:12px">Cast (${cast.length})</b><span class="grow"></span>
+      <button class="act" id="btn-world-add">Add person</button></div>
+    <div id="world-cast" style="margin-top:8px">${rows || '<div class="empty">Nobody yet. Generate or add someone.</div>'}</div>
+    <div class="btns">
+      <button class="act primary" id="btn-world-save">Save world</button>
+      <span class="muted" id="world-hint"></span>
+    </div>
+  </div>`;
+}
+
+function collectWorld(){
+  const cast = $$("#world-cast .world-row").map(row=>{
+    const o = {};
+    $$(".world-field", row).forEach(i=>{ o[i.dataset.k] = i.value.trim(); });
+    return o;
+  }).filter(c=>c.name);
+  return { backstory: $("#world-backstory").value.trim(), cast };
 }
 
 function routinePanel(r){
@@ -858,6 +937,8 @@ document.addEventListener("click", async (e)=>{
     const card = b.closest(".card");
     await api("/api/contact",{ jid, field:"nick", value: $(".f-nick",card).value });
     await api("/api/contact",{ jid, field:"persona", value: $(".f-persona",card).value });
+    await api("/api/contact",{ jid, field:"relation", value: $(".f-relation",card).value, note: $(".f-relation-note",card).value });
+    await api("/api/contact",{ jid, field:"relationNote", value: $(".f-relation-note",card).value });
     toast("Saved"); refresh();
   }
   if(act==="proactive"){

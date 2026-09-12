@@ -6,6 +6,7 @@ import { routinePromptBlock, routineSparks, routineForChat } from "./routine.mjs
 import { languageDirective } from "./lang.mjs";
 import { needsIntroduction, tierOf } from "./stranger.mjs";
 import { openNotes, openVouches } from "./links.mjs";
+import { relationPromptBlock, worldForChat, worldPromptBlock } from "./world.mjs";
 import { tasksBlock } from "./tasks.mjs";
 
 const ENGINE_FILE = path.join(PROMPT_DIR, "engine.md");
@@ -202,6 +203,7 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
   const tier = tierOf(chat);
   const askIntro = needsIntroduction(chat);
   const notes = openNotes(chat);
+  const world = worldForChat(chat);
   const vouches = openVouches(chat);
 
   // the one deliberate exception to "never talk about other people": a referral
@@ -277,6 +279,8 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     nickLine,
     "Catatan: \"Batasan\" di bawah itu soal cara DIA manggil/ngerusak kamu. Panggilan KAMU ke dia diatur di baris di atas — dua hal yang beda, jangan dicampur.",
     trusted ? "" : tier === "acquaintance" ? acquaintanceBlock : strangerBlock,
+    relationPromptBlock(chat),
+    worldPromptBlock(world, {}),
     crossBlock,
     vouchBlock,
     trusted ? tasksBlock(chat) : "",

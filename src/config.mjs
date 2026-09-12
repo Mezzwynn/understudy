@@ -216,6 +216,9 @@ function buildConfig() {
   // how often she actually follows up on "go eat / go sleep", so she does not
   // turn into a repeating alarm clock
   // ── her own daily life (routine.mjs) ──
+  // her backstory + the people around her (world.mjs)
+  world: envGet("WORLD", "true") === "true",
+
   routine: envGet("ROUTINE", "true") === "true",
   routineMood: envGet("ROUTINE_MOOD", "true") === "true",
   routineKeepDays: num(envGet("ROUTINE_KEEP_DAYS", "3"), 3),

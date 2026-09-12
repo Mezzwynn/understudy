@@ -13,6 +13,7 @@ import path from "node:path";
 import { PERSONA_DIR, ROOT, config } from "./config.mjs";
 import { parsePersonaFrontmatter } from "./prompt.mjs";
 import { KNOBS, currentValues } from "../scripts/_settings.mjs";
+import { loadWorld, saveWorld, worldFile } from "./world.mjs";
 
 export const BUNDLE_FORMAT = "understudy-character";
 export const BUNDLE_VERSION = 1;
@@ -66,6 +67,7 @@ export function exportPersona(slug, { withSettings = true, notes = "" } = {}) {
   if (withSettings) {
     for (const k of KNOBS) if (values[k.key] !== undefined) settings[k.key] = values[k.key];
   }
+  const world = loadWorld(card.slug);
   return {
     format: BUNDLE_FORMAT,
     version: BUNDLE_VERSION,
@@ -74,6 +76,8 @@ export function exportPersona(slug, { withSettings = true, notes = "" } = {}) {
     frontmatter: card.frontmatter,
     body: card.body.trim(),
     settings,
+    // her history and the people around her, so a shared character keeps its world
+    world: world.backstory || world.cast.length ? { backstory: world.backstory, cast: world.cast } : null,
     notes: String(notes || "").slice(0, 400),
   };
 }
@@ -118,6 +122,12 @@ export function importPersona(obj, { overwrite = false, applySettings = false, s
     .map(([k, v]) => `${k}: ${String(v).replace(/\n/g, " ").trim()}`);
   fs.writeFileSync(personaFile(slug), `---\n${lines.join("\n")}\n---\n\n${check.body}\n`);
 
+  let worldSaved = false;
+  if (obj.world && (obj.world.backstory || (obj.world.cast || []).length)) {
+    saveWorld(slug, { backstory: obj.world.backstory, cast: obj.world.cast, source: "import" });
+    worldSaved = true;
+  }
+
   // only keys this install actually knows about
   let settingsApplied = 0;
   if (applySettings && obj.settings && typeof obj.settings === "object") {
@@ -130,7 +140,7 @@ export function importPersona(obj, { overwrite = false, applySettings = false, s
     }
   }
 
-  return { ok: true, slug, renamed, settingsApplied, name: check.frontmatter.name };
+  return { ok: true, slug, renamed, settingsApplied, worldSaved, name: check.frontmatter.name };
 }
 
 /* -------------------------------- delete ------------------------------ */
@@ -147,6 +157,12 @@ export function deletePersona(slug, { setEnvFn = null } = {}) {
   fs.mkdirSync(TRASH, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   fs.renameSync(file, path.join(TRASH, `${s}-${stamp}.md`));
+
+  const world = worldFile(s);
+  if (fs.existsSync(world)) {
+    fs.mkdirSync(TRASH, { recursive: true });
+    fs.renameSync(world, path.join(TRASH, `${s}-${stamp}.world.json`));
+  }
 
   const routine = path.join(ROUTINE_DIR, `${s}.json`);
   if (fs.existsSync(routine)) {

@@ -190,6 +190,34 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## Backstory, cast and relationships
+
+Two things keep her consistent across a long conversation (and across contacts):
+
+**Her world** (`src/world.mjs`, stored in `personas/<slug>.world.json`)
+- a backstory: where she comes from, what shaped her, what she would never say out loud
+- a cast: the people she actually deals with — family, a companion, coworkers — each with how
+  she would describe them and one detail that keeps them from drifting
+- for a **canon character** it is generated from the source material (real family, companions),
+  for an **original character** it is invented from the card. Both can be edited by hand in the
+  Character tab, or by asking the agent. Exports carry it, so a shared character keeps its world.
+
+**Who you are to her** (per contact, `chat.relation`)
+
+| | |
+|---|---|
+| chat | partner, spouse, ex, friend, best friend, sibling, parent, child, relative |
+| work | coworker, boss, employee, client, mentor, student |
+| other | neighbour, rival, not defined yet |
+
+Each preset carries a tone instruction, so she is warm with a partner, professional with a
+client, respectful with a parent or a boss, guarded with an ex or a rival — without turning into
+a different person. Set it from the dashboard contact card, or just tell the agent
+("make Hik my partner", "she should be polite with this one").
+
+Both are injected into the system prompt as private context: she may mention her sister once if
+it fits, and she must never dump her whole backstory or introduce her cast to you.
+
 ## Her own day (routine)
 
 Every day she gets a generated day plan: hour blocks (what she is doing, where) and a
