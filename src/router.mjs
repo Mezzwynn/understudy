@@ -359,6 +359,8 @@ async function respond(sock, jid, p) {
         await sendText(sock, jid, line);
         chat.stats.outbound = (chat.stats.outbound || 0) + 1;
         chat.lastInteraction = Date.now();
+        // she sent it, so she has to remember sending it
+        chat.history.push({ role: "assistant", content: stripAudioTags(line), ts: Date.now() });
         pstate.dryCount = (pstate.dryCount || 0) + 1;
         if (pstate.dryCount >= config.drySilentAfter) {
           pstate.state = "silent";

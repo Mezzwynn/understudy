@@ -29,13 +29,7 @@ function detectInstruction(text) {
   return null;
 }
 
-function pushFact(list, fact) {
-  const f = String(fact).trim();
-  if (!f) return;
-  if (list.some((x) => x.toLowerCase() === f.toLowerCase())) return;
-  list.push(f);
-  if (list.length > 40) list.splice(0, list.length - 40);
-}
+/* ------------------------------ memory ------------------------------- */
 
 function applyControl(chat, control, incoming = "") {
   if (!control || typeof control !== "object") return;
@@ -53,7 +47,7 @@ function applyControl(chat, control, incoming = "") {
     const src = Array.isArray(control[key]) ? control[key] : key === "facts" && Array.isArray(control.remember) ? control.remember : [];
     for (const v of src.slice(0, key === "facts" ? 3 : 2)) {
       const before = mem[key]?.length || 0;
-      pushFact(mem[key], v);
+      pushFact(mem[key], v, key === "facts" ? { trivia: true } : {});
       if (key === "facts" && (mem[key]?.length || 0) > before) {
         mem.factDates = mem.factDates || {};
         const text = String(v).trim();
@@ -109,49 +103,165 @@ function applyControl(chat, control, incoming = "") {
   }
 }
 
-async function maybeSummarize(chat) {
-  if (chat.history.length <= config.summarizeAt) return;
-  const half = Math.floor(chat.history.length / 2);
+/* ------------------------------ memory ------------------------------- */
+
+// words that carry no meaning for comparing two memory lines
+const STOPWORDS = new Set(
+  ["yang","dan","di","ke","dari","itu","ini","aku","kamu","dia","sudah","udah","masih","lagi","gak","ga","nggak","tidak","bikin","buat","sama","juga","terus","dengan","untuk","pas","saat","kalau","biar","the","a","an","to","of","is","it","he","she","i","you","and","or","for","on","in","at","that","this","his","her","not","no","do","does"],
+);
+function memTokens(s) {
+  return new Set(
+    String(s)
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !STOPWORDS.has(w)),
+  );
+}
+function memSimilar(a, b) {
+  const A = memTokens(a), B = memTokens(b);
+  if (!A.size || !B.size) return 0;
+  let inter = 0;
+  for (const t of A) if (B.has(t)) inter++;
+  return inter / (A.size + B.size - inter);
+}
+
+/**
+ * Facts must be ABOUT them, not a transcript of the last message. The tracker
+ * loves writing "Bilang \"tch\" — bereaksi kesal", which is worthless a week later.
+ */
+const TRIVIA_VERB =
+  /^(bilang|berkata|mengatakan|mengucap|menyebut|menulis|menjawab|membalas|merespons|bereaksi|bertanya|menanyakan|meminta|memohon|mengancam|menegaskan|menyalahkan|meniru|mengeluh|bercanda|tertawa|menyerah|menolak|menyindir|menuding)\b/i;
+
+function looksLikeTrivia(text) {
+  const s = String(text || "").trim();
+  if (!s) return true;
+  if (TRIVIA_VERB.test(s)) return true;
+  if (/^["'“”]/.test(s)) return true;
+  // "something \"quoted phrase\" something" near the start
+  if (/^[^—]{0,40}["“][^"”]{3,60}["”]/.test(s)) return true;
+  return false;
+}
+
+/** Add a memory line, folding it into a near-identical one instead of duplicating. */
+function pushFact(list, fact, { max = 40, threshold = 0.5, trivia = false } = {}) {
+  const f = String(fact).trim();
+  if (!f) return;
+  if (trivia && looksLikeTrivia(f)) return;
+  for (let i = 0; i < list.length; i++) {
+    const ex = String(list[i]);
+    if (ex.toLowerCase() === f.toLowerCase()) return;
+    if (memSimilar(f, ex) >= threshold) {
+      // keep whichever version says more
+      if (f.length > ex.length + 6) list[i] = f;
+      else return;
+    }
+  }
+  list.push(f);
+  if (list.length > max) list.splice(0, list.length - max);
+}
+
+/**
+ * Rewrite the long-term memory: one runnable summary plus consolidated lists.
+ * Runs on the same schedule as before, but now it also merges the duplicated
+ * "jangan panggil honey" style lines and drops what is no longer true.
+ */
+export async function consolidateMemory(chat, { force = false } = {}) {
+  if (!force && chat.history.length <= config.summarizeAt) return false;
+  const half = force ? chat.history.length : Math.floor(chat.history.length / 2);
   const old = chat.history.slice(0, half);
   const transcript = old.map((m) => `${m.role === "user" ? "them" : "you"}: ${m.content}`).join("\n");
+  const mem = chat.memory || (chat.memory = {});
 
   const existing = [
-    chat.memory.summary ? `MEMORY SO FAR: ${chat.memory.summary}` : "",
-    chat.memory.facts?.length ? `FACTS: ${chat.memory.facts.join(" | ")}` : "",
-    chat.memory.plans?.length ? `PLANS: ${chat.memory.plans.join(" | ")}` : "",
-    chat.memory.boundaries?.length ? `BOUNDARIES: ${chat.memory.boundaries.join(" | ")}` : "",
+    mem.summary ? `MEMORY SO FAR: ${mem.summary}` : "",
+    mem.relationship ? `RELATIONSHIP: ${mem.relationship}` : "",
+    mem.facts?.length ? `FACTS: ${mem.facts.join(" | ")}` : "",
+    mem.plans?.length ? `PLANS: ${mem.plans.join(" | ")}` : "",
+    mem.boundaries?.length ? `BOUNDARIES: ${mem.boundaries.join(" | ")}` : "",
+    mem.jokes?.length ? `JOKES: ${mem.jokes.join(" | ")}` : "",
   ]
     .filter(Boolean)
     .join("\n");
 
+  const system = [
+    "You maintain the long-term memory of a roleplay character.",
+    "You get the memory so far plus a transcript chunk. Rewrite the memory: merge duplicates, drop anything that is no longer true, keep the most specific wording.",
+    "Answer with EXACTLY these five sections, in this order, nothing else:",
+    "SUMMARY:",
+    "(max 8 short lines, plain text, no bullets) who they are, state of the relationship, open threads)",
+    "FACTS:",
+    "(REBUILD THIS FROM SCRATCH from the transcript — do not copy the trivia lines from the memory so far. Durable things about THEM: work, habits, health, family, preferences, important events. NOT quotes of what they said, not their reactions, not what happened in one message — drop all trivia.)",
+    "(max 15 lines, one per line, each starting with '- ')",
+    "BOUNDARIES:",
+    "(max 8 lines, one per line, each starting with '- ') things she must not do around them",
+    "PLANS:",
+    "(max 6 lines, one per line, each starting with '- ') ongoing promises and plans",
+    "JOKES:",
+    "(max 5 lines, one per line, each starting with '- ') running jokes and callbacks",
+    "LANGUAGE: same language as the transcript (Indonesian transcript -> Indonesian). Never answer in English just because these instructions are English.",
+    `The other person's name is ${JSON.stringify(chat.profile?.name || "")} — use exactly that name. Never invent or guess a name; if it is empty, do not use any name at all.`,
+    "Lines that say the same thing in different words MUST be merged into one line, but keep every DISTINCT rule: never drop a boundary just because another one looks similar. Drop only what is no longer true.",
+    "Only state things that actually appear. Never invent, never roleplay, never address the reader, no preamble.",
+  ].join("\n");
+
+  let out;
   try {
-    const summary = await llmChat(
+    out = await llmChat(
       [
-        {
-          role: "system",
-          content:
-            "You maintain the long-term memory of a roleplay character. " +
-            "You get the memory so far plus a transcript chunk. Return a REPLACEMENT summary: max 8 short lines, plain text " +
-            "(no markdown, no headings, no bullet symbols). " +
-            "LANGUAGE: write the summary in the SAME language as the transcript (if the transcript is Indonesian, write Indonesian; " +
-            "if mixed, use the dominant one). Never answer in English just because these instructions are English. " +
-            "Cover: who the other person is, the state of the relationship, ongoing threads, and anything still unresolved. " +
-            "Only state things that actually appear. Never invent, never roleplay, never address the reader, no preamble.",
-        },
+        { role: "system", content: system },
         { role: "user", content: `${existing}\n\n--- transcript ---\n${transcript}` },
       ],
-      { temperature: 0.2, maxTokens: 320 },
+      { temperature: 0.2, maxTokens: 1800 },
     );
-    chat.memory.summary = summary
-      .trim()
-      .replace(/^#+\s*/gm, "")
-      .replace(/^[-*•]\s*/gm, "")
-      .slice(0, 1200);
-    chat.history = chat.history.slice(half);
-    log(`summarized ${half} old turns for ${chat.jid}`);
   } catch (err) {
-    log(`summarize failed (keeping history): ${err.message}`);
+    log(`memory consolidation failed: ${err.message}`);
+    return false;
   }
+
+  const sections = {};
+  let current = "summary";
+  sections[current] = [];
+  for (const rawLine of String(out).split(/\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const head = line.match(/^(SUMMARY|FACTS|BOUNDARIES|PLANS|JOKES)\s*:\s*(.*)$/i);
+    if (head) {
+      current = head[1].toLowerCase();
+      sections[current] = sections[current] || [];
+      if (head[2]) sections[current].push(head[2]);
+      continue;
+    }
+    sections[current] = sections[current] || [];
+    sections[current].push(line.replace(/^[-*•\d.\s]+/, ""));
+  }
+
+  const clean = (arr, max, threshold, trivia = false) => {
+    const out2 = [];
+    for (const item of (arr || []).map((s) => String(s).replace(/\s+/g, " ").trim()).filter(Boolean)) {
+      pushFact(out2, item, { max, threshold, trivia });
+    }
+    return out2;
+  };
+
+  const summary = (sections.summary || []).join("\n").replace(/^#+\s*/gm, "").slice(0, 1200).trim();
+  if (summary) mem.summary = summary;
+  if (sections.facts) mem.facts = clean(sections.facts, 20, 0.5, true);
+  if (sections.boundaries) mem.boundaries = clean(sections.boundaries, 12, 0.45);
+  if (sections.plans) mem.plans = clean(sections.plans, 10, 0.5);
+  if (sections.jokes) mem.jokes = clean(sections.jokes, 8, 0.5);
+
+  if (!force) chat.history = chat.history.slice(half);
+  log(
+    `memory consolidated: ${half} turns · facts ${mem.facts?.length || 0} · boundaries ${
+      mem.boundaries?.length || 0
+    }`,
+  );
+  return true;
+}
+
+async function maybeSummarize(chat) {
+  await consolidateMemory(chat);
 }
 
 /** Change the mood — unless the dashboard locked it for this contact. */
@@ -358,6 +468,12 @@ export async function generateProactive(session, persona, { displayName } = {}) 
     if (!text || /^skip\b/i.test(text.trim())) return null;
     if (looksBroken(text)) {
       log(`proactive leaked meta text, retrying`);
+      continue;
+    }
+    // she must talk TO them — reject diary entries that narrate them in the
+    // third person ("mungkin dia nunggu aku ngecek. tapi aku nggak akan.")
+    if (/\b(dia|he|she|him|her)\b/i.test(text) && !/\b(kamu|u|you|lu|km|kmu)\b/i.test(text)) {
+      log(`proactive narrated them in third person, retrying`);
       continue;
     }
     // don't send the same thought twice (compare against the last few messages,

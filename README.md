@@ -292,6 +292,26 @@ rp                  the CLI (symlink it anywhere)
 
 MIT — see [LICENSE](LICENSE).
 
+## Memory hygiene
+
+Long-term memory is rewritten, not just appended to:
+
+- `remember` only accepts **durable** facts about the person (work, habits, health, family,
+  preferences). Quotes of what they said and "he reacted annoyed" style trivia are filtered
+  out in code, so a week of chatting doesn't bury the facts in noise.
+- The periodic consolidation pass rebuilds the summary **and** the fact/plan/boundary/joke
+  lists, merging near-duplicates ("don't call me honey" x5 becomes one line), dropping what
+  is no longer true, and never inventing a name (the contact's real name is injected into
+  the prompt).
+- Bottoms up: facts ≤ 20, boundaries ≤ 12, plans ≤ 10, jokes ≤ 8. Fuzzy dedupe compares word
+  sets, so reworded duplicates collapse instead of piling up.
+
+## Language
+
+`language:` in the persona frontmatter is now actually injected into the prompt
+("BAHASA: …"). Before, it was parsed and ignored — she ended up copying whatever language
+the prompt examples were written in.
+
 ## Trusted vs stranger
 
 Two tiers, so a shared bot number does not treat the whole internet like a best friend.

@@ -161,6 +161,11 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     "# Yang ada di kepalamu sekarang (jangan pernah diucapin atau dijelasin)",
     "",
     `Sekarang: ${fmtTime()}`,
+    // the persona card's `language` field used to be read and then ignored, so
+    // she copied whatever language the prompt examples were written in
+    persona.language
+      ? `BAHASA: ${persona.language}. Pakai bahasa ini. Jangan ganti bahasa kecuali dia ganti dulu, dan jangan tiru bahasa contoh di instruksi ini.`
+      : "",
     persona.work_hours ? `Jam kerja kamu: ${persona.work_hours} (di luar itu kamu bebas)` : "",
     soft
       ? `Kamu lagi MELUNAK — tapi cuma sementara (kira-kira ${softLeftMin} menit lagi). Boleh lebih lembut/hangat sekarang, tapi jangan lebay dan jangan ngumumin. Kamu tahu ini bakal lewat, dan itu bikin kamu agak risih.`
@@ -480,6 +485,8 @@ export function buildProactiveMessages(chat, persona, { displayName } = {}) {
       : "Sekarang di luar jam kerja kamu — lagi bebas.",
     `Pesan terakhir di chat ini ${fmtAgo(chat.lastInteraction)}.`,
     "Baca history dulu biar nyambung, dan sadar jam sekarang.",
+    "Pesan ini DITUJUKAN KE DIA — ngomong langsung ke dia (kamu/u/you). DILARANG nyeritain dia ke orang ketiga (\"dia\", \"he\", \"she\") dan DILARANG nulis kayak catatan harian/curhat yang nggak ditujukan ke siapa pun.",
+    "Contoh di bawah cuma contoh RASA — JANGAN tiru bahasanya, tulis pakai bahasamu sendiri.",
     banned,
   ];
   const body = useCheckin

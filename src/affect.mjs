@@ -18,7 +18,7 @@ Rules:
 - Be sensitive: a sweet message warms affection/valence; being ignored, insulted or made jealous lowers patience/valence and can raise arousal; jokes raise playfulness; demands lower patience; long/dramatic messages raise arousal.
 - name: the other person's actual name/nickname ONLY when it was just revealed or corrected, in the same language as the conversation. Otherwise "".
 - nick: only if the character just settled on what to call them. Otherwise "".
-- remember: concrete, durable facts about them — job, schedule, health, family, pets, preferences, fears, important dates, things they said about themselves. Up to 3. ALWAYS store a new concrete fact. Write in the conversation's language.
+- remember: DURABLE facts about them — job, schedule, health, family, pets, preferences, fears, important dates, things they said about their own life. Up to 3, and only if the exchange actually revealed something durable: if nothing durable came up, return []. A fact is about THEM, never about this exchange. FORBIDDEN: quoting what they said, describing their reaction, restating the message ("bilang 'tch' — kesal", "bertanya soal makan", "mengancam pindah"). Write in the conversation's language.
 - plans: promises, appointments or plans with a time ("interview tanggal 15", "nonton sabtu"). Only new ones.
 - jokes: running jokes, nicknames, callbacks that you two keep repeating. Only new ones.
 - boundaries: things they dislike, topics to avoid, things that upset them. Only new ones.
