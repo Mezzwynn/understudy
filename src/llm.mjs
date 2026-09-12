@@ -88,6 +88,11 @@ async function callProvider(p, { messages, temperature, maxTokens, json }) {
  * Chat completion with per-provider retry + cross-provider fallback.
  */
 export async function chat(messages, opts = {}) {
+  // the smoke test runs the whole reply path without touching the network
+  if (process.env.SMOKE_NO_LLM) {
+    const text = process.env.SMOKE_LLM_TEXT || "ya. whatever.";
+    return opts.json ? "{}" : text;
+  }
   const maxTokens = opts.maxTokens ?? config.maxTokens;
   const list = opts.provider ? [opts.provider] : providers();
   let lastErr;

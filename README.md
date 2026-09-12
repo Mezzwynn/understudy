@@ -284,6 +284,25 @@ It can change behaviour settings, the personality card, the routine, schedules, 
 character and per-contact nicknames. It **cannot** touch code, files, API keys, ALLOW/TRUSTED
 lists, or delete anything — that is enforced in code by an allowlist, not by the prompt.
 
+## Testing
+
+```bash
+rp test            # everything below
+rp lint            # identifiers that are called but never imported/defined
+rp smoke           # the whole reply path with a fake socket, no model calls
+rp smoke --live    # same, with the real model (costs a few calls)
+rp turing          # humanness eval against an independent judge
+```
+
+`rp lint` exists because of a real incident: a missing import
+(`ReferenceError: decide is not defined`) passed `node --check` and every unit test, and the
+only symptom was that she silently stopped answering anyone — the bot looked alive.
+
+`rp smoke` pushes real messages (owner, new stranger, spam, a mention of another contact)
+through the actual router with a fake WhatsApp socket, using a throwaway
+`UNDERSTUDY_DATA_DIR`, and fails if a case throws or produces no reply. It also asserts the
+persona actually loaded, after a botched edit left `persona.name === undefined`.
+
 ## Requirements
 
 - **Node.js 18+** (tested on Node 26, Android/Termux)

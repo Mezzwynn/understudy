@@ -9,6 +9,18 @@ import { stripAudioTags, detectInjection } from "./guard.mjs";
 import { applyDeltas, normalize, isMoodLocked } from "./mood.mjs";
 import { generateImage, randomSticker, saveUserSticker } from "./image.mjs";
 import {
+  decide,
+  promoteIfReady,
+  needsIntroduction,
+  markIntroAsked,
+  blockNumber,
+  tierOf,
+  WARN_LINES,
+} from "./stranger.mjs";
+import { detectMention, addCrossNote, addVouch, resolveNotes } from "./links.mjs";
+import { runTask, notifyTaskReply } from "./tasks.mjs";
+import { ensureToday, tickMoments, momentDeltas, saveRoutine } from "./routine.mjs";
+import {
   phoneFromJid,
   sendText,
   sendReaction,

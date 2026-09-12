@@ -4,7 +4,9 @@ import { fileURLToPath } from "node:url";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const STARTED_AT = Date.now();
-export const DATA_DIR = path.join(ROOT, "data");
+// The data directory can be pointed elsewhere (the smoke test uses a throwaway
+// one, so a test run can never touch real chats).
+export const DATA_DIR = process.env.UNDERSTUDY_DATA_DIR || path.join(ROOT, "data");
 export const AUTH_DIR = path.join(DATA_DIR, "auth");
 export const CHATS_DIR = path.join(DATA_DIR, "chats");
 export const PROMPT_DIR = path.join(ROOT, "prompt");
@@ -98,7 +100,7 @@ function buildConfig() {
     .filter(Boolean),
 
   // WhatsApp LIDs (new anonymous ids) mapped to real numbers, e.g.
-  // LID_MAP=123456789012345:+6281234567890
+  // LID_MAP=215341758152901:+6285111046991
   lidMap: (() => {
     const out = {};
     for (const pair of envGet("LID_MAP", "").split(",")) {

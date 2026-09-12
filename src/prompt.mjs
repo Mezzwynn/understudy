@@ -43,6 +43,7 @@ export function loadPersona(name = config.persona) {  const file = path.join(PER
 
   return {
     slug: name,
+    name: meta.name || config.botName,
     voiceCard,
     cardRaw: raw,
     card: textCard,

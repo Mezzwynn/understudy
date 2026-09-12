@@ -1,33 +1,46 @@
 #!/usr/bin/env bash
-# rp — control Understudy from anywhere.
-#
-#   Usage: rp <command> [args]
-#   Install globally (optional):
-#     ln -s "$(pwd)/rp" "$PREFIX/bin/rp"     # Termux
-#     sudo ln -s "$(pwd)/rp" /usr/local/bin/rp
+# rp — control the Understudy WhatsApp roleplay agent from anywhere.
 #
 #   rp start | stop | restart | status
-#   rp log [n] | rp last [n]
-#   rp setup | rp character | rp config
-#   rp persona ... | rp contacts ... | rp mood ...
-#   rp voice "..." | rp sticker ...
-#   rp reset <id|all> [--mood] [--all]
-#   rp test | rp turing | rp bench | rp number | rp boot
+#   rp log [n]        follow the log (Ctrl+C to exit)
+#   rp last [n]       recent in/out messages
+#   rp persona ...    list | use <name> | new <name>
+#   rp contacts ...   list | show | set name/nick/persona | reset
+#   rp sticker ...    add stickers (--generate "prompt" name)
+#   rp setup          connect a model (API key)
+#   rp character      create a character (guided by the model)
+#   rp config         behaviour settings (auto / manual)
+#   rp mood ...       list | show <jid> | set <jid> <key> <value> | nudge <jid> <event>
+#   rp test           lint + reply-path smoke test + offline selftest
+#   rp lint           static check: identifiers used but never imported
+#   rp smoke [--live] reply path end to end with a fake socket
+#   rp voice "..."    generate a voice note (preview)
+#   rp number         show the linked WhatsApp number
+#   rp sync           git commit + push (GitHub)
+#   rp dash           open the local web dashboard
+#   rp stats          quota + usage
+#   rp doctor         health check (keys, quota, dependencies)
+#   rp watchdog       keep the bot alive (auto-restart + notification)
+#   rp routine ...    today | --new | --history | --at HH:MM
+#   rp boot           install auto-start on reboot
 
-SELF="$(readlink -f "$0" 2>/dev/null || echo "$0")"
-DIR="$(cd "$(dirname "$SELF")" && pwd)"
 US_DIR="${UNDERSTUDY_DIR:-$DIR}"
 
 if [ ! -d "$US_DIR" ]; then
   echo "understudy not found at: $US_DIR"
+  echo "set UNDERSTUDY_DIR=/path/to/understudy"
   exit 1
 fi
+
 cd "$US_DIR" || exit 1
 
 cmd="${1:-status}"
 [ $# -gt 0 ] && shift
 
 case "$cmd" in
+  routine|rout)  node scripts/routine.mjs "${@:2}" ;;
+  smoke)    node scripts/smoke.mjs "${@:2}" ;;
+  lint)     node scripts/lint.mjs "${@:2}" ;;
   start)    ./start.sh ;;
   stop)     ./stop.sh ;;
   restart)  ./restart.sh ;;
@@ -44,17 +57,26 @@ case "$cmd" in
     tail -n "${1:-30}" -f rp.log ;;
   last)
     grep -av '█\|▄' rp.log 2>/dev/null | grep -aE '←|→|ignored|failed' | tail -n "${1:-10}" ;;
-  persona|p)  node scripts/persona.mjs "$@" ;;
-  contacts|c) node scripts/contacts.mjs "$@" ;;
-  mood|m)     node scripts/mood.mjs "$@" ;;
-  reset)      node scripts/reset.mjs "$@" ;;
-  voice|vn)   node scripts/voice.mjs "$@" ;;
-  sticker|st) node scripts/sticker.mjs "$@" ;;
+  persona|p)
+    node scripts/persona.mjs "$@" ;;
   setup|connect)  node scripts/setup.mjs ;;
   character|char) node scripts/character.mjs "$@" ;;
   config|setting) node scripts/config.mjs "$@" ;;
-  test)       node scripts/selftest.mjs ;;
-  stats|biaya) node scripts/stats.mjs ;;
+  contacts|c)
+    node scripts/contacts.mjs "$@" ;;
+  sticker|stiker)
+    node scripts/sticker.mjs "$@" ;;
+  mood|m)
+    node scripts/mood.mjs "$@" ;;
+  test|selftest)
+    echo "── 1. static check (undefined identifiers) ──"
+    node scripts/lint.mjs || exit 1
+    echo "── 2. reply path (fake socket, no model calls) ──"
+    node scripts/smoke.mjs || exit 1
+    echo "── 3. offline brain ──"
+    node scripts/selftest.mjs ;;
+  stats|biaya)
+    node scripts/stats.mjs ;;
   doctor|cek)
     node scripts/doctor.mjs ;;
   watchdog|wd)
@@ -65,8 +87,14 @@ case "$cmd" in
       sleep 1
       echo "watchdog started (pid $(cat data/watchdog.pid 2>/dev/null))"
     fi ;;
-  turing|tt)  node scripts/turing.mjs ;;
-  bench)      node scripts/bench.mjs ;;
+  voice|vn)
+    node scripts/voice.mjs "$@" ;;
+  turing|tt)
+    node scripts/turing.mjs ;;
+  bench)
+    node scripts/bench.mjs ;;
+  reset)
+    node scripts/reset.mjs "$@" ;;
   sync|push)
     if [ ! -d .git ]; then
       echo "not a git repository — run: git init -b main && git add -A && git commit -m init"
@@ -83,14 +111,17 @@ case "$cmd" in
   number|num)
     n="$(grep -a 'connected as' rp.log 2>/dev/null | tail -1 | sed 's/.*as //')"
     echo "${n:-unknown (never connected)}" ;;
-  boot)  ./install-boot.sh ;;
-  dir)   echo "$US_DIR" ;;
+  boot)
+    ./install-boot.sh ;;
+  dir)
+    echo "$US_DIR" ;;
   edit)
     f="${1:-.env}"
     [ -f "$f" ] || { echo "no such file: $f"; exit 1; }
     ${EDITOR:-vi} "$f" ;;
   help|-h|--help)
-    sed -n '2,15p' "$SELF" | sed 's/^# \{0,1\}//' ;;
+    sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)
-    echo "unknown command: $cmd"; echo "run: rp help" ;;
+    echo "unknown command: $cmd"
+    echo "run: rp help" ;;
 esac
