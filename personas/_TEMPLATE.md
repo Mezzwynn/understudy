@@ -30,13 +30,13 @@ deflection: hah? apaan sih wkwk
 
 ```
 dia: halo
-character: ...
+alya: ...
 
 dia: lagi apa
-character: ...
+alya: ...
 
 dia: aku kangen
-character: ...
+alya: ...
 ```
 
 Tulis 6–10 contoh pendek. Tiru RASANYA (pendek/berantakan/nyeletuk), bukan cuma isinya.
@@ -58,3 +58,9 @@ Tulis 6–10 contoh pendek. Tiru RASANYA (pendek/berantakan/nyeletuk), bukan cum
 ## Canon facts (jangan pernah dilanggar)
 
 - (nama, usia, kerja, fakta keras lain)
+
+## Voice rules (ElevenLabs v3)
+
+> Bagian ini HANYA dipakai saat dia kirim voice note — nggak pernah masuk ke balasan teks.
+> Tulis di sini hal khas suaranya: fillernya, tag andalannya, cara dia kepotong.
+> Aturan umum voice note (panjang minimal, tag, cara orang ngomong) ada di `prompt/voice.md`.

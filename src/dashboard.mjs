@@ -2,14 +2,18 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { ROOT, PERSONA_DIR, config, envGet, STARTED_AT, log } from "./config.mjs";
+import { ROOT, PERSONA_DIR, config, envGet, STARTED_AT, log, reloadConfig } from "./config.mjs";
 import { listChats, loadChat, saveChat, loadState } from "./store.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
+import { runAdmin } from "./admin.mjs";
+import { exportPersona, importPersona, deletePersona, listSlugs, trashContents, restoreFromTrash } from "./persona-io.mjs";
+import { tierOf, strangerState, unblock } from "./stranger.mjs";
+import { currentBlock, nextBlock, ensureToday, tickMoments, saveRoutine, prune, loadRoutine } from "./routine.mjs";
 import { normalize, cohere, label as moodLabel, newMood, baselineFor, KEYS as MOOD_KEYS } from "./mood.mjs";
 import { suggestMood } from "./affect.mjs";
 import { isConnected, getSock } from "./whatsapp.mjs";
 import { dueSlot } from "./proactive.mjs";
-import { KNOBS, currentValues, applyValues, autoSuggest } from "../scripts/_settings.mjs";
+import { KNOBS, currentValues, applyValues, autoSuggest, setEnv } from "../scripts/_settings.mjs";
 
 /**
  * dashboard.mjs — tiny local web dashboard (no dependencies).
@@ -133,10 +137,29 @@ function personaList() {
     });
 }
 
+let contacts = [];
+let SETTINGS_LOADED_HINT = false;
+
 async function summary() {
   const persona = loadPersona();
   const st = loadState();
-  const contacts = listChats().map((c) => ({
+  const activeSlug = persona.slug;
+  const activeRoutine = loadRoutine(activeSlug);
+  const routineSummary = activeRoutine
+    ? {
+        slug: activeSlug,
+        date: activeRoutine.date,
+        weekday: activeRoutine.weekday || "",
+        theme: activeRoutine.theme,
+        now: currentBlock(activeRoutine) || null,
+        next: nextBlock(activeRoutine) || null,
+        blocks: activeRoutine.blocks || [],
+        moments: (activeRoutine.moments || []).map((m) => ({ at: m.at, kind: m.kind, what: m.what, intensity: m.intensity, lived: Boolean(m.firedAt) })),
+        highlights: (activeRoutine.highlights || []).slice(-8),
+        history: (activeRoutine.history || []).slice(-3).map((d) => ({ date: d.date, theme: d.theme })),
+      }
+    : null;
+  contacts = listChats().map((c) => ({
     jid: c.jid,
     name: c.profile?.name || "",
     nick: c.profile?.nick || "",
@@ -149,8 +172,17 @@ async function summary() {
       : null,
     state: c.proactive?.state || "idle",
     trusted: c.trusted === true,
+    tier: tierOf(c),
+    blocked: Boolean(c.stranger?.blockedAt),
+    strikes: c.stranger?.strikes || 0,
+    tasks: (c.tasks || []).slice(-3).map((t) => ({ to: t.to, text: t.text, status: t.status })),
+    crossNotes: (c.crossNotes || []).filter((n) => !n.done).map((n) => ({ kind: n.kind, from: n.fromName, what: n.what })),
+    vouches: (c.vouches || []).filter((v) => v.status === "pending").map((v) => ({ with: v.referrerName, status: v.status })),
+    blockReason: c.stranger?.blockReason || "",
     moodLabel: c.mood ? moodLabel(normalize(c.mood)) : "",
     moodMode: c.moodLock?.locked ? "manual" : "auto",
+    routineTheme: routineSummary?.theme || "",
+    routineNow: routineSummary?.now || null,
     moodLockedAt: c.moodLock?.locked ? c.moodLock.at || 0 : 0,
     baseline: baselineFor(c),
     dryCount: c.proactive?.dryCount || 0,
@@ -162,6 +194,7 @@ async function summary() {
   }));
 
   return {
+    routine: routineSummary,
     bot: {
       connected: isConnected(),
       number: getSock()?.user?.id ? String(getSock().user.id).split(":")[0].split("@")[0] : null,
@@ -223,6 +256,39 @@ export function startDashboard() {
         return json(res, 200, await summary());
       }
 
+        if (req.method === "GET" && url.pathname === "/api/persona/card") {
+        const slug = url.searchParams.get("slug") || config.persona;
+        const file = path.join(PERSONA_DIR, `${slug}.md`);
+        if (!fs.existsSync(file)) return json(res, 404, { ok: false, error: "persona not found" });
+        const raw = fs.readFileSync(file, "utf8");
+        const meta = parsePersonaFrontmatter(raw);
+        const body = raw.replace(/^---[\s\S]*?\n---\s*\n?/, "");
+        return json(res, 200, { ok: true, slug, frontmatter: meta, body, raw });
+      }
+
+
+      if (req.method === "GET" && url.pathname === "/api/persona/export") {
+        const slug = url.searchParams.get("slug") || config.persona;
+        const withSettings = url.searchParams.get("settings") !== "0";
+        let bundle;
+        try {
+          bundle = exportPersona(slug, { withSettings });
+        } catch (err) {
+          return json(res, 404, { ok: false, error: err.message });
+        }
+        const body = JSON.stringify(bundle, null, 2);
+        res.writeHead(200, {
+          "content-type": "application/json; charset=utf-8",
+          "content-disposition": `attachment; filename="${bundle.slug}.character.json"`,
+          "cache-control": "no-store",
+        });
+        return res.end(body);
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/persona/trash") {
+        return json(res, 200, { ok: true, files: trashContents() });
+      }
+
       if (req.method === "POST") {
         const body = await readBody(req);
 
@@ -231,8 +297,11 @@ export function startDashboard() {
           const slug = loadPersona().slug;
           if (typeof body.activeHours === "string") setPersonaField(slug, "active_hours", body.activeHours);
           if (typeof body.chatSchedule === "string") setPersonaField(slug, "chat_schedule", body.chatSchedule);
-          log("dashboard: settings updated");
-          return json(res, 200, { ok: true, needsRestart: true });
+          // the running bot reads .env through the config object — refresh it in
+          // place so a settings change applies immediately, no restart
+          reloadConfig();
+          log("dashboard: settings updated (applied live)");
+          return json(res, 200, { ok: true, needsRestart: false });
         }
 
         if (url.pathname === "/api/auto") {
@@ -245,9 +314,72 @@ export function startDashboard() {
           return json(res, 200, { ok: true, suggested });
         }
 
+        if (url.pathname === "/api/persona/import") {
+          const bundle = typeof body.bundle === "string" ? JSON.parse(body.bundle) : body.bundle;
+          const r = importPersona(bundle, {
+            overwrite: body.overwrite === true,
+            applySettings: body.applySettings === true,
+            setEnvFn: setEnv,
+          });
+          if (!r.ok) return json(res, 400, { ok: false, error: r.reason });
+          if (r.settingsApplied) reloadConfig();
+          log(`dashboard: imported character ${r.slug}${r.renamed ? " (renamed)" : ""}`);
+          return json(res, 200, r);
+        }
+
+        if (url.pathname === "/api/persona/delete") {
+          const r = deletePersona(String(body.slug || ""), { setEnvFn: setEnv });
+          if (!r.ok) return json(res, 400, { ok: false, error: r.reason });
+          reloadConfig();
+          log(`dashboard: character ${r.slug} moved to .trash${r.switchedTo ? ` (now using ${r.switchedTo})` : ""}`);
+          return json(res, 200, r);
+        }
+
+        if (url.pathname === "/api/persona/restore") {
+          const r = restoreFromTrash(String(body.file || ""), { setEnvFn: setEnv });
+          if (!r.ok) return json(res, 400, { ok: false, error: r.reason });
+          return json(res, 200, r);
+        }
+
+        if (url.pathname === "/api/persona/save") {
+          const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
+          const file = path.join(PERSONA_DIR, `${slug}.md`);
+          if (!fs.existsSync(file)) return json(res, 404, { ok: false, error: "persona not found" });
+          const fm = body.frontmatter && typeof body.frontmatter === "object" ? body.frontmatter : {};
+          const lines = Object.entries(fm)
+            .filter(([k]) => /^[a-z_]+$/i.test(k))
+            .map(([k, v]) => `${k}: ${String(v).replace(/\n/g, " ").trim()}`);
+          const text = `---\n${lines.join("\n")}\n---\n\n${String(body.body || "").trim()}\n`;
+          fs.writeFileSync(file, text);
+          log(`dashboard: persona ${slug} saved (${lines.length} fields)`);
+          return json(res, 200, { ok: true, slug });
+        }
+
+        if (url.pathname === "/api/admin") {
+          const msg = String(body.message || "").trim();
+          if (!msg) return json(res, 400, { ok: false, error: "empty message" });
+          const r = await runAdmin({
+            message: msg,
+            history: Array.isArray(body.history) ? body.history : [],
+            context: { personas: personaList().map((p) => p.slug), contacts },
+          });
+          if (r.reload) SETTINGS_LOADED_HINT = true;
+          return json(res, 200, { ok: r.ok, say: r.say, applied: r.applied, refused: r.refused });
+        }
+
+        if (url.pathname === "/api/routine/new") {
+          const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
+          const p = loadPersona(slug);
+          const fresh = await ensureToday(p, { force: true });
+          if (!fresh) return json(res, 400, { ok: false, error: "the model could not build a routine" });
+          tickMoments(fresh);
+          saveRoutine(slug, prune(fresh));
+          return json(res, 200, { ok: true, routine: fresh });
+        }
+
         if (url.pathname === "/api/persona") {
           if (!body.slug || !fs.existsSync(path.join(PERSONA_DIR, `${body.slug}.md`))) {
-            return json(res, 400, { ok: false, error: "persona tidak ditemukan" });
+            return json(res, 400, { ok: false, error: "persona not found" });
           }
           const meta = parsePersonaFrontmatter(fs.readFileSync(path.join(PERSONA_DIR, `${body.slug}.md`), "utf8"));
           const { setEnv } = await import("../scripts/_settings.mjs");
@@ -255,6 +387,29 @@ export function startDashboard() {
           if (meta.name) setEnv("BOT_NAME", meta.name);
           log(`dashboard: persona → ${body.slug}`);
           return json(res, 200, { ok: true });
+        }
+
+        if (url.pathname === "/api/block") {
+          const chat = loadChat(body.jid);
+          if (chat.trusted === true) return json(res, 400, { ok: false, error: "trusted contacts are never blocked" });
+          if (body.block) {
+            const { getSock } = await import("./whatsapp.mjs");
+            const sock = getSock();
+            if (!sock) return json(res, 400, { ok: false, error: "WhatsApp is not connected" });
+            const { blockNumber } = await import("./stranger.mjs");
+            await blockNumber(sock, chat, "manual, from the dashboard");
+          } else {
+            unblock(chat);
+            try {
+              const { getSock } = await import("./whatsapp.mjs");
+              await getSock()?.updateBlockStatus(chat.jid, "unblock");
+            } catch (err) {
+              log(`unblock on WhatsApp failed: ${err.message}`);
+            }
+          }
+          saveChat(chat);
+          log(`dashboard: blocked=${Boolean(body.block)} for ${body.jid}`);
+          return json(res, 200, { ok: true, blocked: Boolean(body.block) });
         }
 
         if (url.pathname === "/api/trust") {
@@ -294,7 +449,7 @@ export function startDashboard() {
             if (chat.moodLock.value.updatedAt) delete chat.moodLock.value.updatedAt;
           }
           saveChat(chat);
-          log(`dashboard: mood ${body.jid} → ${moodLabel(chat.mood)}${body.lock ? " (dikunci)" : ""}`);
+          log(`dashboard: mood ${body.jid} → ${moodLabel(chat.mood)}${body.lock ? " (locked)" : ""}`);
           return json(res, 200, { ok: true, mood: chat.mood, label: moodLabel(chat.mood), locked: chat.moodLock?.locked === true });
         }
 
@@ -307,7 +462,7 @@ export function startDashboard() {
           } catch (err) {
             log(`dashboard: suggestMood failed ${err.message}`);
           }
-          if (!suggested) return json(res, 400, { ok: false, error: "model tidak mengembalikan mood" });
+          if (!suggested) return json(res, 400, { ok: false, error: "the model returned no mood" });
           if (body.apply) {
             // leaving manual mode: hand the mood back to the tracker
             chat.moodLock = null;

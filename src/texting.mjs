@@ -58,7 +58,11 @@ export function typingDelayFor(text) {
 /** How long she spends reading an incoming message before anything happens. */
 export function readingDelayFor(text) {
   const v = config.readMinMs + text.length * rand(6, 16);
-  return Math.round(Math.min(config.readMaxMs, Math.max(config.readMinMs, v)));
+  let ms = Math.min(config.readMaxMs, Math.max(config.readMinMs, v));
+  // one in ten she genuinely gets distracted (phone down, doing something else).
+  // This used to be a second, separate knob; now READ_MAX_MS is the only owner.
+  if (Math.random() < 0.1) ms = Math.min(config.readMaxMs * 4, ms * 3 + 20000);
+  return Math.round(ms);
 }
 
 /** The pause after reading, before the "typing…" indicator appears. */
@@ -191,9 +195,8 @@ export function maybeBurst(bubbles, chance) {
   return [m[1], m[2]];
 }
 
-/** Long, distracted pause before replying. */
-export function maybeLongDelay() {
-  if (Math.random() > config.longDelayChance) return 0;
-  const { longDelayMinMs: a, longDelayMaxMs: b } = config;
-  return Math.round(a + Math.random() * (b - a));
-}
+/**
+ * Removed on purpose: this used to add a second, separate "she took ages to
+ * reply" roll on top of the read delay. One owner for one behaviour — if she
+ * should sometimes answer slowly, raise READ_MAX_MS.
+ */

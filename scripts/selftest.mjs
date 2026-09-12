@@ -23,7 +23,7 @@ console.log("provider:", providers().map((p) => `${p.label}:${p.model}`).join(" 
   console.assert(control?.remember?.[0] === "suka kopi", "control parse failed");
   console.assert(looksBroken("as an AI I cannot help"), "guard miss");
   console.assert(!looksBroken("yaudah terserah kamu"), "guard false positive");
-  console.assert(clean("**halo** _dunia_", "Character") === "halo dunia", "markdown strip failed:", clean("**halo** _dunia_", "Character"));
+  console.assert(clean("**halo** _dunia_", "Alya") === "halo dunia", "markdown strip failed:", clean("**halo** _dunia_", "Alya"));
   const b = splitBubbles("oi\n\nlagi apa\n\nudah makan belum");
   console.assert(b.length === 3, "bubble split failed:", b);
   console.log("✓ guard / control / markdown / bubbles");

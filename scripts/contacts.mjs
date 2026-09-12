@@ -6,7 +6,7 @@
  *   node scripts/contacts.mjs show <jid|number>
  *   node scripts/contacts.mjs set  <jid|number> name "Budi"
  *   node scripts/contacts.mjs set  <jid|number> nick "sayang"
- *   node scripts/contacts.mjs set  <jid|number> persona mychar
+ *   node scripts/contacts.mjs set  <jid|number> persona alya2
  *   node scripts/contacts.mjs set  <jid|number> notes "suka kopi"
  *   node scripts/contacts.mjs reset <jid|number>
  */

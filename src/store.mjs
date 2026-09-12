@@ -28,6 +28,9 @@ export function defaultChat(jid) {
   instructions: [],
   // temporary soft window: she melts for a while, then pulls back
   softUntil: 0,
+  // the only things that cross the per-contact wall (links.mjs)
+  crossNotes: [],
+  vouches: [],
     // who this person is (per contact, never shared)
     profile: {
       name: "", // WhatsApp display name

@@ -23,20 +23,20 @@ last_dup=0
 while true; do
   count="$(pgrep -cf '^node src/index\.mjs' 2>/dev/null || echo 0)"
   if [ "$count" = "0" ]; then
-    echo "[$(date '+%F %T')] bot mati — restart" >> watchdog.log
+    echo "[$(date '+%F %T')] bot is down — restarting" >> watchdog.log
     ./start.sh >> watchdog.log 2>&1
     if command -v termux-notification >/dev/null 2>&1; then
-      termux-notification -t "Understudy" -c "Bot mati, sudah di-restart." --priority high >/dev/null 2>&1
+      termux-notification -t "Understudy" -c "Bot was down and has been restarted." --priority high >/dev/null 2>&1
     fi
   elif [ "$count" -gt 1 ]; then
     # two bots would answer every message twice — kill them all, start one
-    echo "[$(date '+%F %T')] $count instance jalan — bersihin" >> watchdog.log
+    echo "[$(date '+%F %T')] $count instances running — cleaning up" >> watchdog.log
     ./stop.sh >> watchdog.log 2>&1
     ./start.sh >> watchdog.log 2>&1
     now="$(date +%s)"
     if [ $((now - last_dup)) -gt 900 ] && command -v termux-notification >/dev/null 2>&1; then
       last_dup="$now"
-      termux-notification -t "Understudy" -c "Ada $count bot jalan sekaligus — sudah dibersihin." --priority high >/dev/null 2>&1
+      termux-notification -t "Understudy" -c "$count bots were running at once — cleaned up." --priority high >/dev/null 2>&1
     fi
   fi
   sleep "$INTERVAL"

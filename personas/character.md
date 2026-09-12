@@ -75,3 +75,9 @@ Tulis 6–10 contoh pendek. Tiru RASANYA (pendek/berantakan/nyeletuk).
 ## Canon facts (jangan dilanggar)
 
 - TODO: nama, usia, kerja, fakta keras lain
+
+## Voice rules (ElevenLabs v3)
+
+> Only used when she sends a **voice note** — never in text replies.
+> Put her voice-specific habits here: fillers, signature tags, how she gets cut off.
+> The general voice rules (minimum length, tags, how people talk out loud) live in `prompt/voice.md`.

@@ -190,6 +190,100 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## Her own day (routine)
+
+Every day she gets a generated day plan: hour blocks (what she is doing, where) and a
+handful of emotional moments at specific times (`fun`, `annoyed`, `sad`, `scared`,
+`proud`, `tired`, `sweet`, `awkward`).
+
+- The plan is **global per character** — one person has one Monday, so everyone she talks
+  to sees the same day (`data/routine/<slug>.json`).
+- A moment that comes due nudges her mood (gently, once) for **every** chat she is in.
+- It gives her something new to talk about, so she stops recycling "did you eat?".
+- Storage: today's plan, the last 3 days (`ROUTINE_KEEP_DAYS`) and then only the
+  **highlights** survive. Ordinary days are deleted.
+- `rp routine` · `rp routine --new` · `rp routine --history`
+
+## Three tiers: stranger → acquaintance → trusted
+
+| | stranger | acquaintance | trusted |
+|---|---|---|---|
+| tone | cold, guarded | normal, still distant | the full character |
+| pet names | never | never | yes, mood-gated |
+| voice notes / stickers / photos | no | no | yes |
+| messages first | no | no | yes |
+| remembers your business | no | partly | yes |
+
+A brand new number gets asked **who they are** ("hey / who's this", "i asked first") until
+they introduce themselves. Say who you are, behave, and after
+`STRANGER_PROMOTE_AFTER` messages she treats you like someone she just met.
+
+**Spam gets warned, then blocked.** Every message from a non-trusted contact is scored
+(links +2, scam/loan/gambling words +3, asking for a code +4, sexual solicitation +3,
+broadcast wording +2, repeating itself +2, flooding +2). At `STRANGER_WARN_SCORE` she sends
+**one** warning; at `STRANGER_BLOCK_SCORE` the number is blocked on WhatsApp. Trusted
+contacts are never auto-blocked.
+
+## Cross-chat context (referrals)
+
+Contacts are sealed by default — she never mixes two people up and never gossips. The single
+deliberate exception: when someone says *"a friend gave me your number"*, she asks that friend.
+
+1. the stranger's chat records: waiting for them to confirm
+2. the referrer's chat gets a note: someone claims you gave them my number — ask them
+3. whatever the answer is, it lands back in the stranger's chat (confirmed → they become an
+   acquaintance; denied → it counts against them)
+
+Any mention of another known contact creates a note in that person's chat, not only referrals.
+
+## Errands (message a third number for you)
+
+Say *"order food for me on this number"* and she does it — and remembers doing it:
+
+- the action is written into her own history, so summarising can never lose it
+- the target's chat gets the real message plus why it arrived
+- when they reply, you get a note: *"Warung Geprek replied: iya kak, 25 menit lagi"*
+
+Only trusted contacts can ask, codes/passwords are refused, and there is a daily cap
+(`TASK_DAILY_MAX`).
+
+## Sharing characters
+
+```bash
+rp persona export fiona             # -> fiona.character.json
+rp persona import fiona.character.json --apply-settings
+rp persona delete fiona             # moved to personas/.trash/
+rp persona trash / restore <file>
+```
+The dashboard has Export / Import / Delete buttons in the **Character** tab. A bundle carries
+the card **and** the behaviour settings tuned for it; stickers and chat data are never
+included. Import validates the format, and a taken name gets a `-2` suffix instead of
+overwriting. Delete is always recoverable from `.trash/`.
+
+## Text and voice are separate
+
+Voice rules used to live inside the character card, so they leaked into every text reply and
+she started writing `[soft]` in normal messages. Now:
+
+- `prompt/voice.md` — the engine-level voice rules, injected **only** when a voice note is
+  actually being made
+- the card's `## Voice rules` section is split out at load time (`persona.card` vs
+  `persona.voiceCard`)
+- **a voice note is never one or two words** — spoken out loud that sounds broken. Aim for
+  2–5 sentences. Short belongs in text.
+- the exception: genuine nerves. `a— aku... [pause] no, forget it.` is allowed and welcome.
+- a code guard (`voiceLongEnough()`) sends a planned voice note as **text** if it comes out
+  under 7 words with no stammer, so you never receive a weird two-word voice note.
+
+## The config agent (OOC)
+
+A dashboard tab where you talk to the setup assistant in plain language ("make her reply less
+often", "inject a routine for today", "add to her personality: she loves black coffee").
+
+It can change behaviour settings, the personality card, the routine, schedules, the active
+character and per-contact nicknames. It **cannot** touch code, files, API keys, ALLOW/TRUSTED
+lists, or delete anything — that is enforced in code by an allowlist, not by the prompt.
+
 ## Requirements
 
 - **Node.js 18+** (tested on Node 26, Android/Termux)
@@ -260,15 +354,46 @@ Key design choices:
 ## Repo layout
 
 ```
-src/                the agent (config, whatsapp, router, engine, mood, media…)
-prompt/engine.md    global roleplay rules
+src/
+  index.mjs         entry point (WhatsApp + schedulers + dashboard)
+  router.mjs        decides what happens to an incoming message
+  engine.mjs        builds a reply, applies the tracker control block
+  prompt.mjs        the system prompt (state, mood, memory, routine, cross-chat)
+  mood.mjs          six-dimension mood + circadian drift
+  affect.mjs        the separate tracker model (mood, memory, tasks)
+  routine.mjs       her own day, global per character
+  stranger.mjs      stranger/acquaintance tiers, spam scoring, blocking
+  links.mjs         cross-chat notes (referrals)
+  tasks.mjs         errands: message a third number and remember it
+  persona-io.mjs    export / import / delete characters
+  admin.mjs         the OOC config agent (allowlisted actions)
+  texting.mjs       bubbles, typing, typos, delays
+  voice.mjs         ElevenLabs / Gemini TTS + toSpeakable()
+  guard.mjs         injection, meta-leak, filler-tic guard
+  image.mjs vision.mjs embed.mjs store.mjs llm.mjs whatsapp.mjs
+  dashboard.mjs     the local web dashboard
+prompt/engine.md    global roleplay rules (text)
+prompt/voice.md     rules for spoken replies (voice only)
 personas/           character cards (character.md is the blank starter)
-scripts/            setup, character, config, contacts, mood, voice, sticker, tests, bench
+dashboard/          the dashboard UI (single html file)
+scripts/            setup, character, config, contacts, mood, routine, voice, sticker, persona
 assets/stickers/    .webp stickers sent at random
-data/               auth, chats, state (gitignored)
+data/               auth, chats, routines, state (gitignored)
 install.sh          one-command installer
 rp                  the CLI (symlink it anywhere)
 .env.example        all settings with defaults
+```
+
+Commands:
+
+```bash
+rp start | stop | restart | status | log | last | number
+rp character        create a character (guided by the model)
+rp config           behaviour settings (auto / manual)
+rp routine          her day: today | --new | --history | --at HH:MM
+rp persona          list | use | new | export | import | delete | trash | restore
+rp contacts | mood | sticker | voice | stats | doctor
+rp test | turing | bench | dash | sync | boot | watchdog
 ```
 
 ---
@@ -311,36 +436,3 @@ Long-term memory is rewritten, not just appended to:
 `language:` in the persona frontmatter is now actually injected into the prompt
 ("BAHASA: …"). Before, it was parsed and ignored — she ended up copying whatever language
 the prompt examples were written in.
-
-## Trusted vs stranger
-
-Two tiers, so a shared bot number does not treat the whole internet like a best friend.
-
-```env
-TRUSTED=628123456789           # comma separated, E.164. "*" = everyone
-TRUST_STRANGERS=false          # true = old behaviour (everyone trusted)
-BASELINE_TRUSTED=0.30,0.60,0.45,0.68,0.60,0.50
-```
-
-| | trusted | stranger |
-|---|---|---|
-| resting mood | warm (`Warm`) | flat and guarded (`Reserved`) |
-| pet names | yes, mood-gated | **never** — not even if the model tries |
-| voice notes / stickers / photos | yes | no |
-| soft window (melting, then pulling back) | yes | no |
-| promises & check-ups ("did you eat?") | yes | no |
-| messages first (proactive) | yes | no |
-
-New contacts start untrusted. Anyone listed in `TRUSTED=` is upgraded on their next
-message (never downgraded automatically) — or flip it per contact from the dashboard.
-
-**Why the resting mood matters:** it is where she drifts back to when nothing is
-happening, so it defines what "normal" feels like for that person. A stranger rests at
-`affection 0.30` (below the pet-name gate), so warmth has to be *earned*. Put it too high
-and every contact starts out soft — which throws away the melting, the sulking and the
-"don't call me that" moments.
-
-```bash
-rp restart      # one instance only: stop.sh also cleans up stray processes
-rp status       # warns if more than one instance is alive (double replies!)
-```

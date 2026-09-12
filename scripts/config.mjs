@@ -22,32 +22,32 @@ function defaults() {
 }
 
 async function runAuto() {
-  if (!envGet("LLM_BASE_URL")) return console.log("  Belum ada model — jalankan: rp setup");
+  if (!envGet("LLM_BASE_URL")) return console.log("  No model configured — run: rp setup");
   const persona = loadPersona();
   const current = currentValues();
-  console.log(`  Karakter aktif: ${persona.name} ${persona.emoji}`);
-  console.log("  Model sedang memilih setting…");
+  console.log(`  Active character: ${persona.name} ${persona.emoji}`);
+  console.log("  The model is choosing settings…");
   const suggested = await autoSuggest(persona, current);
-  console.log(`\n  Usulan:\n${formatTable(suggested)}\n`);
+  console.log(`\n  Proposal:\n${formatTable(suggested)}\n`);
   const ok = await ask("  Terapkan? [y/N]", "y");
-  if (ok.toLowerCase() !== "y") return console.log("  dibatalkan.");
+  if (ok.toLowerCase() !== "y") return console.log("  cancelled.");
   applyValues(suggested);
-  console.log("  ✓ diterapkan. Jalankan: rp restart");
+  console.log("  ✓ applied. Run: rp restart");
 }
 
 async function runManual() {
   const current = currentValues();
-  console.log(`\n  Setting sekarang:\n${formatTable(current)}\n`);
+  console.log(`\n  Current settings:\n${formatTable(current)}\n`);
   const values = await askManually(rl, current);
   applyValues(values);
-  console.log("  ✓ diterapkan. Jalankan: rp restart");
+  console.log("  ✓ applied. Run: rp restart");
 }
 
 async function main() {
   const cmd = process.argv[2] || "";
 
   if (cmd === "show") {
-    console.log(`\n  Karakter: ${loadPersona().name}\n`);
+    console.log(`\n  Character: ${loadPersona().name}\n`);
     console.log(formatTable(currentValues()));
     console.log();
     return;
@@ -56,7 +56,7 @@ async function main() {
   if (cmd === "manual") return runManual();
   if (cmd === "reset") {
     applyValues(defaults());
-    console.log("  ✓ setting dikembalikan ke default. Jalankan: rp restart");
+    console.log("  ✓ settings reset to defaults. Run: rp restart");
     return;
   }
   if (cmd) {
@@ -85,10 +85,10 @@ async function main() {
     await runManual();
   } else if (pick === "4") {
     applyValues(defaults());
-    console.log("  ✓ default. Jalankan: rp restart");
+    console.log("  ✓ defaults restored. Run: rp restart");
   }
 }
 
 main()
-  .catch((err) => console.error("gagal:", err.message))
+  .catch((err) => console.error("failed:", err.message))
   .finally(() => close());

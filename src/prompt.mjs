@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { PERSONA_DIR, PROMPT_DIR, config } from "./config.mjs";
-import { label, tone, KEYS } from "./mood.mjs";
+import { label, tone, KEYS, normalize, newMood, baselineFor } from "./mood.mjs";
+import { routinePromptBlock, routineSparks, routineForChat } from "./routine.mjs";
+import { languageDirective } from "./lang.mjs";
+import { needsIntroduction, tierOf } from "./stranger.mjs";
+import { openNotes, openVouches } from "./links.mjs";
+import { tasksBlock } from "./tasks.mjs";
 
 const ENGINE_FILE = path.join(PROMPT_DIR, "engine.md");
 
@@ -30,9 +35,18 @@ export function loadPersona(name = config.persona) {  const file = path.join(PER
   if (!fs.existsSync(file)) throw new Error(`Persona not found: ${file}`);
   const raw = fs.readFileSync(file, "utf8");
   const meta = parsePersonaFrontmatter(raw);
+  // the card's "## Voice rules" section is for VOICE NOTES ONLY — it must never
+  // leak into text replies (that made her write audio tags in normal messages)
+  const split = raw.split(/\n(?=##\s+Voice)/i);
+  const voiceCard = split.length > 1 ? split.slice(1).join("\n").trim() : "";
+  const textCard = split[0].trim();
+
   return {
     slug: name,
-    name: meta.name || config.botName,
+    voiceCard,
+    cardRaw: raw,
+    card: textCard,
+
     emoji: meta.emoji || "",
     vibe: meta.vibe || "",
     language: meta.language || "",
@@ -45,8 +59,20 @@ export function loadPersona(name = config.persona) {  const file = path.join(PER
     work_hours: meta.work_hours || "",
     chat_schedule: meta.chat_schedule || "",
     appearance: meta.appearance || "",
-    card: raw,
   };
+}
+
+let VOICE_RULES = "";
+/** prompt/voice.md — the engine-level rules for spoken replies. */
+function loadVoiceRules() {
+  if (!VOICE_RULES) {
+    try {
+      VOICE_RULES = fs.readFileSync(path.join(PROMPT_DIR, "voice.md"), "utf8");
+    } catch {
+      VOICE_RULES = "# VOICE NOTE\nWrite it the way a person talks out loud. 2-5 sentences.";
+    }
+  }
+  return VOICE_RULES;
 }
 
 function fmtTime(date = new Date()) {
@@ -103,7 +129,9 @@ function factsWithAge(mem) {
 }
 
 export function buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled, worried } = {}) {
-  const mood = chat.mood;
+  // always have a mood object, even for a chat that was never used
+  const mood = normalize(chat.mood || newMood(baselineFor(chat)));
+  chat.mood = mood;
   const mem = chat.memory || {};
   const profile = chat.profile || {};
   const nums = KEYS.map((k) => `${k} ${mood[k].toFixed(2)}`).join(" | ");
@@ -124,14 +152,39 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
   const sulking = pstate === "dry" || pstate === "silent";
   const softLeftMin = chat.softUntil ? Math.round((chat.softUntil - Date.now()) / 60000) : 0;
   const soft = softLeftMin > 0 && !sulking;
+
+  // what has she already nagged about today? repeating it is what makes her feel
+  // forced, so the prompt is told to drop it
+  // fillers she just used — the model loves turning one into a tic
+  const recentFillers = (() => {
+    const words = ["tch", "tsk", "hmm", "hm", "uh", "emm", "yah", "wkwk"];
+    const last = (chat.history || [])
+      .filter((h) => h.role === "assistant")
+      .slice(-4)
+      .map((h) => String(h.content || "").toLowerCase())
+      .join("\n");
+    return words
+      .map((w) => [w, (last.match(new RegExp(`\\b${w}\\b`, "g")) || []).length])
+      .filter(([, n]) => n >= 2)
+      .map(([w, n]) => `${w} (${n}x)`);
+  })();
+
+  const nagged = (() => {
+    const now = Date.now();
+    const counts = {};
+    for (const i of chat.instructions || []) {
+      if (now - (i.createdAt || 0) > 6 * 3600 * 1000) continue;
+      counts[i.label] = (counts[i.label] || 0) + 1;
+    }
+    return Object.entries(counts)
+      .filter(([, n]) => n >= 2)
+      .map(([k, n]) => `${k} (${n}x)`);
+  })();
   const trusted = chat.trusted === true;
-  const warm =
-    trusted &&
-    !sulking &&
-    (soft ||
-      (mood.affection >= config.nickAffectionMin &&
-        mood.valence >= config.nickValenceMin &&
-        mood.patience >= config.nickPatienceMin));
+  // ONE dial decides whether she is warm enough for the pet name (affection,
+  // patience and mood averaged). Three separate thresholds used to fight.
+  const warmth = (mood.affection + mood.patience + (mood.valence + 1) / 2) / 3;
+  const warm = trusted && !sulking && (soft || warmth >= config.nickMoodMin);
   const nickPct = Math.round(config.nickChance * 100);
   const nickLine = !trusted
     ? "Kamu manggil dia: — (kamu belum kenal dia, jadi JANGAN pakai panggilan sayang apa pun)"
@@ -145,6 +198,34 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
         `\nKalau dia manggil kamu dengan nama sayang, kamu boleh nolak ketus (\"don't call me that\").`
       : "Kamu manggil dia: —";
 
+  const tier = tierOf(chat);
+  const askIntro = needsIntroduction(chat);
+  const notes = openNotes(chat);
+  const vouches = openVouches(chat);
+
+  // the one deliberate exception to "never talk about other people": a referral
+  const crossBlock = notes.length
+    ? [
+        "## Yang lagi nyangkut sama ORANG LAIN (khusus ini, boleh disebut)",
+        ...notes.map((n) => {
+          if (n.kind === "referral")
+            return `- ${n.fromName} (belum kamu kenal) bilang dapat nomor kamu dari dia. SEKALI aja, tanya dia natural di tengah obrolan: dia kenal nggak. Jangan interogasi, jangan jelasin panjang.`;
+          if (n.kind === "answer")
+            return `- Jawaban soal orang yang lagi ngobrol sama kamu: ${n.what}. Sikapmu IKUT jawaban itu — kalau dia kenal, boleh santai; kalau dia bilang nggak kenal, kamu curiga dan jaga jarak. Jangan bilang "aku dapat kabar dari orang lain".`;
+          return `- ${n.fromName} nyebut-nyebut kamu. Boleh disinggung kalau nyambung, jangan dibahas panjang.`;
+        }),
+        "Selain yang di atas, tetap: JANGAN cerita hal pribadi orang lain ke dia, dan jangan ketuker orang.",
+      ].join("\n")
+    : "";
+
+  const vouchBlock = vouches.length
+    ? [
+        "## Yang lagi kamu tunggu",
+        ...vouches.map((v) => `- Kamu udah nanya ${v.referrerName} soal orang ini. Belum ada jawaban. Jangan ngeyel, tinggal tunggu.`),
+        "Kalau dia nanya kamu udah tanya siapa-siapa, boleh bilang kamu lagi nunggu kabar. Jangan mengarang jawaban.",
+      ].join("\n")
+    : "";
+
   // Someone she has never met: cold, short, no flirting, nothing personal.
   const strangerBlock = [
     "## Ini orang yang BELUM kamu kenal",
@@ -155,6 +236,21 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     "- Jangan cerita hal pribadi soal kamu. Kamu nggak wajib menghibur dia.",
     "- Kalau dia cuma iseng atau nyari perhatian, jawab seadanya. Boleh banget cuma \"hm.\" atau \"ya udah.\"",
     "- Kamu baru boleh agak terbuka kalau dia beneran sopan DAN obrolannya nyambung — tapi tetap pelan, jangan langsung hangat.",
+    askIntro
+      ? "## Kamu BELUM tahu dia siapa\nTanya dulu, wajar dan singkat: siapa ini, kenal dari mana, kenapa ada nomor kamu. Boleh ketus. Jangan lanjut ngobrol panjang sebelum tahu."
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  // Someone she has met properly but is not close to yet.
+  const acquaintanceBlock = [
+    "## Kenalan baru (bukan orang asing, belum dekat)",
+    "- Kamu udah tahu dia siapa. Jadi santai aja, kayak ngobrol sama orang baru yang oke.",
+    "- Boleh ngobrol normal, tanya hal biasa, bercanda tipis. Tapi jangan genit, jangan mesra.",
+    "- Jangan pakai panggilan sayang, jangan janji apa-apa, jangan minta/ngasih foto atau voice note.",
+    "- Kalau dia mulai aneh atau minta yang aneh, kamu langsung dingin lagi.",
+    "- Tetap jaga jarak: kamu belum dekat sama dia, jadi jangan cerita hal pribadi.",
   ].join("\n");
 
   const state = [
@@ -164,7 +260,8 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     // the persona card's `language` field used to be read and then ignored, so
     // she copied whatever language the prompt examples were written in
     persona.language
-      ? `BAHASA: ${persona.language}. Pakai bahasa ini. Jangan ganti bahasa kecuali dia ganti dulu, dan jangan tiru bahasa contoh di instruksi ini.`
+      ? `BAHASA: ${languageDirective(persona.language)} (kartu karakter bilang: "${persona.language}"). ` +
+        `Jangan ganti bahasa kecuali dia ganti dulu, dan jangan tiru bahasa catatan/instruksi di sini.`
       : "",
     persona.work_hours ? `Jam kerja kamu: ${persona.work_hours} (di luar itu kamu bebas)` : "",
     soft
@@ -177,10 +274,20 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     `Nama: ${who || "belum tau namanya"}`,
     who ? "Pakai nama itu. JANGAN pernah manggil dia dengan nama lain, dan jangan mengarang nama." : "",
     nickLine,
-    trusted ? "" : strangerBlock,
+    "Catatan: \"Batasan\" di bawah itu soal cara DIA manggil/ngerusak kamu. Panggilan KAMU ke dia diatur di baris di atas — dua hal yang beda, jangan dicampur.",
+    trusted ? "" : tier === "acquaintance" ? acquaintanceBlock : strangerBlock,
+    crossBlock,
+    vouchBlock,
+    trusted ? tasksBlock(chat) : "",
     `Nomor: ${profile.number || "—"}`,
     `Chat pertama: ${since}`,
     profile.notes ? `Catatan soal dia: ${profile.notes}` : "",
+    recentFillers.length
+      ? `Filler yang BARU kamu pakai: ${recentFillers.join(", ")}. Jangan diulang sekarang — kalau mau nyeletuk, pakai yang lain atau diem aja.`
+      : "",
+    nagged.length
+      ? `Kamu SUDAH nyuruh dia soal: ${nagged.join(", ")}. Itu udah cukup — JANGAN diulang lagi. Kalau diulang terus, itu ngeselin, bukan perhatian.`
+      : "",
     "Ini CUMA orang ini. Jangan pernah ketuker sama orang lain, dan jangan ceritain hal tentang orang lain ke dia. Kalau kamu belum tahu namanya, tanya dengan natural — jangan kayak interogasi.",
     "Kalau namanya belum kamu tahu atau chat pertama masih hari ini, berarti ini orang yang belum kamu kenal. Bersikap wajar sama orang baru — jangan pura-pura udah kenal lama, dan jangan ceritain hal pribadi ke orang asing.",
     "",
@@ -188,6 +295,8 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     `Lagi: ${label(mood)}`,
     nums,
     `Efeknya: ${tone(mood)}`,
+    "",
+    routinePromptBlock(routineForChat(chat)),
     "",
     "## Yang kamu inget",
     `Hubungan: ${mem.relationship || "—"}`,
@@ -250,34 +359,12 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     ...(voice
       ? [
           "",
-          "# MODE VOICE NOTE — naskah untuk DIUCAPKAN (ElevenLabs v3)",
-          "Sekarang kamu ninggalin voice note, bukan ngetik. Yang kamu tulis bakal dibacakan suara. Tulis seperti orang ngomong: berantakan, hidup, nggak rapi.",
+          loadVoiceRules().trim(),
           "",
-          "## Audio tag",
-          "- Ditulis dalam kurung siku, huruf kecil. Contoh: [soft] [sighs] [sighing] [pause] [dryly] [whispers] [laughs]",
-          "- Tag boleh DESKRIPTIF dan bebas, bukan cuma dari daftar: [soft, voice thick with love], [flat, tired], [almost inaudible], [smiling a little]",
-          "- Tag boleh muncul di TENGAH kalimat dan boleh dipakai lebih dari sekali. Jangan numpuk semua di awal.",
-          "- Contoh penempatan: [soft] I don't care. [sighing] I just want a simple life.",
-          `- Tag andalan kamu: ${persona.voice_tags || "[dryly] [pause] [sighs] [quietly] [flatly]"}`,
-          "",
-          "## Cara orang ngomong",
-          "- Ada bunyi isi: emm, ee, uh, hmm, tch, yah, nah, well...",
-          "- Kata bisa ditarik: anddd, yahh, okayyy, sooo",
-          "- Sering kepotong dan mulai ulang: 'I— something', 'I mean—', '...forget it.'",
-          "- Kalimat pendek dan panjang campur. Boleh ngulang kata. Boleh batalin kalimatnya sendiri.",
-          "- '...' buat mikir/trail off, '—' buat kepotong, ',' buat napas pendek, HURUF KAPITAL buat penekanan.",
-          "- Jangan emoji, markdown, tanda bintang, atau deskripsi di luar tag.",
-          "- JANGAN dirapikan. Voice note yang rapi = ketauan robot.",
-          "",
-          "## Panjang",
-          "1-3 kalimat aja. Boleh cuma satu kata + tag. Jangan pidato.",
-          "",
-          "## Contoh rasa (jangan tiru isinya, tiru rasanya)",
-          "[soft, barely awake] hey. [pause] emm... it's three am, honey.",
-          "[dryly] I was working. [sighs] I just— whatever. relax.",
-          "[almost inaudible] ...i miss you. [soft] don't make it weird.",
-          "Output HANYA kalimat yang diucapkan. Nggak ada penjelasan tambahan di luar tag.",
-          persona.voice_style ? `\n## Gaya suara kamu\n${persona.voice_style}` : "",
+          "## Nada suara kamu (kartu karakter)",
+          persona.voiceCard || "",
+          persona.voice_style ? `Gaya suara: ${persona.voice_style}` : "",
+          persona.voice_tags ? `Tag andalan kamu: ${persona.voice_tags}` : "",
         ].filter(Boolean)
       : []),
     ...(recalled?.length
@@ -501,7 +588,13 @@ export function buildProactiveMessages(chat, persona, { displayName } = {}) {
       ]
     : [
         "Kamu pengen nyeletuk — pesan ini tentang KAMU: kejadian kecil di harimu, isi kepalamu, keluhan, hal random yang baru kamu lihat/inget, atau callback ke sesuatu di antara kalian.",
-        `Pemicu hari ini (boleh diubah sesuai karaktermu): ${pickSparks(2).join(" / ")}.`,
+        (() => {
+          const own = routineSparks(routineForChat(chat));
+          const mine = pickSparks(2);
+          return own.length
+            ? `Yang BARU kejadian sama kamu hari ini (pakai ini kalau nyambung, jangan ngarang): ${own.join(" / ")}. Cadangan: ${mine.join(" / ")}.`
+            : `Pemicu hari ini (boleh diubah sesuai karaktermu): ${mine.join(" / ")}.`;
+        })(),
         `Yang kamu ingat tentang dia (boleh disinggung): ${facts}.`,
       ];
 

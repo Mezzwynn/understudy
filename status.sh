@@ -9,7 +9,7 @@ if [ "$count" = "0" ]; then
 elif [ "$count" = "1" ]; then
   echo "status: RUNNING (pid $(pgrep -f '^node src/index\.mjs' | head -1))"
 else
-  echo "status: RUNNING — $count INSTANCE (harus dibersihin: rp restart)"
+  echo "status: RUNNING — $count INSTANCES (clean up with: rp restart)"
   pgrep -af '^node src/index\.mjs'
 fi
 

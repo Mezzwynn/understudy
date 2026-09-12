@@ -2,7 +2,7 @@ import { config, log } from "./config.mjs";
 import { loadChat, saveChat, loadState, saveState } from "./store.mjs";
 import { generateReply, generateDryReply } from "./engine.mjs";
 import { loadPersona } from "./prompt.mjs";
-import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst, maybeLongDelay } from "./texting.mjs";
+import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst } from "./texting.mjs";
 import { describeImage, transcribeAudio } from "./vision.mjs";
 import { synthesize, toSpeakable } from "./voice.mjs";
 import { stripAudioTags, detectInjection } from "./guard.mjs";
@@ -265,6 +265,20 @@ export function isGenuineApology(text) {
 }
 const DRY_LINES = ["y.", "h.", "k.", "ok.", "sure.", "mhm.", "yeah.", "nothing."];
 
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+/**
+ * A voice note that is too short sounds broken when spoken out loud — short
+ * belongs in a text message. The exception is a genuinely flustered delivery:
+ * a stammer or a breath ("a— aku...", "[pause] ...no.") is allowed to be short.
+ */
+function voiceLongEnough(text) {
+  const words = String(text).split(/\s+/).filter(Boolean).length;
+  if (words >= 7) return true;
+  const flustered = /—|\[pause\]|\[sighs\]|\[breath|\[whispers\]|\[almost inaudible\]/i.test(String(text));
+  return flustered && words >= 3;
+}
+
 function pickDryLine(p) {
   let v;
   let guard = 0;
@@ -324,6 +338,88 @@ async function respond(sock, jid, p) {
   if (!chat.profile.nick && config.defaultNick && trusted) chat.profile.nick = config.defaultNick;
 
   const persona = loadPersona(chat.persona || undefined);
+
+  // ── strangers: warn first, block only if it keeps going ──────────────────
+  const strangerVerdict = decide(chat, incoming);
+  if (strangerVerdict.action === "blocked") {
+    log(`ignored message from blocked contact ${chat.jid}`);
+    saveChat(chat);
+    return;
+  }
+  if (strangerVerdict.action === "block") {
+    const line = WARN_LINES.length ? pick(WARN_LINES) : "";
+    if (line) {
+      try {
+        await sendText(sock, chat.jid, line);
+        chat.history.push({ role: "assistant", content: line, ts: Date.now() });
+        chat.stats.outbound = (chat.stats.outbound || 0) + 1;
+      } catch (err) {
+        log(`warn send failed: ${err.message}`);
+      }
+    }
+    await blockNumber(sock, chat, strangerVerdict.reasons.join(", "));
+    saveChat(chat);
+    return;
+  }
+  if (strangerVerdict.action === "warn" && !chat.stranger?.warnedAt) {
+    const line = pick(WARN_LINES);
+    chat.stranger.warnedAt = Date.now();
+    try {
+      await sendText(sock, chat.jid, line);
+      chat.history.push({ role: "assistant", content: line, ts: Date.now() });
+      chat.stats.outbound = (chat.stats.outbound || 0) + 1;
+    } catch (err) {
+      log(`warn send failed: ${err.message}`);
+    }
+    saveChat(chat);
+    return;
+  }
+
+  // ── cross-chat: someone mentioned another contact, or answered about one ──
+  try {
+    await resolveNotes(chat, incoming);
+    const mention = detectMention(chat, incoming);
+    if (mention) {
+      const who = chat.profile?.name || chat.profile?.number || "someone";
+      const target = loadChat(mention.target.jid);
+      if (mention.isReferral) {
+        const note = addCrossNote(target, {
+          fromJid: chat.jid,
+          fromName: who,
+          kind: "referral",
+          what: `${who} (not a contact yet) says they got my number from you: "${String(incoming).slice(0, 120)}"`,
+          ref: { strangerJid: chat.jid, strangerName: who },
+        });
+        if (note) {
+          addVouch(chat, mention.target, String(incoming).slice(0, 160));
+          saveChat(target);
+          log(`referral: ${who} → ${mention.target.name || mention.target.jid}`);
+        }
+      } else {
+        if (addCrossNote(target, { fromJid: chat.jid, fromName: who, kind: "mention", what: `${who} mentioned you: "${String(incoming).slice(0, 120)}"` })) {
+          saveChat(target);
+        }
+      }
+    }
+  } catch (err) {
+    log(`cross-chat failed: ${err.message}`);
+  }
+
+  // her own day (global, shared by everyone she talks to): make sure today
+  // exists, then let the moments that came due move THIS chat's mood
+  if (chat.trusted === true && config.routine) {
+    try {
+      const routine = await ensureToday(persona, { mood: chat.mood });
+      const fired = tickMoments(routine);
+      if (fired.length && !isMoodLocked(chat)) {
+        for (const m of fired) chat.mood = applyDeltas(normalize(chat.mood), momentDeltas(m));
+      }
+      if (fired.length) saveRoutine(routine.slug, routine);
+    } catch (err) {
+      log(`routine failed: ${err.message}`);
+    }
+  }
+
   const isMedia = incoming.startsWith("[");
   const bare = isMedia ? "" : incoming.replace(/\s/g, "");
   const mm = moodMultipliers(chat.mood);
@@ -380,13 +476,23 @@ async function respond(sock, jid, p) {
     pstate.dryCount = 0;
     chat.coldUntil = 0;
     if (!isMoodLocked(chat)) chat.mood = applyDeltas(normalize(chat.mood), {
-      valence: worried ? 0.02 : 0.2,
-      patience: worried ? 0.05 : 0.18,
-      affection: 0.06,
+      valence: worried ? 0.02 : 0.12,
+      patience: worried ? 0.05 : 0.12,
+      affection: 0.05,
       arousal: worried ? 0.12 : -0.05,
     });
     thawed = true;
     log(worried ? `thawing (health scare) → ${jid}` : `thawing after apology → ${jid}`);
+  }
+
+  // a stranger who behaves and introduces themselves becomes an acquaintance
+  promoteIfReady(chat);
+
+  // the third party replied to an errand she ran — tell the owner right away
+  try {
+    notifyTaskReply(chat, incoming);
+  } catch (err) {
+    log(`task reply notify failed: ${err.message}`);
   }
 
   // read receipts are not instant
@@ -429,14 +535,6 @@ async function respond(sock, jid, p) {
   await sleep(pretypeDelayFor());
   await presence(sock, jid, "composing");
 
-  // sometimes she gets distracted for a while before answering
-  const distracted = maybeLongDelay();
-  if (distracted) {
-    await presence(sock, jid, "paused");
-    log(`distracted for ${Math.round(distracted / 1000)}s`);
-    await sleep(distracted);
-    await presence(sock, jid, "composing");
-  }
 
   // decide the reply format up front, so a voice note can be written for speech.
   // An explicit request overrides the dice: "kirim vn dong" -> voice, "text aja" -> text.
@@ -562,7 +660,7 @@ async function respond(sock, jid, p) {
   // ── voice note(s): the whole reply, split in two, or text-then-voice ──
   if (!sentMedia && wantVoice) {
     const speakable = toSpeakable(replyText);
-    if (speakable.length >= 12) {
+    if (speakable.length >= 12 && voiceLongEnough(speakable)) {
       const sentences = speakable.split(/(?<=[.!?…])\s+/).filter(Boolean);
       let opening = null;
       let chunks = [speakable];
@@ -584,7 +682,7 @@ async function respond(sock, jid, p) {
         try {
           await sendText(sock, jid, opening);
           chat.stats.outbound = (chat.stats.outbound || 0) + 1;
-          if (config.debug) log(`→ ${jid} (teks sebelum VN): ${opening}`);
+          if (config.debug) log(`→ ${jid} (text before the voice note): ${opening}`);
         } catch (err) {
           log(`send failed: ${err.message}`);
         }
@@ -617,7 +715,10 @@ async function respond(sock, jid, p) {
     }
   }
 
-  if (!sentMedia) {
+  // is a plain text reply still going out? (one garnish per reply: never
+  // photo + sticker + voice note stacked on top of each other)
+  const willSendText = !sentMedia;
+  if (willSendText) {
     const bubbles = maybeBurst(splitBubbles(chatText), config.burstChance);
     const quoted =
       config.quoteChance > 0 && p.msg && Math.random() < config.quoteChance ? p.msg : undefined;
@@ -694,8 +795,19 @@ async function respond(sock, jid, p) {
     }
   }
 
-  // ── sticker as an addition (text/voice already sent) ──
-  if (stickerPick && !stickerAlone) {
+  // ── errands the owner asked for: send them now, and write them down ──
+  if ((chat.pendingTasks || []).length) {
+    for (const task of chat.pendingTasks) {
+      const r = await runTask(sock, chat, task);
+      if (!r.ok) log(`task not sent: ${r.reason}`);
+      else if (config.debug) log(`task ok → ${task.to}`);
+    }
+    chat.pendingTasks = [];
+    saveChat(chat);
+  }
+
+  // ── sticker as an addition (only on top of a text reply) ──
+  if (stickerPick && !stickerAlone && willSendText) {
     await presence(sock, jid, "composing");
     await sleep(500 + Math.random() * 1200);
     try {

@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0b0c10" />
-<title>Understudy</title>
+<title>Understudy — Control Panel</title>
 <style>
   :root{
     --bg:#0b0c10; --bg2:#0f1116; --card:#15171d; --card2:#1b1e26; --line:#262a34;
@@ -140,14 +140,16 @@
       <span class="badge" id="pstate">—</span>
       <span class="grow"></span>
       <span class="muted"><span class="dot" id="dot"></span> <span id="num">—</span></span>
-      <button class="act ghost" id="btn-refresh" title="Muat ulang" style="padding:6px 10px">↻</button>
+      <button class="act ghost" id="btn-refresh" title="Reload" style="padding:6px 10px">↻</button>
     </div>
-    <div class="tiny" id="sub" style="margin-top:5px">memuat…</div>
+    <div class="tiny" id="sub" style="margin-top:5px">loading…</div>
     <nav id="tabs">
-      <button data-t="contacts" class="active">Kontak</button>
-      <button data-t="settings">Setting</button>
-      <button data-t="schedule">Jadwal</button>
-      <button data-t="quota">Kuota</button>
+      <button data-t="contacts" class="active">Contacts</button>
+      <button data-t="character">Character</button>
+      <button data-t="agent">Agent</button>
+      <button data-t="settings">Settings</button>
+      <button data-t="schedule">Schedule</button>
+      <button data-t="quota">Usage</button>
       <button data-t="log">Log</button>
     </nav>
   </div>
@@ -156,10 +158,12 @@
 <main>
   <section id="tab-contacts">
     <div class="card tight" id="ctools">
-      <input id="q" placeholder="Cari kontak (nama / nomor)…" autocomplete="off">
+      <input id="q" placeholder="Search contacts (name or number)…" autocomplete="off">
     </div>
     <div id="clist"></div>
   </section>
+  <section id="tab-character" hidden></section>
+  <section id="tab-agent" hidden></section>
   <section id="tab-settings" hidden></section>
   <section id="tab-schedule" hidden></section>
   <section id="tab-quota" hidden></section>
@@ -174,7 +178,7 @@ const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MOODKEYS = ["valence","energy","arousal","affection","patience","playfulness"];
 const MOODMIN = { valence:-1 };
-let DATA=null, tab="contacts", SETTINGS_LOADED=false;
+let DATA=null, tab="contacts", SETTINGS_LOADED=false, CHAR_LOADED=false, CHAR_SLUG=null, charDirty=false;
 const draft = {};       // jid -> values being edited
 let dragging = false;
 
@@ -204,7 +208,7 @@ function hue(k,v){
 function fmtMs(v){ const n=Number(v); if(!Number.isFinite(n)) return ""; return (n/1000).toFixed(n<1000?2:1)+"s"; }
 function hintFor(k,v){
   const n = Number(v);
-  if(!Number.isFinite(n)) return k==="DEFAULT_NICK" ? "kosong = dia manggil kamu dengan “kamu/you”" : "";
+  if(!Number.isFinite(n)) return k==="DEFAULT_NICK" ? "empty = she calls you by your name / \"you\"" : "";
   if(/_MS$/.test(k)) return "≈ "+fmtMs(n);
   if(/_CHANCE$/.test(k) || /^NICK_(AFFECTION|VALENCE|PATIENCE)_MIN$/.test(k)) return Math.round(n*100)+"%";
   if(/_MIN$/.test(k) || /_AFTER$/.test(k)) return n+" menit";
@@ -220,7 +224,7 @@ function renderHeader(){
   $("#pstate").textContent = b.connected ? "online" : "terputus";
   $("#pstate").className = "badge " + (b.connected ? "ok" : "warn");
   const h=Math.floor(b.uptimeSec/3600), m=Math.floor(b.uptimeSec%3600/60);
-  $("#sub").innerHTML = `aktif ${h}j ${m}m · chat duluan: sepi &gt;${b.idleMin}m, jeda ${b.gapMin}m · jam tenang ${b.quiet[0]}:00–${b.quiet[1]}:00`;
+  $("#sub").innerHTML = `up ${h}h ${m}m · messages first: idle &gt;${b.idleMin}m, gap ${b.gapMin}m · quiet hours ${b.quiet[0]}:00–${b.quiet[1]}:00`;
 }
 
 /* ============================ contacts ============================ */
@@ -236,12 +240,12 @@ function moodRead(c){
       <span class="mlabel">${esc(c.moodLabel||"—")}</span>
       <span class="badge">auto</span>
       <span class="grow"></span>
-      <span class="tiny">dikelola model dari obrolan</span>
+      <span class="tiny">managed by the model from the chat</span>
     </div>
     ${rows}
     <div class="btns">
-      <button class="act" data-act="mood-manual" data-jid="${esc(c.jid)}">Manual</button>
-      <button class="act" data-act="mood-auto" data-jid="${esc(c.jid)}">Auto (model)</button>
+      <button class="act" data-act="mood-manual" data-jid="${esc(c.jid)}" >Manual</button>
+      <button class="act" data-act="mood-auto" data-jid="${esc(c.jid)}" >Auto (model)</button>
     </div>
   </div>`;
 }
@@ -262,21 +266,28 @@ function moodEdit(c){
       <span class="badge soft">manual</span>
       <span class="grow"></span>
     </div>
-    <div class="locked">🔒 <span>Mood dikunci${c.moodLockedAt?` sejak ${ago(c.moodLockedAt)}`:""} — dia nggak akan berubah sendiri sampai kamu pencet <b>Auto</b>.</span></div>
+    <div class="locked">🔒 <span>Mood locked${c.moodLockedAt?` ${ago(c.moodLockedAt)}`:""} — it will not change on its own until you press <b>Auto</b>.</span></div>
     ${rows}
     <div class="btns">
-      <button class="act primary" data-act="mood-save" data-jid="${esc(c.jid)}">Simpan</button>
-      <button class="act" data-act="mood-baseline" data-jid="${esc(c.jid)}">Balikin ke normal</button>
-      <button class="act" data-act="mood-auto" data-jid="${esc(c.jid)}">Auto (model)</button>
+      <button class="act primary" data-act="mood-save" data-jid="${esc(c.jid)}" >Save</button>
+      <button class="act" data-act="mood-baseline" data-jid="${esc(c.jid)}" >Reset to normal</button>
+      <button class="act" data-act="mood-auto" data-jid="${esc(c.jid)}" >Auto (model)</button>
     </div>
   </div>`;
+}
+function routineBox(c){
+  // the routine is global (one day per character) — this is only a summary,
+  // panel lengkapnya ada di tab Karakter
+  if(!c.routineTheme) return "";
+  return `<div class="tiny" style="margin-top:8px">Hari ini: <b style="color:var(--tx)">${esc(c.routineTheme)}</b>${
+    c.routineNow?` · now: ${esc(c.routineNow.what)}`:""}</div>`;
 }
 function contactCard(c){
   const badge = c.state==="dry"?"dry":c.state==="silent"?"silent":c.state==="awaiting"?"awaiting":"";
   const initial = (c.name||c.number||"?").trim().charAt(0).toUpperCase();
   const manual = c.moodMode === "manual";
   const commit = (c.commitments&&c.commitments.length)
-    ? `<div class="tiny" style="margin-top:8px">Janji: ${c.commitments.map(x=>`“${esc(x.what)}” <span class="tiny">(${new Date(x.due).toLocaleString("id-ID",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})})</span>`).join(" · ")}</div>`
+    ? `<div class="tiny" style="margin-top:8px">Promise: ${c.commitments.map(x=>`“${esc(x.what)}” <span class="tiny">(${new Date(x.due).toLocaleString("id-ID",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})})</span>`).join(" · ")}</div>`
     : "";
   return `<div class="card ccard fadein">
     <div class="row">
@@ -287,31 +298,37 @@ function contactCard(c){
           <span class="badge ${badge}">${c.state}${c.state==="dry"?` (${c.dryCount})`:""}</span>
           ${c.softMinutes?`<span class="badge soft">soft ${c.softMinutes}m</span>`:""}
         </div>
-        <div class="tiny" style="margin-top:2px">${esc(c.number)}${c.nick?` · dipanggil “${esc(c.nick)}”`:""}</div>
+        <div class="tiny" style="margin-top:2px">${esc(c.number)}${c.nick?` · called “${esc(c.nick)}”`:""}</div>
       </div>
-      <span class="badge ${c.trusted?'ok':'warn'}">${c.trusted?'dipercaya':'orang asing'}</span>
+      <span class="badge ${c.trusted?'ok':c.tier==='acquaintance'?'':'warn'}">${c.blocked?'blocked':c.tier}</span>
     </div>
     <div class="stats">
-      <span class="stat">masuk <b>${c.inbound}</b></span>
-      <span class="stat">keluar <b>${c.outbound}</b></span>
-      <span class="stat">terakhir <b>${ago(c.lastInteraction)}</b></span>
-      ${c.lastProactiveAt?`<span class="stat">chat duluan <b>${ago(c.lastProactiveAt)}</b></span>`:""}
+      <span class="stat">in <b>${c.inbound}</b></span>
+      <span class="stat">out <b>${c.outbound}</b></span>
+      <span class="stat">last <b>${ago(c.lastInteraction)}</b></span>
+      ${c.lastProactiveAt?`<span class="stat">started <b>${ago(c.lastProactiveAt)}</b></span>`:""}
     </div>
     ${manual ? moodEdit(c) : moodRead(c)}
+    ${(c.tasks||[]).length?`<div class="tiny" style="margin-top:7px">📤 ${c.tasks.map(t=>`to <b>${esc(t.to)}</b>: ${esc(t.text.slice(0,50))} <span class="tiny">(${esc(t.status)})</span>`).join(" · ")}</div>`:""}
+    ${(c.crossNotes||[]).length?`<div class="tiny" style="margin-top:7px">🔗 ${c.crossNotes.map(n=>`<b>${esc(n.from)}</b>: ${esc(n.what.slice(0,90))}`).join(" · ")}</div>`:""}
+    ${(c.vouches||[]).length?`<div class="tiny" style="margin-top:4px;color:var(--warn)">⏳ waiting for ${c.vouches.map(v=>esc(v.with)).join(", ")} to answer</div>`:""}
+    ${c.blocked?`<div class="locked" style="background:#241414;border-color:#5c2a2a;color:#ffb1b1">⛔ Blocked${c.blockReason?` — ${esc(c.blockReason)}`:""}</div>`:c.strikes?`<div class="tiny" style="margin-top:6px;color:var(--warn)">suspicion score ${c.strikes}</div>`:""}
     ${commit}
+    ${routineBox(c)}
     <details>
-      <summary>Pengaturan kontak ini</summary>
+      <summary>Contact settings</summary>
       <div class="grid" style="margin-top:10px">
-        <div><label>Panggilan buat dia</label>
+        <div><label>Name you go by for her</label>
           <input class="f-nick" data-jid="${esc(c.jid)}" value="${esc(c.nick)}" placeholder="mis. sayang"></div>
-        <div><label>Karakter (slug, opsional)</label>
+        <div><label>Character (slug, optional)</label>
           <input class="f-persona" data-jid="${esc(c.jid)}" value="${esc(c.persona)}" placeholder="(default)"></div>
       </div>
       <div class="btns">
-        <button class="act primary" data-act="save" data-jid="${esc(c.jid)}">Simpan</button>
-        <button class="act" data-act="trust" data-jid="${esc(c.jid)}" data-v="${c.trusted?0:1}">${c.trusted?'Jadikan orang asing':'Jadikan dipercaya'}</button>
-        <button class="act" data-act="proactive" data-jid="${esc(c.jid)}">Chat duluan sekarang</button>
-        <button class="act danger" data-act="reset" data-jid="${esc(c.jid)}">Reset konteks</button>
+        <button class="act primary" data-act="save" data-jid="${esc(c.jid)}" >Save</button>
+        <button class="act" data-act="trust" data-jid="${esc(c.jid)}" data-v="${c.trusted?0:1}">${c.trusted?'Revoke trusted':'Mark as trusted'}</button>
+        <button class="act" data-act="proactive" data-jid="${esc(c.jid)}" >Message them now</button>
+        <button class="act" data-act="block" data-jid="${esc(c.jid)}" data-v="${c.blocked?0:1}" ${c.trusted?'disabled':''}>${c.blocked?'Unblock':'Block number'}</button>
+        <button class="act danger" data-act="reset" data-jid="${esc(c.jid)}" >Reset context</button>
       </div>
     </details>
   </div>`;
@@ -321,7 +338,232 @@ function renderContacts(){
   const q = ($("#q").value||"").trim().toLowerCase();
   const list = DATA.contacts.filter(c => !q || (c.name||"").toLowerCase().includes(q) || (c.number||"").includes(q));
   root.innerHTML = list.length ? list.map(contactCard).join("")
-    : `<div class="card"><div class="empty">${DATA.contacts.length?"Nggak ada yang cocok.":"Belum ada kontak."}</div></div>`;
+    : `<div class="card"><div class="empty">${DATA.contacts.length?"No matches.":"No contacts yet."}</div></div>`;
+}
+
+/* ============================ character ============================ */
+const CHAR_FIELDS = [
+  ["name", "Name", "e.g. Fiona"],
+  ["emoji", "Emoji", "🖤"],
+  ["vibe", "Vibe (one line)", "Cold on the surface, caring but refuses to show it"],
+  ["language", "Language", "English-dominant, casual, with a little Indonesian"],
+  ["deflection", "Line she uses when accused of being an AI", "hm. whatever."],
+  ["active_hours", "Active hours", "11-14,17-19,21-2"],
+  ["work_hours", "Work hours", "13-21"],
+  ["chat_schedule", "Message-first schedule", "11,16,20,23"],
+  ["voice", "Voice (Gemini TTS)", "Kore"],
+  ["voice_eleven", "ElevenLabs voice ID", ""],
+  ["voice_tags", "Signature audio tags", "[sighs] [pause] [dryly]"],
+  ["voice_style", "Voice style", ""],
+  ["appearance", "Appearance (for photos)", ""],
+];
+const KINDICON = { fun:"😄", sweet:"🥰", proud:"😤", annoyed:"😒", sad:"😢", scared:"😨", tired:"😮‍💨", awkward:"😬" };
+
+async function renderCharacter(force){
+  const root = $("#tab-character");
+  // do not redraw while the user is typing — it would wipe their input
+  if(charDirty && !force && root.innerHTML.trim()) return;
+  let card = DATA.personaCard;
+  if(!card || force){
+    const slug = CHAR_SLUG || DATA.bot.persona.slug;
+    card = await api("/api/persona/card?slug="+encodeURIComponent(slug));
+    if(!card.ok){ root.innerHTML = `<div class="card"><div class="empty">Gagal muat kartu characters.</div></div>`; return; }
+    DATA.personaCard = card; CHAR_SLUG = slug;
+  }
+  const fm = card.frontmatter || {};
+  root.innerHTML = `
+    <div class="card">
+      <div class="row"><h2 style="margin:0">Character</h2><span class="grow"></span>
+        <select id="char-picker" style="max-width:150px">
+          ${DATA.personas.map(p=>`<option value="${esc(p.slug)}" ${p.slug===CHAR_SLUG?"selected":""}>${esc((p.emoji||"")+" "+p.name)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="btns" style="margin-top:11px">
+        <button class="act" id="btn-char-export">Export .json</button>
+        <button class="act" id="btn-char-import">Import .json</button>
+        <button class="act" id="btn-char-share">Share in chat</button>
+        <span class="grow"></span>
+        <button class="act danger" id="btn-char-delete">Delete</button>
+        <input type="file" id="char-file" accept=".json,application/json" hidden>
+      </div>
+      <div class="grid" style="margin-top:12px">
+        ${CHAR_FIELDS.map(([k,label,ph])=>`<div><label>${esc(label)}<span class="tiny"> · ${k}</span></label>
+          <input class="cf" data-k="${k}" value="${esc(fm[k]||"")}" placeholder="${esc(ph)}"></div>`).join("")}
+      </div>
+      <div class="hint" style="margin-top:8px">Active hours = when she may appear online. Schedule = when she may message first (hour only = random minute each day).</div>
+    </div>
+
+    <div class="card">
+      <h2>Personality (character card)</h2>
+      <textarea id="char-body" rows="18" style="font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.6">${esc(card.body||"")}</textarea>
+      <div class="hint" style="margin-top:6px">This is what makes her feel alive: vocabulary, texting habits, example lines, what she hides. The more specific, the better.</div>
+      <div class="btns">
+        <button class="act primary" id="btn-char-save" >Save character</button>
+        <span class="grow"></span>
+        <span class="muted" id="char-hint"></span>
+      </div>
+    </div>
+
+    ${routinePanel(DATA.routine)}
+  `;
+  $("#char-picker").onchange = (e)=>{
+    if(charDirty && !confirm("You have unsaved changes. Switch character?")){ e.target.value = CHAR_SLUG; return; }
+    charDirty = false; CHAR_SLUG = e.target.value; DATA.personaCard=null; renderCharacter(true);
+  };
+  $("#btn-char-save").onclick = ()=>saveCharacter();
+  $("#btn-char-export").onclick = ()=>{ window.location = "/api/persona/export?slug="+encodeURIComponent(CHAR_SLUG); };
+  $("#btn-char-import").onclick = ()=>$("#char-file").click();
+  $("#btn-char-share").onclick = async ()=>{
+    const r = await api("/api/admin",{ message:`Export the character ${CHAR_SLUG} as a shareable file and tell me what is in it` });
+    toast((r.say||"").slice(0,160));
+    drawAgent && null;
+  };
+  $("#char-file").onchange = async (e)=>{
+    const f = e.target.files[0]; if(!f) return;
+    const text = await f.text();
+    const applySettings = confirm("Also apply the behaviour settings inside this file?");
+    const r = await api("/api/persona/import",{ bundle:text, applySettings });
+    if(!r.ok){ toast("Import failed: "+(r.error||"")); return; }
+    toast("Imported as \""+r.slug+"\""+(r.renamed?" (name was taken)":"")+(r.settingsApplied?" · "+r.settingsApplied+" settings applied":""));
+    CHAR_SLUG = r.slug; DATA.personaCard = null; charDirty=false;
+    await refresh(true);
+  };
+  $("#btn-char-delete").onclick = async ()=>{
+    if(!confirm(`Delete "${CHAR_SLUG}"? It is moved to personas/.trash/ so you can restore it later.`)) return;
+    const r = await api("/api/persona/delete",{ slug: CHAR_SLUG });
+    if(!r.ok){ toast("Failed: "+(r.error||"")); return; }
+    toast("Deleted"+ (r.switchedTo? " · now using "+r.switchedTo : ""));
+    CHAR_SLUG = r.switchedTo || (DATA.personas[0]&&DATA.personas[0].slug) || null;
+    DATA.personaCard = null; await refresh(true);
+  };
+  const rb = $("#btn-routine-new");
+  if(rb) rb.onclick = async ()=>{
+    if(charDirty && !confirm("You have unsaved card changes. Generate a new routine anyway? (unsaved edits may be lost)")) return;
+    toast("Generating a new day…");
+    const r = await api("/api/routine/new",{ slug: CHAR_SLUG });
+    toast(r.ok ? ("New routine: "+r.routine.theme) : ("Failed: "+(r.error||"")));
+    await refresh(true);
+  };
+}
+
+function routinePanel(r){
+  if(!r) return `<div class="card"><h2>Today's routine</h2><div class="empty">Nothing yet. Generate a routine.</div>
+    <div class="btns"><button class="act primary" id="btn-routine-new">Generate today's routine</button></div></div>`;
+  return `<div class="card">
+    <div class="row"><h2 style="margin:0">Today's routine</h2><span class="grow"></span>
+      <span class="badge">${esc(r.weekday||"")} ${esc(r.date||"")}</span>
+      <button class="act" id="btn-routine-new" >Regenerate</button>
+    </div>
+    <div class="locked" style="background:#131a24;border-color:#2b3a52;color:#a9c6e8;margin-top:11px">
+      🕐 now: <b>${esc(r.now?r.now.what:"(free)")}</b>${r.now&&r.now.place?` · ${esc(r.now.place)}`:""}
+    </div>
+    <div class="muted" style="margin-bottom:10px">Theme: ${esc(r.theme||"—")}${r.next?` · next: ${esc(r.next.what)}`:""}</div>
+    ${(r.moments||[]).map(m=>`<div class="mrow" style="grid-template-columns:44px 20px 1fr">
+      <span class="tiny">${esc(m.at)}</span><span>${KINDICON[m.kind]||"•"}</span>
+      <span style="font-size:11px;color:${m.lived?"var(--tx)":"var(--dim2)"}">${esc(m.what)}${m.lived?"":" <span class='tiny'>(pending)</span>"}</span></div>`).join("")}
+    <details style="margin-top:9px"><summary>Full schedule (${(r.blocks||[]).length} blok)</summary>
+      <div style="margin-top:8px">${(r.blocks||[]).map(b=>`<div class="mrow" style="grid-template-columns:96px 1fr">
+        <span class="tiny">${esc(b.start)}–${esc(b.end)}</span><span style="font-size:11px">${esc(b.what)}${b.place?` <span class="tiny">· ${esc(b.place)}</span>`:""}</span></div>`).join("")}</div></details>
+    ${(r.highlights||[]).length?`<details style="margin-top:6px"><summary>Saved highlights (${r.highlights.length})</summary>
+      <div style="margin-top:8px">${r.highlights.map(h=>`<div class="mrow" style="grid-template-columns:20px 1fr"><span>${KINDICON[h.kind]||"•"}</span><span style="font-size:11px">${esc(h.what)}</span></div>`).join("")}</div></details>`:""}
+    ${(r.history||[]).length?`<div class="tiny" style="margin-top:8px">Previous days: ${r.history.map(h=>esc((h.date||"")+" "+h.theme)).join(" · ")}</div>`:""}
+  </div>`;
+}
+
+async function saveCharacter(){
+  const frontmatter = {};
+  $$(".cf").forEach(i=>{ frontmatter[i.dataset.k] = i.value.trim(); });
+  const body = $("#char-body").value;
+  const r = await api("/api/persona/save",{ slug: CHAR_SLUG, frontmatter, body });
+  if(!r.ok){ toast("gagal: "+(r.error||"")); return; }
+  charDirty = false;
+  toast("Character saved — applied immediately, no restart needed");
+  await refresh(true);
+  const h=$("#char-hint");
+  if(h) h.textContent = "✓ saved · used from the next reply on";
+}
+
+/* ============================== agent ============================== */
+let AGENT_LOG = [];
+let AGENT_LOADED = false;
+const AGENT_IDEAS = [
+  "Make her reply less often, she answers too much right now",
+  "Inject a routine for today: gym in the morning, client meeting at noon, a walk in the afternoon, cooking at night",
+  "She gets cold too fast, make her a bit more patient",
+  "Add to her personality: she loves strong black coffee",
+  "Change her active hours to 10-14,17-20,22-2",
+  "Make today's routine more interesting",
+  "She is exhausted today, set her mood accordingly",
+];
+
+function renderAgent(){
+  const root = $("#tab-agent");
+  if(!AGENT_LOADED){
+    root.innerHTML = `
+      <div class="card tight">
+        <div class="row"><b style="font-size:12px">Configuration agent (OOC)</b><span class="grow"></span>
+          <span class="badge warn">cannot touch the core system</span></div>
+        <div class="tiny" style="margin-top:5px">It can change: behaviour settings · personality card · routine · schedule · active hours · active character · per-contact nickname.
+        It <b>cannot</b>: edit code or files, delete data, change API keys, ALLOW or TRUSTED lists.</div>
+      </div>
+      <div class="card tight"><div class="slots" id="agent-ideas">
+        ${AGENT_IDEAS.map(i=>`<span class="slot" data-idea="${esc(i)}" style="cursor:pointer;font-size:11px">${esc(i)}</span>`).join("")}
+      </div></div>
+      <div id="agent-log"></div>
+      <div class="card tight" style="position:sticky;bottom:8px">
+        <div class="row"><input id="agent-in" placeholder="What should I change?" autocomplete="off">
+          <button class="act primary" id="agent-send">Send</button></div>
+      </div>`;
+    $("#agent-send").onclick = sendAgent;
+    $("#agent-in").onkeydown = (e)=>{ if(e.key==="Enter") sendAgent(); };
+    $("#agent-ideas").onclick = (e)=>{
+      const i = e.target.closest("[data-idea]"); if(!i) return;
+      $("#agent-in").value = i.dataset.idea; sendAgent();
+    };
+    AGENT_LOADED = true;
+  }
+  drawAgent();
+}
+
+function drawAgent(){
+  const log = $("#agent-log");
+  if(!log) return;
+  if(!AGENT_LOG.length){
+    log.innerHTML = `<div class="card"><div class="empty">No messages yet.<br>Pick one of the examples above, or type your own.</div></div>`;
+    return;
+  }
+  log.innerHTML = AGENT_LOG.map(m=>{
+    if(m.role==="me") return `<div class="card" style="margin-left:auto;max-width:88%;background:#241d3d;border-color:#4a3f7a">
+        <div class="tiny">you</div><div>${esc(m.text)}</div></div>`;
+    const chips = [
+      ...(m.applied||[]).map(a=>`<span class="badge ok">✓ ${esc(a.describe)}</span>`),
+      ...(m.refused||[]).map(r=>`<span class="badge silent">✗ ${esc(r.reason)}</span>`),
+    ].join(" ");
+    return `<div class="card" style="max-width:92%">
+        <div class="tiny">agent</div>
+        <div>${esc(m.say||"")}</div>
+        ${chips?`<div class="row" style="margin-top:8px">${chips}</div>`:""}
+      </div>`;
+  }).join("");
+  log.lastElementChild?.scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
+async function sendAgent(){
+  const inp = $("#agent-in");
+  const text = (inp.value||"").trim();
+  if(!text) return;
+  inp.value = "";
+  AGENT_LOG.push({ role:"me", text });
+  AGENT_LOG.push({ role:"agent", say:"…sedang mikir…" });
+  drawAgent();
+  const history = AGENT_LOG.slice(0,-1).slice(-6).map(m=>({role:m.role, text:m.text||m.say}));
+  const r = await api("/api/admin",{ message:text, history });
+  AGENT_LOG[AGENT_LOG.length-1] = { role:"agent", say:r.say||"(kosong)", applied:r.applied, refused:r.refused };
+  drawAgent();
+  if((r.applied||[]).length){
+    SETTINGS_LOADED = false; DATA.personaCard = null; charDirty = false;
+    const back = tab; await refresh(true); tab = back;
+  }
 }
 
 /* ============================ settings ============================ */
@@ -357,38 +599,37 @@ function renderSettings(){
 
   root.innerHTML = `
     <div class="card">
-      <h2>Karakter</h2>
+      <h2>Character</h2>
       <div class="grid">
-        <div><label>Karakter aktif</label>
+        <div><label>Active character</label>
           <select id="set-persona">${DATA.personas.map(p=>`<option value="${esc(p.slug)}" ${p.slug===DATA.bot.persona.slug?"selected":""}>${esc((p.emoji||"")+" "+p.name)}</option>`).join("")}</select></div>
-        <div><label>Jam aktif</label><input id="set-hours" value="${esc(s.activeHours)}" placeholder="11-14,17-19,21-2"></div>
-        <div><label>Jadwal chat duluan</label><input id="set-sched" value="${esc(s.chatSchedule)}" placeholder="11,12,13,17,18,19"></div>
+        <div><label>Active hours</label><input id="set-hours" value="${esc(s.activeHours)}" placeholder="11-14,17-19,21-2"></div>
+        <div><label>Message-first schedule</label><input id="set-sched" value="${esc(s.chatSchedule)}" placeholder="11,12,13,17,18,19"></div>
       </div>
-      <div class="hint" style="margin-top:8px">Jadwal: <b>jam saja</b> = menitnya acak tiap hari (11,12,13) · <b>jam:menit</b> = menit tetap (12:30).</div>
+      <div class="hint" style="margin-top:8px">Schedule format: <b>hour only</b> = random minute each day (11,12,13) · <b>hour:minute</b> = fixed minute (12:30).</div>
     </div>
     <div class="card">
-      <div class="row"><h2 style="margin:0">Tingkah laku</h2><span class="grow"></span>
-        <input id="knob-q" placeholder="cari setting…" style="max-width:190px"></div>
+      <div class="row"><h2 style="margin:0">Behaviour</h2><span class="grow"></span>
+        <input id="knob-q" placeholder="search settings…" style="max-width:190px"></div>
       <div style="margin-top:12px" id="knobbox">
-        ${groups}${rest?`<div class="kwrap"><div class="kick">Lainnya</div><div class="grid">${rest}</div></div>`:""}
+        ${groups}${rest?`<div class="kwrap"><div class="kick">Other</div><div class="grid">${rest}</div></div>`:""}
       </div>
       <div class="btns" style="margin-top:14px">
-        <button class="act primary" id="btn-save-settings">Simpan</button>
-        <button class="act primary" id="btn-save-restart">Simpan &amp; Restart</button>
-        <button class="act" id="btn-auto">Auto (model yang atur)</button>
-        <button class="act danger" id="btn-restart">Restart bot</button>
+        <button class="act primary" id="btn-save-settings" >Save (applies immediately)</button>
+        <button class="act" id="btn-auto" >Auto (let the model decide)</button>
+        <span class="grow"></span>
+        <button class="act danger" id="btn-restart" >Restart bot</button>
       </div>
       <div class="muted" id="save-hint" style="margin-top:9px"></div>
     </div>`;
-  $("#btn-save-settings").onclick = () => saveSettings(false);
-  $("#btn-save-restart").onclick = () => saveSettings(true);
+  $("#btn-save-settings").onclick = () => saveSettings();
   $("#btn-auto").onclick = async () => {
-    toast("model sedang memilih…");
+    toast("The model is deciding…");
     const r = await api("/api/auto",{apply:true});
-    if(r.ok){ toast("setting otomatis diterapkan"); SETTINGS_LOADED=false; await refresh(true); }
-    else toast("gagal: "+(r.error||"?"));
+    if(r.ok){ toast("Automatic settings applied"); SETTINGS_LOADED=false; await refresh(true); }
+    else toast("Failed: "+(r.error||"?"));
   };
-  $("#btn-restart").onclick = async () => { await api("/api/restart",{}); toast("merestart…"); };
+  $("#btn-restart").onclick = async () => { await api("/api/restart",{}); toast("Restarting…"); };
   $("#knob-q").oninput = (e)=>{
     const q = e.target.value.trim().toLowerCase();
     $$(".kfield").forEach(f=>{ f.style.display = (!q || f.dataset.search.includes(q)) ? "" : "none"; });
@@ -396,7 +637,7 @@ function renderSettings(){
   };
   SETTINGS_LOADED = true;
 }
-async function saveSettings(andRestart){
+async function saveSettings(){
   const values = {};
   $$(".knob").forEach(i=>{
     const v=i.value.trim();
@@ -408,13 +649,10 @@ async function saveSettings(andRestart){
   if(slug !== DATA.bot.persona.slug) await api("/api/persona",{slug});
   await api("/api/settings",{values, activeHours, chatSchedule});
   SETTINGS_LOADED = false;
-  toast(andRestart ? "disimpan, merestart…" : "tersimpan");
+  toast("Saved — applied immediately, no restart needed");
   await refresh(true);
   const hint = $("#save-hint");
-  if(hint) hint.innerHTML = andRestart
-    ? "✓ tersimpan &amp; direstart — tunggu ~10 detik."
-    : "✓ tersimpan ke <b>.env</b>. Pencet <b>Simpan &amp; Restart</b> biar bot yang jalan baca nilai barunya.";
-  if(andRestart) await api("/api/restart",{});
+  if(hint) hint.innerHTML = "✓ written to <b>.env</b> and picked up by the running bot.";
 }
 
 /* ============================ schedule ============================ */
@@ -422,13 +660,13 @@ function renderSchedule(){
   const root = $("#tab-schedule");
   const next = DATA.schedule.find(s=>!s.passed && !s.quiet);
   root.innerHTML = `<div class="card">
-    <h2>Jadwal hari ini</h2>
-    <div class="slots">${DATA.schedule.map(s=>`<span class="slot ${s.passed?"past":""} ${next&&s.time===next.time?"next":""}">${s.time}${s.quiet?" (tenang)":""}</span>`).join("") || '<span class="muted">(belum diatur)</span>'}</div>
-    <div class="muted" style="margin-top:11px">Berikutnya: <b style="color:#fff">${next?next.time:"—"}</b></div>
+    <h2>Today's schedule</h2>
+    <div class="slots">${DATA.schedule.map(s=>`<span class="slot ${s.passed?"past":""} ${next&&s.time===next.time?"next":""}">${s.time}${s.quiet?" (quiet)":""}</span>`).join("") || '<span class="muted">(not set)</span>'}</div>
+    <div class="muted" style="margin-top:11px">Next: <b style="color:#fff">${next?next.time:"—"}</b></div>
     <div class="grid" style="margin-top:12px">
-      <div class="stat">sepi minimal <b>${DATA.bot.idleMin} menit</b> sebelum dia nyapa</div>
-      <div class="stat">jeda antar chat duluan <b>${DATA.bot.gapMin} menit</b></div>
-      <div class="stat">jam tenang <b>${DATA.bot.quiet[0]}:00–${DATA.bot.quiet[1]}:00</b></div>
+      <div class="stat">she waits for <b>${DATA.bot.idleMin} min</b> of silence before starting a chat</div>
+      <div class="stat">gap between her own messages <b>${DATA.bot.gapMin} min</b></div>
+      <div class="stat">quiet hours <b>${DATA.bot.quiet[0]}:00–${DATA.bot.quiet[1]}:00</b></div>
     </div>
   </div>`;
 }
@@ -441,20 +679,20 @@ function renderQuota(){
   const el = q.eleven ? q.eleven.left : null;
   const elMax = q.eleven && q.eleven.limit ? q.eleven.limit : null;
   root.innerHTML = `<div class="card">
-      <h2>Kuota</h2>
+      <h2>Usage</h2>
       <div class="grid">
-        <div><div class="stat">Foto hari ini</div><div style="font-size:19px;font-weight:650;color:#fff">${q.photos}<span class="tiny"> / ${q.photoMax}</span></div>
+        <div><div class="stat">Photos today</div><div style="font-size:19px;font-weight:650;color:#fff">${q.photos}<span class="tiny"> / ${q.photoMax}</span></div>
           <div class="prog"><i style="width:${Math.min(100,Math.round(q.photos/Math.max(1,q.photoMax)*100))}%"></i></div></div>
-        <div><div class="stat">Voice note (karakter)</div><div style="font-size:19px;font-weight:650;color:#fff">${q.ttsChars}${q.ttsMax?`<span class="tiny"> / ${q.ttsMax}</span>`:""}</div>
+        <div><div class="stat">Voice notes (characters)</div><div style="font-size:19px;font-weight:650;color:#fff">${q.ttsChars}${q.ttsMax?`<span class="tiny"> / ${q.ttsMax}</span>`:""}</div>
           <div class="prog"><i style="width:${q.ttsMax?Math.min(100,Math.round(q.ttsChars/q.ttsMax*100)):0}%"></i></div></div>
-        ${el!==null?`<div><div class="stat">ElevenLabs sisa</div><div style="font-size:19px;font-weight:650;color:#fff">${el}<span class="tiny"> karakter</span></div>
+        ${el!==null?`<div><div class="stat">ElevenLabs remaining</div><div style="font-size:19px;font-weight:650;color:#fff">${el}<span class="tiny"> characters</span></div>
           ${elMax?`<div class="prog"><i style="width:${Math.min(100,Math.round(el/elMax*100))}%"></i></div>`:""}
-          ${q.eleven.reset?`<div class="hint">reset ${esc(q.eleven.reset)}</div>`:""}</div>`:""}
+          ${q.eleven.reset?`<div class="hint">resets ${esc(q.eleven.reset)}</div>`:""}</div>`:""}
       </div>
     </div>
     <div class="card">
-      <h2>Token ${q.usageDay?`· ${q.usageDay}`:""}</h2>
-      <table><tr><th>provider</th><th>call</th><th>in</th><th>out</th></tr>${rows||'<tr><td colspan=4 class="muted">belum ada</td></tr>'}</table>
+      <h2>Tokens ${q.usageDay?`· ${q.usageDay}`:""}</h2>
+      <table><tr><th>provider</th><th>calls</th><th>in</th><th>out</th></tr>${rows||'<tr><td colspan=4 class="muted">none yet</td></tr>'}</table>
     </div>`;
 }
 
@@ -483,6 +721,8 @@ function renderLog(){
 function renderAll(){
   renderHeader();
   if(tab==="contacts" && !dragging) renderContacts();
+  if(tab==="character") renderCharacter();
+  if(tab==="agent") renderAgent();
   if(tab==="settings") renderSettings();
   if(tab==="schedule") renderSchedule();
   if(tab==="quota") renderQuota();
@@ -490,13 +730,18 @@ function renderAll(){
 }
 async function refresh(forceSettings){
   DATA = await api("/api/summary");
-  if(forceSettings) SETTINGS_LOADED = false;
+  if(forceSettings) { SETTINGS_LOADED = false; DATA.personaCard = null; }
   renderAll();
 }
 
 /* ============================ events ============================ */
 document.addEventListener("input", (e)=>{
   const t = e.target;
+  if(t.closest && t.closest("#tab-character")){
+    charDirty = true;
+    const h = $("#char-hint");
+    if(h) h.innerHTML = '<span style="color:var(--warn)">● unsaved changes</span>';
+  }
   if(t.classList?.contains("mrange")){
     dragging = true;
     const jid = t.dataset.jid;
@@ -524,51 +769,58 @@ document.addEventListener("click", async (e)=>{
     const c = DATA.contacts.find(x=>x.jid===jid);
     draft[jid] = { values: { ...(c.mood||{}) } };
     await api("/api/mood",{ jid, mood: c.mood, lock: true });
-    toast("mode manual — mood dikunci");
+    toast("Manual mode — mood locked");
     SETTINGS_LOADED = false; await refresh(true);
   }
   if(act==="mood-save"){
     const values = draft[jid]?.values || {};
     const r = await api("/api/mood",{ jid, mood: values, lock: true });
     delete draft[jid];
-    toast("mood disimpan & dikunci → "+(r.label||""));
+    toast("Mood saved and locked → "+(r.label||""));
     await refresh(true);
   }
   if(act==="mood-baseline"){
     const c = DATA.contacts.find(x=>x.jid===jid);
     draft[jid] = { values: { ...(c.baseline||c.mood||{}) } };
     renderContacts();
-    toast("angka direset ke normal — pencet Simpan buat mengunci");
+    toast("angka diresets ke normal — pencet Simpan buat mengunci");
   }
   if(act==="mood-auto"){
-    toast("model sedang menilai mood…");
+    toast("Assessing mood…");
     const r = await api("/api/mood/auto",{ jid, apply:true });
     delete draft[jid];
     toast(r.ok ? ("auto → "+(r.label||"")+(r.suggested?.reason?" · "+r.suggested.reason:"")) : ("gagal: "+(r.error||"")));
     await refresh(true);
   }
+  if(act==="block"){
+    const want = b.dataset.v === "1";
+    if(want && !confirm("Block this number on WhatsApp? They will no longer be able to message this account.")) return;
+    const r = await api("/api/block",{ jid, block: want });
+    toast(r.ok ? (want?"Number blocked":"Number unblocked") : ("Failed: "+(r.error||"")));
+    await refresh(true);
+  }
   if(act==="trust"){
     const want = b.dataset.v === "1";
-    if(!want && !confirm("Cabut kepercayaan? Dia bakal dingin lagi, panggilan sayang & mood-nya direset ke mode asing.")) return;
+    if(!want && !confirm("Cabut kepercayaan? Dia bakal dingin lagi, panggilan sayang & mood-nya diresets ke mode asing.")) return;
     await api("/api/trust",{ jid, trusted: want });
-    toast(want ? "sekarang dipercaya (full mode)" : "sekarang mode orang asing");
+    toast(want ? "Trusted (full mode)" : "Stranger mode");
     await refresh(true);
   }
   if(act==="save"){
     const card = b.closest(".card");
     await api("/api/contact",{ jid, field:"nick", value: $(".f-nick",card).value });
     await api("/api/contact",{ jid, field:"persona", value: $(".f-persona",card).value });
-    toast("disimpan"); refresh();
+    toast("Saved"); refresh();
   }
   if(act==="proactive"){
-    toast("menyusun pesan…");
+    toast("Composing…");
     const r = await api("/api/proactive",{jid});
-    toast(r.ok ? ("terkirim: "+r.text) : ("nggak jadi: "+(r.reason||"")));
+    toast(r.ok ? ("Sent: "+r.text) : ("Skipped: "+(r.reason||"")));
     refresh();
   }
   if(act==="reset"){
-    if(!confirm("Reset konteks obrolan? Riwayat & mood-nya dibersihin.")) return;
-    await api("/api/contact/reset",{jid}); toast("konteks direset"); refresh();
+    if(!confirm("Reset this conversation? History and mood are cleared.")) return;
+    await api("/api/contact/reset",{jid}); toast("Context reset"); refresh();
   }
 });
 
@@ -576,6 +828,7 @@ $$("#tabs button").forEach(b=>{
   b.onclick = () => {
     $$("#tabs button").forEach(x=>x.classList.remove("active"));
     b.classList.add("active");
+    if(charDirty && tab==="character" && b.dataset.t!=="character" && !confirm("You have unsaved card changes. Leave this tab?")) return;
     tab = b.dataset.t;
     $$("main > section").forEach(s=>s.hidden=true);
     $("#tab-"+tab).hidden=false;
@@ -585,7 +838,9 @@ $$("#tabs button").forEach(b=>{
 $("#btn-refresh").onclick = ()=>refresh(true);
 
 refresh();
-setInterval(()=>{ if(tab!=="settings") refresh(); }, 5000);
+// never auto-refresh a tab that is being edited — this used to wipe
+// whatever was being typed, every five seconds
+setInterval(()=>{ if(tab!=="settings" && tab!=="character") refresh(); }, 5000);
 </script>
 </body>
 </html>

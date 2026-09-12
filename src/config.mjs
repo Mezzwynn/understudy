@@ -34,8 +34,10 @@ function parseEnvFile(file) {
   return out;
 }
 
-const fileEnv = parseEnvFile(path.join(ROOT, ".env"));
-const env = { ...fileEnv, ...process.env };
+function freshEnv() {
+  return { ...parseEnvFile(path.join(ROOT, ".env")), ...process.env };
+}
+let env = freshEnv();
 
 const num = (v, d) => {
   const n = Number(v);
@@ -47,7 +49,8 @@ export function envGet(key, fallback = "") {
   return v === undefined || v === "" ? fallback : v;
 }
 
-export const config = {
+function buildConfig() {
+  return {
   botName: envGet("BOT_NAME", "Alya"),
   persona: envGet("PERSONA", "example"),
   // What the character calls the user by default. Only applies to TRUSTED
@@ -63,6 +66,19 @@ export const config = {
     .filter(Boolean),
   // Set true if you want every contact treated as trusted (old behaviour).
   trustStrangers: envGet("TRUST_STRANGERS", "false") === "true",
+
+  // ── strangers: guard + block, and when someone stops being a stranger ──
+  // ── errands for the owner (send a message to a third number) ──
+  tasks: envGet("TASKS", "true") === "true",
+  taskDailyMax: num(envGet("TASK_DAILY_MAX", "5"), 5),
+
+  strangerGuard: envGet("STRANGER_GUARD", "true") === "true",
+  // suspicion points: link 2, scam wording 3, code/password 4, sexual 3, flood 2, repeats 2 ...
+  strangerWarnScore: num(envGet("STRANGER_WARN_SCORE", "3"), 3),
+  strangerBlockScore: num(envGet("STRANGER_BLOCK_SCORE", "7"), 7),
+  strangerFloodPerMin: num(envGet("STRANGER_FLOOD_PER_MIN", "6"), 6),
+  // how many messages from them before she treats a well-behaved stranger as an acquaintance
+  strangerPromoteAfter: num(envGet("STRANGER_PROMOTE_AFTER", "6"), 6),
   // Resting mood for trusted contacts: valence,energy,arousal,affection,patience,playfulness
   baselineTrusted: envGet("BASELINE_TRUSTED", "0.30,0.60,0.45,0.68,0.60,0.50")
     .split(",")
@@ -82,7 +98,7 @@ export const config = {
     .filter(Boolean),
 
   // WhatsApp LIDs (new anonymous ids) mapped to real numbers, e.g.
-  // LID_MAP=215341758152901:+6285111046991
+  // LID_MAP=123456789012345:+6281234567890
   lidMap: (() => {
     const out = {};
     for (const pair of envGet("LID_MAP", "").split(",")) {
@@ -114,9 +130,6 @@ export const config = {
 
   // Human imperfections
   skipChance: num(envGet("SKIP_CHANCE", "0.06"), 0.06),
-  longDelayChance: num(envGet("LONG_DELAY_CHANCE", "0.1"), 0.1),
-  longDelayMinMs: num(envGet("LONG_DELAY_MIN_MS", "25000"), 25000),
-  longDelayMaxMs: num(envGet("LONG_DELAY_MAX_MS", "150000"), 150000),
   typoChance: num(envGet("TYPO_CHANCE", "0.2"), 0.2),
   correctionChance: num(envGet("CORRECTION_CHANCE", "0.35"), 0.35),
   reactionChance: num(envGet("REACTION_CHANCE", "0.12"), 0.12),
@@ -160,10 +173,10 @@ export const config = {
   // jam kerja user (biar pertanyaan "udah makan?" dll pas waktunya)
   userWorkHours: envGet("USER_WORK_HOURS", "9-17"),
 
-  // nickname behaviour ("honey")
-  nickAffectionMin: num(envGet("NICK_AFFECTION_MIN", "0.45"), 0.45),
-  nickValenceMin: num(envGet("NICK_VALENCE_MIN", "-0.05"), -0.05),
-  nickPatienceMin: num(envGet("NICK_PATIENCE_MIN", "0.35"), 0.35),
+  // nickname behaviour ("honey"). ONE dial: how warm she has to feel before the
+  // pet name is allowed (average of affection, patience and mood). Three separate
+  // thresholds used to fight each other.
+  nickMoodMin: num(envGet("NICK_MOOD_MIN", "0.55"), 0.55),
   nickChance: num(envGet("NICK_CHANCE", "0.25"), 0.25),
   nickAcceptWarm: envGet("NICK_ACCEPT_WARM", "true") === "true",
 
@@ -198,6 +211,18 @@ export const config = {
   commitmentMaxMin: num(envGet("COMMITMENT_MAX_MIN", "480"), 480),
   // she told them to do something (eat / sleep / workout) -> check later
   instructionFollowup: envGet("INSTRUCTION_FOLLOWUP", "true") === "true",
+  // how often she actually follows up on "go eat / go sleep", so she does not
+  // turn into a repeating alarm clock
+  // ── her own daily life (routine.mjs) ──
+  routine: envGet("ROUTINE", "true") === "true",
+  routineMood: envGet("ROUTINE_MOOD", "true") === "true",
+  routineKeepDays: num(envGet("ROUTINE_KEEP_DAYS", "3"), 3),
+  routineHighlightMin: num(envGet("ROUTINE_HIGHLIGHT_MIN", "0.5"), 0.5),
+  routineHighlightMax: num(envGet("ROUTINE_HIGHLIGHT_MAX", "30"), 30),
+
+  checkupChance: num(envGet("CHECKUP_CHANCE", "0.45"), 0.45),
+  checkupCooldownMin: num(envGet("CHECKUP_COOLDOWN_MIN", "120"), 120),
+  maxPendingCheckups: num(envGet("MAX_PENDING_CHECKUPS", "2"), 2),
   instructionMinMin: num(envGet("INSTRUCTION_MIN_MIN", "6"), 6),
   instructionMaxMin: num(envGet("INSTRUCTION_MAX_MIN", "35"), 35),
   // temporary softness: she melts, then pulls back (tsundere)
@@ -248,8 +273,22 @@ export const config = {
   // chance the sticker is the whole reply instead of an addition to text/voice
   stickerOnlyChance: num(envGet("STICKER_ONLY_CHANCE", "0.4"), 0.4),
 
-  debug: envGet("DEBUG", "false") === "true",
-};
+    debug: envGet("DEBUG", "false") === "true",
+  };
+}
+
+export const config = buildConfig();
+
+/**
+ * Re-read .env into the SAME config object, so a running bot picks up new
+ * settings without being restarted (`rp restart` should not be part of editing
+ * a value in the dashboard).
+ */
+export function reloadConfig() {
+  env = freshEnv();
+  Object.assign(config, buildConfig());
+  return config;
+}
 
 function provider(baseUrl, apiKey, model, label, temperature) {
   if (!baseUrl || !apiKey || !model) return null;

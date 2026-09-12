@@ -3,14 +3,20 @@
  * persona.mjs — list / use / create character cards.
  *
  *   node scripts/persona.mjs list
- *   node scripts/persona.mjs use mychar
- *   node scripts/persona.mjs new mychar
+ *   node scripts/persona.mjs use <slug>
+ *   node scripts/persona.mjs new <slug>
  *   node scripts/persona.mjs current
+ *   node scripts/persona.mjs export <slug> [file.json] [--no-settings]
+ *   node scripts/persona.mjs import <file.json> [--overwrite] [--apply-settings]
+ *   node scripts/persona.mjs delete <slug>
+ *   node scripts/persona.mjs trash
+ *   node scripts/persona.mjs restore <file.md>
  */
 import fs from "node:fs";
 import path from "node:path";
 import { PERSONA_DIR, ROOT } from "../src/config.mjs";
 import { parsePersonaFrontmatter } from "../src/prompt.mjs";
+import { exportPersona, importPersona, deletePersona, listSlugs, trashContents, restoreFromTrash } from "../src/persona-io.mjs";
 
 const ENV_FILE = path.join(ROOT, ".env");
 
@@ -67,8 +73,56 @@ function create(slug) {
   console.log(`✓ created ${dest}\n  edit it, then: node scripts/persona.mjs use ${slug}`);
 }
 
-const [cmd, arg] = process.argv.slice(2);
-switch (cmd) {
+function exportCmd() {
+  const args = process.argv.slice(2);
+  const slug = args[1];
+  if (!slug) throw new Error("usage: persona.mjs export <slug> [file.json] [--no-settings]");
+  const out = args[2] && !args[2].startsWith("--") ? args[2] : `${slug}.character.json`;
+  const bundle = exportPersona(slug, { withSettings: !args.includes("--no-settings") });
+  fs.writeFileSync(out, JSON.stringify(bundle, null, 2));
+  console.log(`✓ exported ${bundle.slug} → ${out}`);
+  console.log(`  ${bundle.body.length} characters of card, ${Object.keys(bundle.settings).length} settings included`);
+  console.log("  share that single file — the other person runs: rp persona import <file>");
+}
+
+function importCmd() {
+  const args = process.argv.slice(2);
+  const file = args[1];
+  if (!file) throw new Error("usage: persona.mjs import <file.json> [--overwrite] [--apply-settings]");
+  if (!fs.existsSync(file)) throw new Error(`no such file: ${file}`);
+  const bundle = JSON.parse(fs.readFileSync(file, "utf8"));
+  const r = importPersona(bundle, {
+    overwrite: args.includes("--overwrite"),
+    applySettings: args.includes("--apply-settings"),
+    setEnvFn: setEnv,
+  });
+  if (!r.ok) throw new Error(r.reason);
+  console.log(`✓ imported "${r.name}" as slug "${r.slug}"${r.renamed ? " (the name was taken, so it got a suffix)" : ""}`);
+  if (r.settingsApplied) console.log(`  ${r.settingsApplied} behaviour settings applied — run: rp restart`);
+  console.log(`  activate it with: rp persona use ${r.slug}`);
+}
+
+function deleteCmd() {
+  const args = process.argv.slice(2);
+  const slug = args[1];
+  if (!slug) throw new Error("usage: persona.mjs delete <slug>");
+  const r = deletePersona(slug, { setEnvFn: setEnv });
+  if (!r.ok) throw new Error(r.reason);
+  console.log(`✓ "${r.slug}" moved to personas/.trash/ (recover with: rp persona restore <file>)`);
+  if (r.switchedTo) console.log(`  it was the active character — now using "${r.switchedTo}"`);
+}
+
+function trashCmd() {
+  const files = trashContents();
+  if (!files.length) return console.log("trash is empty");
+  console.log("In personas/.trash/:");
+  for (const f of files) console.log(`  ${f}`);
+  console.log("\nrestore with: rp persona restore <file>");
+}
+
+function main() {
+  const [cmd, arg] = process.argv.slice(2);
+  switch (cmd) {
   case "list":
   case "ls":
   case undefined:
@@ -85,6 +139,40 @@ switch (cmd) {
   case "current":
     console.log(currentSlug() || "(none)");
     break;
+  case "export":
+    exportCmd();
+    break;
+  case "import":
+    importCmd();
+    break;
+  case "delete":
+  case "rm":
+    {
+      const r = deletePersona(process.argv[3], { setEnvFn: setEnv });
+      if (!r.ok) throw new Error(r.reason);
+      console.log(`✓ "${r.slug}" moved to personas/.trash/`);
+      if (r.switchedTo) console.log(`  it was the active character — now using "${r.switchedTo}"`);
+    }
+    break;
+  case "trash":
+    trashCmd();
+    break;
+  case "restore":
+    {
+      const r = restoreFromTrash(process.argv[3], { setEnvFn: setEnv });
+      if (!r.ok) throw new Error(r.reason);
+      console.log(`✓ restored as "${r.slug}"`);
+    }
+    break;
   default:
-    console.log("usage: persona.mjs [list|use <name>|new <name>|current]");
+    console.log("usage: persona.mjs [list|use <slug>|new <slug>|current|export <slug>|import <file>|delete <slug>|trash|restore <file>]");
+}
+
+}
+
+try {
+  main();
+} catch (err) {
+  console.error(`✗ ${err.message}`);
+  process.exit(1);
 }

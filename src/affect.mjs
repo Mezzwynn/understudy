@@ -11,7 +11,7 @@ import { label, snapshot, KEYS } from "./mood.mjs";
 const SYSTEM = `You are the internal affect tracker for a roleplay character. You are shown the character's current mood, what the character remembers, the other person's message, and the character's reply. Update the character's emotional state and long-term memory.
 
 Respond with ONLY a JSON object, no prose, no markdown:
-{"mood":{"valence":0.0,"energy":0.0,"arousal":0.0,"affection":0.0,"patience":0.0,"playfulness":0.0},"remember":[],"forget":[],"plans":[],"jokes":[],"boundaries":[],"relationship":"","name":"","nick":"","followup":{"what":"","due":"","for":""}}
+{"mood":{"valence":0.0,"energy":0.0,"arousal":0.0,"affection":0.0,"patience":0.0,"playfulness":0.0},"remember":[],"forget":[],"plans":[],"jokes":[],"boundaries":[],"relationship":"","name":"","nick":"","followup":{"what":"","due":"","for":""},"task":{}}
 
 Rules:
 - mood values are DELTAS applied to the current mood, each between -0.2 and 0.2. Omit a key if it did not change.
@@ -21,9 +21,10 @@ Rules:
 - remember: DURABLE facts about them — job, schedule, health, family, pets, preferences, fears, important dates, things they said about their own life. Up to 3, and only if the exchange actually revealed something durable: if nothing durable came up, return []. A fact is about THEM, never about this exchange. FORBIDDEN: quoting what they said, describing their reaction, restating the message ("bilang 'tch' — kesal", "bertanya soal makan", "mengancam pindah"). Write in the conversation's language.
 - plans: promises, appointments or plans with a time ("interview tanggal 15", "nonton sabtu"). Only new ones.
 - jokes: running jokes, nicknames, callbacks that you two keep repeating. Only new ones.
-- boundaries: things they dislike, topics to avoid, things that upset them. Only new ones.
+- boundaries: things that upset her around them. Always write WHO does WHAT ("dia manggil aku 'honey' — aku nggak suka"), never the ambiguous "benci dipanggil X". Only new ones.
 - followup: fill this ONLY when a future update was agreed — the character promised to report back ("nanti aku kabarin kalau udah selesai", "I'll let you know") OR the other person asked to be told ("kabarin ya kalau udah beres", "tell me when it's done"). Set what = short description of what will be reported; due = ISO-8601 datetime if a time was agreed, otherwise empty string; for = "me" if the character promised, "them" if they asked her to report. Otherwise use an empty object {}.
 - Never invent mood changes for a flat, neutral exchange: an all-zero mood object is valid.
+- task: fill this ONLY when the other person asks the character to contact somebody else for them (order food, tell someone something, ask a third person). Format {"type":"message","to":"<phone number>","text":"<the message to send>","why":"<short reason>"}. Otherwise {}. Never invent a number that was not given in the conversation. The character may agree in her reply; she does not send it herself, the system does.
 - Output JSON only.`;
 
 function safeParse(text) {

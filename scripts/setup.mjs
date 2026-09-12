@@ -92,10 +92,10 @@ async function main() {
   if (!fs.existsSync(ENV_FILE)) {
     fs.copyFileSync(path.join(ROOT, ".env.example"), ENV_FILE);
     fs.chmodSync(ENV_FILE, 0o600);
-    console.log("  (.env dibuat dari .env.example)\n");
+    console.log("  (.env created from .env.example)\n");
   }
 
-  console.log("  Pilih provider:\n");
+  console.log("  Choose a provider:\n");
   PROVIDERS.forEach((p, i) => console.log(`   ${i + 1}) ${p.name}`));
   console.log();
 
@@ -107,7 +107,7 @@ async function main() {
   if (provider.key === "custom") {
     baseUrl = await ask("  Base URL (contoh: http://localhost:11434/v1)");
     if (!baseUrl) {
-      console.log("  dibatalkan.");
+      console.log("  cancelled.");
       close();
       return;
     }
@@ -115,14 +115,14 @@ async function main() {
 
   const apiKey = await ask(`  API key (${provider.keyHint})`);
   if (!apiKey) {
-    console.log("  dibatalkan — API key wajib.");
+    console.log("  cancelled — the API key is required.");
     close();
     return;
   }
 
   const model = await ask("  Model", provider.model || "isi model");
   if (!model) {
-    console.log("  dibatalkan — nama model wajib.");
+    console.log("  cancelled — the model name is required.");
     close();
     return;
   }
@@ -138,12 +138,12 @@ async function main() {
     mediaKey = apiKey;
   }
 
-  console.log("\n  Menguji koneksi…");
+  console.log("\n  Testing the connection…");
   try {
     const reply = await testProvider({ baseUrl, apiKey, model, temperature });
-    console.log(`  ✓ berhasil — model menjawab: ${reply.replace(/\s+/g, " ").slice(0, 60)}\n`);
+    console.log(`  ✓ connected — the model replied: ${reply.replace(/\s+/g, " ").slice(0, 60)}\n`);
   } catch (err) {
-    console.log(`  ✗ gagal: ${err.message}\n`);
+    console.log(`  ✗ failed: ${err.message}\n`);
     const force = (await ask("  Simpan tetap?", "n")).toLowerCase();
     if (force !== "y") {
       close();
@@ -173,19 +173,19 @@ async function main() {
     setEnv("IMAGE_MODEL", "gemini-2.5-flash-image");
   }
 
-  console.log(`  ✓ tersimpan di .env
+  console.log(`  ✓ saved to .env
 
-  Langkah berikutnya:
+  Next steps:
 
-    1) hubungkan WhatsApp :  rp start        (scan QR)
-    2) bikin karakter     :  rp character
-    3) atur tingkah laku  :  rp config
+    1) connect WhatsApp   :  rp start        (scan the QR code)
+    2) create a character :  rp character
+    3) tune behaviour     :  rp config
 `);
   close();
 }
 
 main().catch((err) => {
-  console.error("\ngagal:", err.message);
+  console.error("\nfailed:", err.message);
   close();
   process.exit(1);
 });

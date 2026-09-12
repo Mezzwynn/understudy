@@ -23,7 +23,7 @@ rm -f "$PIDFILE"
 
 left="$(pgrep -f '^node src/index\.mjs' 2>/dev/null | tr '\n' ' ')"
 if [ -n "$left" ]; then
-  echo "WARNING: masih ada proses: $left"
+  echo "WARNING: processes still alive: $left"
   exit 1
 fi
 echo "stopped (pid $(echo $all | tr '\n' ' '))"

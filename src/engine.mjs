@@ -2,9 +2,11 @@ import { chat as llmChat } from "./llm.mjs";
 import { embed } from "./embed.mjs";
 import { buildMessages, buildProactiveMessages, buildNudgeMessages, buildDryMessages, buildFollowupMessages, buildCheckupMessages } from "./prompt.mjs";
 import { recallMemory, addMemory } from "./store.mjs";
-import { extractControl, clean, looksBroken, deflection, stripAudioTags } from "./guard.mjs";
+import { extractControl, clean, looksBroken, deflection, stripAudioTags, tameTics } from "./guard.mjs";
 import { drift, applyDeltas, heuristicNudge, normalize, baselineFor, isMoodLocked, lockValue } from "./mood.mjs";
 import { analyzeAffect } from "./affect.mjs";
+import { needsIntroduction, markIntroAsked } from "./stranger.mjs";
+import { validateTask } from "./tasks.mjs";
 import { config, log } from "./config.mjs";
 
 /** Topics she nags about — health/safety stuff a caring person keeps checking. */
@@ -97,6 +99,12 @@ function applyControl(chat, control, incoming = "") {
         log(`commitment recorded: "${what}" (jatuh tempo ${new Date(due).toISOString()})`);
       }
     }
+  }
+  // she was asked to message somebody else — queue it, the router sends it
+  if (control.task && typeof control.task === "object" && Object.keys(control.task).length) {
+    const check = validateTask(chat, control.task);
+    if (check.ok) chat.pendingTasks = [...(chat.pendingTasks || []), check.task].slice(-3);
+    else log(`task refused: ${check.reason}`);
   }
   if (typeof control.summary === "string" && control.summary.trim()) {
     mem.summary = control.summary.trim().slice(0, 1200);
@@ -301,12 +309,18 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
   }
 
   const messages = buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled, worried });
+  // she just asked a stranger who they are — do not ask again next message
+  if (needsIntroduction(chat)) markIntroAsked(chat);
 
   let raw = await llmChat(messages);
   if (config.debug) log(`RAW:\n${raw}`);
   let { text, control } = extractControl(raw);
   const cleanOpts = { keepAudioTags: !!voice };
   text = clean(text, persona.name, cleanOpts);
+  // she over-uses one interjection if left alone; drop the repeat
+  const tamedTic = tameTics(text, chat.history);
+  if (tamedTic !== text) log(`repeated filler stripped: ${text.trim().slice(0, 40)}`);
+  text = tamedTic;
 
   if (looksBroken(text)) {
     log(`guard tripped for ${chat.jid}; regenerating`);
@@ -326,6 +340,7 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
     raw = await llmChat(retry);
     ({ text, control } = extractControl(raw));
     text = clean(text, persona.name, cleanOpts);
+    text = tameTics(text, chat.history);
     if (looksBroken(text) || !text) {
       log(`guard still tripped; using deflection`);
       text = deflection(persona.name, persona.deflection);
@@ -359,8 +374,10 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
       const strong =
         sweetSignal ||
         (Number(d.affection) || 0) >= 0.08 ||
-        (Number(d.valence) || 0) >= 0.08 ||
-        thawed;
+        (Number(d.valence) || 0) >= 0.08;
+      // note: a fresh apology (thawed) does NOT open the soft window on the same
+      // turn — the prompt says "you are still cold, thaw slowly", so the machine
+      // must not melt her at the same instant.
       const now = Date.now();
       // the soft window is a reward for someone she knows — strangers never get it
       if (chat.trusted === true && strong && now >= (chat.softUntil || 0) && Math.random() < config.softTriggerChance) {
@@ -400,12 +417,19 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
     }
   }
 
-  // she just told them to do something (eat / sleep / workout) -> check later.
-  // only for people she actually knows; she does not mother strangers.
+  // she just told them to do something (eat / sleep / workout) -> maybe check later.
+  // Only for people she actually knows, only sometimes, never twice in a row about
+  // the same thing — otherwise she reads like an alarm clock instead of a person.
   if (config.instructionFollowup && chat.trusted === true) {
     const label = detectInstruction(stripAudioTags(text));
-    const alreadyPending = (chat.instructions || []).some((i) => !i.done && i.label === label);
-    if (label && !alreadyPending) {
+    const list = chat.instructions || (chat.instructions = []);
+    const pending = list.filter((i) => !i.done);
+    const nowTs = Date.now();
+    const cooldown = config.checkupCooldownMin * 60000;
+    const saidRecently = list.some((i) => i.label === label && nowTs - (i.createdAt || 0) < cooldown);
+    const alreadyPending = pending.some((i) => i.label === label);
+    const tooMany = pending.length >= config.maxPendingCheckups;
+    if (label && !alreadyPending && !saidRecently && !tooMany && Math.random() < config.checkupChance) {
       chat.instructions = chat.instructions || [];
       const span = Math.max(1, config.instructionMaxMin - config.instructionMinMin);
       chat.instructions.push({

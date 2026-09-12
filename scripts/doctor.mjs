@@ -23,27 +23,27 @@ console.log("\n  Understudy · doctor\n");
 
 /* 1. runtime */
 const nodeMajor = Number(process.versions.node.split(".")[0]);
-nodeMajor >= 18 ? ok(`Node.js ${process.version}`) : bad(`Node.js ${process.version} (butuh >=18)`);
+nodeMajor >= 18 ? ok(`Node.js ${process.version}`) : bad(`Node.js ${process.version} (needs >=18)`);
 
 const git = spawnSync("git", ["--version"], { encoding: "utf8" });
-git.status === 0 ? ok(git.stdout.trim()) : warn("git tidak ada (npm install bisa gagal)");
+git.status === 0 ? ok(git.stdout.trim()) : warn("git not found (npm install may fail)");
 
-for (const [bin, why] of [["opusenc", "voice note"], ["cwebp", "stiker"]]) {
+for (const [bin, why] of [["opusenc", "voice note"], ["cwebp", "stickers"]]) {
   const r = spawnSync("sh", ["-c", `command -v ${bin}`], { encoding: "utf8" });
-  r.status === 0 ? ok(`${bin} ada (${why})`) : warn(`${bin} tidak ada — ${why} mati`);
+  r.status === 0 ? ok(`${bin} found (${why})`) : warn(`${bin} missing — ${why} will not work`);
 }
 
 fs.existsSync(path.join(ROOT, "node_modules"))
-  ? ok("node_modules ada")
-  : bad("node_modules belum ada — jalankan ./install.sh");
+  ? ok("node_modules present")
+  : bad("node_modules missing — run ./install.sh");
 
 /* 2. config */
 const envFile = path.join(ROOT, ".env");
 if (!fs.existsSync(envFile)) {
-  bad(".env belum ada — copy dari .env.example atau jalankan: rp setup");
+  bad(".env not found — copy .env.example or run: rp setup");
 } else {
   const mode = (fs.statSync(envFile).mode & 0o777).toString(8);
-  mode === "600" ? ok(".env ada (chmod 600)") : warn(`.env permission ${mode} — sebaiknya 600 (chmod 600 .env)`);
+  mode === "600" ? ok(".env present (chmod 600)") : warn(`.env permission ${mode} — should be 600 (chmod 600 .env)`);
 }
 
 /* 3. provider */
@@ -53,15 +53,15 @@ try {
   const t = trackerProvider();
   const j = judgeProvider();
   ok(`tracker: ${t.label}:${t.model} · judge: ${j.label}:${j.model}`);
-  process.stdout.write("  … tes model utama ");
+  process.stdout.write("  … testing the main model ");
   const reply = await llmChat([{ role: "user", content: "balas satu kata: ok" }], { maxTokens: 400 });
-  ok(`terhubung — jawab: ${reply.replace(/\s+/g, " ").slice(0, 40)}`);
+  ok(`connected — replied: ${reply.replace(/\s+/g, " ").slice(0, 40)}`);
 } catch (err) {
-  bad(`provider gagal: ${err.message}`);
+  bad(`provider failed: ${err.message}`);
 }
 
 /* 4. media keys + kuota */
-if (config.geminiApiKey) ok("GEMINI_API_KEY ada (vision / TTS / foto)"); else warn("GEMINI_API_KEY kosong");
+if (config.geminiApiKey) ok("GEMINI_API_KEY present (vision / TTS / photos)"); else warn("GEMINI_API_KEY is empty");
 if (config.elevenlabsApiKey) {
   try {
     const res = await fetch("https://api.elevenlabs.io/v1/user/subscription", {
@@ -70,17 +70,17 @@ if (config.elevenlabsApiKey) {
     if (res.ok) {
       const j = await res.json();
       const left = j.character_limit - j.character_count;
-      (left > 500 ? ok : warn)(`ElevenLabs sisa ${left} karakter (reset ${new Date(j.next_character_count_reset_unix * 1000).toLocaleDateString("id-ID")})`);
-    } else bad(`ElevenLabs key ditolak (HTTP ${res.status})`);
+      (left > 500 ? ok : warn)(`ElevenLabs ${left} characters left (resets ${new Date(j.next_character_count_reset_unix * 1000).toISOString().slice(0, 10)})`);
+    } else bad(`ElevenLabs key rejected (HTTP ${res.status})`);
   } catch {
-    warn("ElevenLabs tidak bisa dicek (offline?)");
+    warn("ElevenLabs could not be checked (offline?)");
   }
-} else warn("ELEVENLABS_API_KEY kosong (voice note pakai Gemini/off)");
+} else warn("ELEVENLABS_API_KEY is empty (voice notes fall back to Gemini or stay off)");
 
 /* 5. whatsapp + data */
 fs.existsSync(path.join(DATA_DIR, "auth", "creds.json"))
-  ? ok("WhatsApp sudah pernah ditautkan (data/auth)")
-  : warn("WhatsApp belum ditautkan — jalankan: rp start");
+  ? ok("WhatsApp has been linked before (data/auth)")
+  : warn("WhatsApp not linked yet — run: rp start");
 // ask the running bot through the dashboard (this script is a separate process)
 let liveConnected = null;
 try {
@@ -89,12 +89,12 @@ try {
 } catch {
   /* bot probably not running */
 }
-if (liveConnected === null) warn("bot sedang tidak jalan (rp start)");
-else if (liveConnected) ok("WhatsApp sekarang: tersambung");
-else bad("WhatsApp tidak tersambung — cek: rp log");
+if (liveConnected === null) warn("the bot is not running (rp start)");
+else if (liveConnected) ok("WhatsApp: connected");
+else bad("WhatsApp not connected — check: rp log");
 
 const chats = listChats();
-ok(`${chats.length} kontak tersimpan`);
+ok(`${chats.length} contacts stored`);
 
 /* stickers */
 const stickerDir = path.join(ROOT, "assets", "stickers");
@@ -105,30 +105,30 @@ try {
   /* none */
 }
 const stickerOk = readableStickers().length;
-if (!stickerTotal) warn("belum ada stiker — taruh .webp di assets/stickers/ atau: rp sticker --sync");
-else if (!stickerOk) bad(`0/${stickerTotal} stiker bisa dibaca — jalankan: rp sticker --sync`);
+if (!stickerTotal) warn("no stickers yet — drop .webp files in assets/stickers/ or run: rp sticker --sync");
+else if (!stickerOk) bad(`0/${stickerTotal} stickers readable — run: rp sticker --sync`);
 else if (stickerOk < stickerTotal)
   warn(
-    `${stickerOk}/${stickerTotal} stiker bisa dibaca — ${stickerTotal - stickerOk} milik app lain dan tidak terpakai (rp sticker --clean untuk buang)`,
+    `${stickerOk}/${stickerTotal} stickers readable — ${stickerTotal - stickerOk} owned by another app and unusable (rp sticker --clean to move them out)`,
   );
-else ok(`${stickerOk} stiker siap dipakai`);
+else ok(`${stickerOk} stickers ready`);
 const st = loadState();
-ok(`pemakaian hari ini: foto ${st.photoCount || 0}/${config.photoGlobalDailyMax} · TTS ${st.elChars || 0} karakter`);
+ok(`today: photos ${st.photoCount || 0}/${config.photoGlobalDailyMax} · TTS ${st.elChars || 0} characters`);
 
 /* 6. persona */
 const p = loadPersona();
-if (/TODO/i.test(p.card) && p.slug === "character") warn(`karakter masih template kosong — jalankan: rp character`);
-else ok(`karakter: ${p.name} ${p.emoji} (${p.slug})`);
-ok(`jam kerja: ${p.work_hours || "—"} · aktif: ${p.active_hours || "—"} · jadwal: ${p.chat_schedule || "—"}`);
+if (/TODO/i.test(p.card) && p.slug === "character") warn(`the character is still the empty template — run: rp character`);
+else ok(`character: ${p.name} ${p.emoji} (${p.slug})`);
+ok(`work hours: ${p.work_hours || "—"} · active: ${p.active_hours || "—"} · schedule: ${p.chat_schedule || "—"}`);
 
 /* 7. dashboard */
 if (config.dashboard) {
   try {
     const res = await fetch(`http://127.0.0.1:${config.dashboardPort}/api/summary`);
-    res.ok ? ok(`dashboard hidup di http://127.0.0.1:${config.dashboardPort}`) : warn("dashboard tidak menjawab");
+    res.ok ? ok(`dashboard is up at http://127.0.0.1:${config.dashboardPort}`) : warn("the dashboard is not responding");
   } catch {
-    warn("dashboard tidak menjawab (normal kalau bot belum jalan)");
+    warn("the dashboard is not responding (normal if the bot is not running)");
   }
-} else warn("dashboard dimatikan (DASHBOARD=false)");
+} else warn("the dashboard is disabled (DASHBOARD=false)");
 
-console.log("\n  Selesai. Kalau ada yang '!', itu opsional/kosmetik; '✗' perlu dibenerin.\n");
+console.log("\n  Done. '!' means optional/cosmetic, '✗' means it needs fixing.\n");

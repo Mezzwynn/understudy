@@ -34,7 +34,7 @@ const slugify = (s) =>
 
 function listPersonas() {
   const files = fs.readdirSync(PERSONA_DIR).filter((f) => f.endsWith(".md") && !f.startsWith("_"));
-  if (!files.length) return console.log("  (belum ada karakter)");
+  if (!files.length) return console.log("  (no characters yet)");
   for (const f of files) {
     const slug = f.replace(/\.md$/, "");
     const meta = parsePersonaFrontmatter(fs.readFileSync(path.join(PERSONA_DIR, f), "utf8"));
@@ -42,51 +42,50 @@ function listPersonas() {
   }
 }
 
-const SYSTEM = `Kamu penulis kartu karakter untuk bot roleplay WhatsApp pribadi.
-Tugasmu: bikin kartu yang SANGAT setia ke sumbernya — bukan versi "baik hati" bikinan sendiri.
+const SYSTEM = `You write character cards for a private WhatsApp roleplay bot.
+Your job: a card that is FAITHFUL to the source — not a friendlier version you invented.
 
-ATURAN KETAT
-1. Pakai fakta KANON saja. Kalau ada yang tidak kamu tahu, pilih yang paling konsisten dengan kanon populer, dan JANGAN mengarang sifat yang bertentangan.
-2. Kalau karakter dari karya fiksi, sebut sumbernya (judul + jenis karya) di bagian Snapshot.
-3. Tangkap detail:
-   - Cara bicara: kata ganti, kebiasaan verbal, kata khas, formal/tidak, campur bahasa apa.
-   - Rentang emosi: gimana dia marah, kesel, sedih, malu, takut, sayang, bercanda — termasuk yang dia SEMBUNYIIN.
-   - Kontradiksi dirinya (yang bikin terasa nyata).
-   - Hubungan awal dengan user dan seberapa cepat dia hangat.
-   - Batasan: yang bikin dia ngambek, ngilang, atau dingin.
-4. JANGAN menjadikannya asisten, selalu ramah, atau selalu setuju. Pertahankan sifat aslinya walau dingin, kasar, atau menyebalkan.
-5. "Contoh ritme chat-nya" WAJIB 8-10 baris dan benar-benar khas dia.
-6. Frontmatter WAJIB format ini, semua terisi:
+STRICT RULES
+1. Use CANON facts only. If something is unknown, pick whatever is most consistent with the popular canon, and do NOT invent contradicting traits.
+2. If the character comes from a fictional work, name the source (title + medium) in the Snapshot.
+3. Capture the details that matter:
+   - Speech: pronouns, verbal habits, signature words, formal or not, which languages they mix.
+   - Emotional range: how they get angry, upset, sad, embarrassed, scared, affectionate, playful — including what they HIDE.
+   - Self-contradictions (this is what makes them feel real).
+   - The starting relationship with the user and how fast they warm up.
+   - Limits: what makes them sulk, disappear, or go cold.
+4. Do NOT turn them into an assistant, always polite, always agreeable. Keep the real personality even if it is cold, blunt or unpleasant.
+5. "Example chat rhythm" MUST be 8-10 lines and unmistakably theirs.
+6. Frontmatter MUST use this format, every field filled:
 ---
-name: <nama panggilan singkat>
+name: <short name>
 emoji: <1 emoji>
-vibe: <1 baris>
-language: <bahasa chat-nya>
-deflection: <kalimat penolakan in-character kalau dituduh AI>
-voice: <pilih satu: Aoede/Kore/Leda/Zephyr/Puck/Charon>
+vibe: <one line>
+language: <the language they chat in>
+deflection: <an in-character line when accused of being an AI>
+voice: <pick one: Aoede/Kore/Leda/Zephyr/Puck/Charon>
 voice_eleven:
 voice_tags: [tag1] [tag2] [tag3] [tag4] [tag5]
-voice_style: <1-2 kalimat gaya suaranya>
-active_hours: <jam dia biasa online, format 11-14,17-19,21-2>
-work_hours: <jam kerjanya, mis. 9-17 atau 13-21; kosongkan kalau nggak kerja>
-chat_schedule: <10 jam dia biasa chat duluan, format 11,12,13,17,18,19,20,22,23,0>
-appearance: <deskripsi penampilan untuk generate foto>
+voice_style: <1-2 sentences on how their voice sounds>
+active_hours: <when they are usually online, format 11-14,17-19,21-2>
+chat_schedule: <hours when they tend to message first, format 11,12,13,17,18,19,20,22,23,0>
+appearance: <appearance description for photo generation>
 ---
 
-Lalu isi kartu dengan bagian:
-# PERSONA CARD — <Nama>
+Then the card itself, with these sections:
+# PERSONA CARD — <Name>
 ## Snapshot
-## Kebiasaan ngetik (yang bikin dia kelihatan manusia)
-### Contoh ritme chat-nya (WAJIB diisi)
-## Kepribadian
-## Sejarah (canon)
-## Batasan karakter
-## Canon facts (jangan dilanggar)
+## Texting habits (what makes them read as human)
+### Example chat rhythm (REQUIRED)
+## Personality
+## History (canon)
+## Character limits
+## Canon facts (never violate)
 ## Voice rules (ElevenLabs v3)
 
-Balas HANYA dalam format:
+Answer ONLY in this format:
 <CARD>
-...kartu lengkap...
+...the complete card...
 </CARD>`;
 
 async function generate(brief) {
@@ -117,72 +116,72 @@ async function generate(brief) {
     } catch {
       /* ignore */
     }
-    throw new Error("model tidak mengembalikan kartu yang valid");
+    throw new Error("the model did not return a valid card");
   }
   return card;
 }
 
 async function buildBrief() {
   console.log(`
-  Mau bikin karakter dari mana?
+  How do you want to build the character?
 
-   1) Film / anime / game / buku   (kasih nama + judulnya)
-   2) Orang nyata / tokoh publik
-   3) Deskripsi bebas
-   4) Bikin dari nol (tanya-jawab singkat)
-   5) Keluar
+   1) Film / anime / game / book   (give the name and the title)
+   2) A real person / public figure
+   3) Free description
+   4) From scratch (short Q&A)
+   5) Exit
 `);
-  const mode = await ask("  Pilih [1-5]", "1");
+  const mode = await ask("  Choose [1-5]", "1");
 
   if (mode === "5") return null;
 
-  const lang = await ask("  Bahasa chat dia", "Bahasa Indonesia santai (campur English dikit)");
-  const nick = await ask("  Dia manggil kamu apa", "");
-  const nickLine = nick ? `Panggilan dia ke user: "${nick}".` : "Panggilan dia ke user: (belum ditentukan, pilih yang natural).";
+  const lang = await ask("  Language she chats in", "Casual English (with a little Indonesian)");
+  const nick = await ask("  What she calls you", "");
+  const nickLine = nick ? `What she calls the user: "${nick}".` : "What she calls the user: (not set — pick something natural).";
 
   if (mode === "1") {
-    const name = await ask("  Nama karakter");
+    const name = await ask("  Character name");
     if (!name) return null;
-    const title = await ask("  Judul karya (film/anime/game/buku)");
-    return `Buatkan kartu karakter untuk "${name}" dari "${title}". ${nickLine} Bahasa chat: ${lang}. Ikuti kanon "${title}" seketat mungkin.`;
+    const title = await ask("  Source title (film/anime/game/book)");
+    return `Write a character card for "${name}" from "${title}". ${nickLine} Chat language: ${lang}. Follow the canon of "${title}" as closely as possible.`;
   }
 
   if (mode === "2") {
-    const name = await ask("  Nama tokoh");
+    const name = await ask("  Public figure name");
     if (!name) return null;
-    const field = await ask("  Bidangnya (musisi/aktor/atlet/streamer/dll)", "");
+    const field = await ask("  Field (musician/actor/athlete/streamer/etc.)", "");
     return (
-      `Buatkan kartu karakter berdasarkan persona PUBLIK "${name}"${field ? ` (${field})` : ""}. ${nickLine} Bahasa chat: ${lang}. ` +
-      `Pakai gaya bicara dan citra publiknya. JANGAN mengarang klaim soal kehidupan pribadinya yang tidak publik, dan jangan menulis hal yang bisa menyinggung/merugikan.`
+      `Write a character card based on the PUBLIC persona of "${name}"${field ? ` (${field})` : ""}. ${nickLine} Chat language: ${lang}. ` +
+      `Use their public speaking style and image. Do NOT invent claims about their non-public private life, and do not write anything defamatory or harmful.`
     );
   }
 
   if (mode === "3") {
-    const desc = await ask("  Ceritakan karakternya (bebas)");
+    const desc = await ask("  Describe the character (free form)");
     if (!desc) return null;
-    return `Buatkan kartu karakter dari deskripsi ini: ${desc}\n${nickLine} Bahasa chat: ${lang}.`;
+    return `Write a character card from this description: ${desc}\n${nickLine} Chat language: ${lang}.`;
   }
 
   // mode 4 — scratch Q&A
-  const name = await ask("  Nama");
+  const name = await ask("  Name");
   if (!name) return null;
-  const age = await ask("  Umur");
-  const place = await ask("  Kota / domisili");
-  const job = await ask("  Kerja / sekolah");
-  const traits = await ask("  ️3-5 sifat (pisah pakai koma)");
-  const typing = await ask("  Cara ngetik (pendek/panjang, slang, kapital, emoji)");
-  const anger = await ask("  Yang bikin dia kesel");
-  const soft = await ask("  Yang bikin dia luluh");
-  const rel = await ask("  Hubungan sama kamu", "deket, belum resmi");
+  const age = await ask("  Age");
+  const place = await ask("  City / residence");
+  const job = await ask("  Work / school");
+  const traits = await ask("  3-5 traits (comma separated)");
+  const typing = await ask("  Texting style (short/long, slang, capitals, emoji)");
+  const anger = await ask("  What annoys her");
+  const soft = await ask("  What softens her");
+  const rel = await ask("  Relationship with you", "close, not official");
   return [
-    "Buatkan kartu karakter ORISINIL dari brief ini:",
-    `Nama: ${name}; Umur: ${age}; Domisili: ${place}; Kerja: ${job}.`,
-    `Sifat: ${traits}.`,
-    `Cara ngetik: ${typing}.`,
-    `Kesel kalau: ${anger}. Luluh kalau: ${soft}.`,
-    `Hubungan dengan user: ${rel}.`,
+    "Write an ORIGINAL character card from this brief:",
+    `Name: ${name}; Age: ${age}; Residence: ${place}; Work: ${job}.`,
+    `Traits: ${traits}.`,
+    `Texting style: ${typing}.`,
+    `Annoyed by: ${anger}. Softened by: ${soft}.`,
+    `Relationship with the user: ${rel}.`,
     nickLine,
-    `Bahasa chat: ${lang}.`,
+    `Chat language: ${lang}.`,
   ].join("\n");
 }
 
@@ -192,41 +191,41 @@ async function main() {
   if (args[0] === "--use" || args[0] === "use") {
     const slug = args[1];
     if (!slug || !fs.existsSync(path.join(PERSONA_DIR, `${slug}.md`))) {
-      console.log("  karakter tidak ditemukan. Lihat: rp character --list");
+      console.log("  character not found. See: rp character --list");
       return;
     }
     setEnv("PERSONA", slug);
     const meta = parsePersonaFrontmatter(fs.readFileSync(path.join(PERSONA_DIR, `${slug}.md`), "utf8"));
     if (meta.name) setEnv("BOT_NAME", meta.name);
-    console.log(`  ✓ aktif: ${meta.name || slug}. Jalankan: rp restart`);
+    console.log(`  ✓ active: ${meta.name || slug}. Run: rp restart`);
     return;
   }
 
   if (!envGet("LLM_BASE_URL")) {
-    console.log("\n  Belum ada model. Jalankan dulu:  rp setup\n");
+    console.log("\n  No model configured. Run first:  rp setup\n");
     return;
   }
 
   console.log(`
   ┌─────────────────────────────────────────────┐
-  │  Understudy · bikin karakter                 │
+  │  Understudy · create a character             │
   └─────────────────────────────────────────────┘`);
 
   const brief = await buildBrief();
-  if (!brief) return console.log("  dibatalkan.");
+  if (!brief) return console.log("  cancelled.");
 
-  console.log("\n  Model sedang menyusun karakter… (bisa 10-30 detik)");
+  console.log("\n  The model is writing the character… (10-30 seconds)");
   let card;
   try {
     card = await generate(brief);
   } catch (err) {
-    console.log(`  ✗ gagal: ${err.message}`);
+    console.log(`  ✗ failed: ${err.message}`);
     return;
   }
 
   const meta = parsePersonaFrontmatter(card);
   const slug = slugify(meta.name || "character");
-  console.log(`\n  ── pratinjau (${slug}) ──\n`);
+  console.log(`\n  ── preview (${slug}) ──\n`);
   console.log(
     card
       .split("\n")
@@ -236,51 +235,51 @@ async function main() {
   );
   console.log("\n  …\n");
 
-  const save = (await ask("  Simpan karakter ini? [y/N]", "y")).toLowerCase();
-  if (save !== "y") return console.log("  dibatalkan.");
+  const save = (await ask("  Save this character? [y/N]", "y")).toLowerCase();
+  if (save !== "y") return console.log("  cancelled.");
 
   const file = path.join(PERSONA_DIR, `${slug}.md`);
   fs.writeFileSync(file, card.endsWith("\n") ? card : card + "\n");
   setEnv("PERSONA", slug);
   if (meta.name) setEnv("BOT_NAME", meta.name);
-  console.log(`  ✓ disimpan: personas/${slug}.md`);
-  console.log(`  ✓ aktif sekarang`);
+  console.log(`  ✓ saved: personas/${slug}.md`);
+  console.log(`  ✓ now active`);
 
   // ── settings: auto / manual / skip ────────────────────────────
   const current = currentValues();
   console.log(`
-  Setting tingkah laku (voice note, reaction, jam, ngambek, dll):
+  Behaviour settings (voice notes, reactions, hours, sulking, etc.):
 
-   1) Auto   — model yang atur, sesuai karakter ini  (disarankan)
-   2) Manual — kamu atur satu per satu
-   3) Skip   — pakai default
+   1) Auto   — let the model tune them for this character  (recommended)
+   2) Manual — set them one by one
+   3) Skip   — keep the defaults
 `);
-  const mode = await ask("  Pilih [1-3]", "1");
+  const mode = await ask("  Choose [1-3]", "1");
 
   try {
     if (mode === "1") {
-      console.log("  Model sedang memilih setting…");
+      console.log("  The model is choosing settings…");
       const suggested = await autoSuggest({ card }, current);
-      console.log(`\n  Usulan:\n${formatTable(suggested)}\n`);
-      const ok = (await ask("  Terapkan? [y/N]", "y")).toLowerCase();
+      console.log(`\n  Proposal:\n${formatTable(suggested)}\n`);
+      const ok = (await ask("  Apply? [y/N]", "y")).toLowerCase();
       if (ok === "y") {
         applyValues(suggested);
         setEnv("PERSONA", slug);
-        console.log("  ✓ setting diterapkan");
+        console.log("  ✓ settings applied");
       }
     } else if (mode === "2") {
       const suggested = await autoSuggest({ card }, current).catch(() => current);
       const values = await askManually(rl, suggested);
       applyValues(values);
-      console.log("  ✓ setting diterapkan");
+      console.log("  ✓ settings applied");
     }
   } catch (err) {
-    console.log(`  ! setting otomatis gagal (${err.message}) — pakai default`);
+    console.log(`  ! automatic settings failed (${err.message}) — keeping the defaults`);
   }
 
-  console.log(`\n  Selesai. Jalankan:  rp restart\n`);
+  console.log(`\n  Done. Run:  rp restart\n`);
 }
 
 main()
-  .catch((err) => console.error("gagal:", err.message))
+  .catch((err) => console.error("failed:", err.message))
   .finally(() => close());

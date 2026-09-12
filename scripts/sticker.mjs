@@ -37,15 +37,15 @@ if (args[0] === "--clean" || args[0] === "clean") {
       /* ignore */
     }
   }
-  console.log(`✓ pindahkan ${moved} stiker yang tidak bisa dibaca → assets/stickers/.trash/`);
-  console.log(`  tersisa: ${readableStickers().length} stiker siap pakai`);
-  console.log("  (balikin kapan saja: rp sticker --restore)");
+  console.log(`✓ moved ${moved} unreadable stickers → assets/stickers/.trash/`);
+  console.log(`  remaining: ${readableStickers().length} stickers ready to use`);
+  console.log("  (restore any time: rp sticker --restore)");
   process.exit(0);
 }
 
 if (args[0] === "--restore" || args[0] === "restore") {
   if (!fs.existsSync(TRASH_DIR)) {
-    console.log("tidak ada .trash — belum pernah ada yang dipindahkan");
+    console.log("no .trash folder — nothing has been moved");
     process.exit(0);
   }
   const dir = path.join(ROOT, "assets", "stickers");
@@ -59,8 +59,8 @@ if (args[0] === "--restore" || args[0] === "restore") {
       /* ignore */
     }
   }
-  console.log(`✓ dikembalikan ${back} stiker dari .trash`);
-  console.log(`  total yang bisa dipakai: ${readableStickers().length}`);
+  console.log(`✓ restored ${back} stickers from .trash`);
+  console.log(`  total usable: ${readableStickers().length}`);
   process.exit(0);
 }
 
@@ -70,14 +70,14 @@ if (args[0] === "--tag" || args[0] === "tag") {
     force,
     onProgress: (f, info, n) => console.log(`  ${String(n).padStart(2)}. ${f} → ${info.tags.join(", ")}`),
   });
-  console.log(`\n✓ selesai: ${done} stiker baru dikasih tag, ${skipped} sudah ada, total ${total}`);
+  console.log(`\n✓ done: ${done} stickers newly tagged, ${skipped} already tagged, total ${total}`);
   process.exit(0);
 }
 
 if (args[0] === "--sync" || args[0] === "sync") {
   const copied = syncStickers(args.slice(1));
-  console.log(`✓ import ${copied} stiker baru ke assets/stickers/`);
-  console.log(`  total yang bisa dipakai: ${readableStickers().length}`);
+  console.log(`✓ imported ${copied} new stickers into assets/stickers/`);
+  console.log(`  total usable: ${readableStickers().length}`);
   process.exit(0);
 }
 

@@ -59,22 +59,22 @@ case "$cmd" in
     node scripts/doctor.mjs ;;
   watchdog|wd)
     if pgrep -f "watchdog.sh" >/dev/null 2>&1; then
-      echo "watchdog sudah jalan (pid $(cat data/watchdog.pid 2>/dev/null))"
+      echo "watchdog already running (pid $(cat data/watchdog.pid 2>/dev/null))"
     else
       setsid ./watchdog.sh >/dev/null 2>&1 < /dev/null &
       sleep 1
-      echo "watchdog jalan (pid $(cat data/watchdog.pid 2>/dev/null))"
+      echo "watchdog started (pid $(cat data/watchdog.pid 2>/dev/null))"
     fi ;;
   turing|tt)  node scripts/turing.mjs ;;
   bench)      node scripts/bench.mjs ;;
   sync|push)
     if [ ! -d .git ]; then
-      echo "belum repo git — jalankan: git init -b main && git add -A && git commit -m init"
+      echo "not a git repository — run: git init -b main && git add -A && git commit -m init"
       exit 1
     fi
     git add -A
     if git diff --cached --quiet; then
-      echo "tidak ada perubahan"
+      echo "nothing to commit"
       exit 0
     fi
     git commit -m "update: $(date '+%Y-%m-%d %H:%M')"

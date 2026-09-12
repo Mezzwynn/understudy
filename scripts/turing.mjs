@@ -54,6 +54,7 @@ const chat = { ...defaultChat("turing@s.whatsapp.net"), mood: newMood() };
 const transcript = [];
 
 const charProvider = providers()[0];
+const tag = (persona.name || "her").toLowerCase().slice(0, 6);
 const jp = judgeProvider();
 console.log(`character : ${persona.name} ${persona.emoji}`);
 console.log(`model     : ${charProvider.label}/${charProvider.model}`);
@@ -75,14 +76,14 @@ async function runPhase(title, script) {
     if (shouldSkip(chat, msg)) {
       chat.stats.skips = (chat.stats.skips || 0) + 1;
       chat.lastSkipAt = Date.now();
-      transcript.push({ who: "note", text: `(character read it and did not reply${chat.coldUntil > Date.now() ? "; she is sulking" : ""})` });
-      console.log("  character : [left on read]");
+      transcript.push({ who: "note", text: `(alya read it and did not reply${chat.coldUntil > Date.now() ? "; she is sulking" : ""})` });
+      console.log(`  ${tag} : [left on read]`);
       continue;
     }
     if (bare.length <= 14 && Math.random() < config.reactionChance) {
       const emoji = pickReaction();
-      transcript.push({ who: "character", text: `(reacted ${emoji} to the message)` });
-      console.log(`  character : [reaction ${emoji}]`);
+      transcript.push({ who: "alya", text: `(reacted ${emoji} to the message)` });
+      console.log(`  ${tag} : [reaction ${emoji}]`);
       continue;
     }
 
@@ -101,8 +102,8 @@ async function runPhase(title, script) {
       }
     }
     for (const b of maybeBurst(splitBubbles(reply), config.burstChance)) {
-      transcript.push({ who: "character", text: b });
-      console.log(`  character : ${b}`);
+      transcript.push({ who: "alya", text: b });
+      console.log(`  ${tag} : ${b}`);
     }
     console.log("");
   }
@@ -113,9 +114,9 @@ async function runPhase(title, script) {
 
 const JUDGE_SYSTEM = `You are an expert at spotting AI chatbots in WhatsApp chats. You will read a transcript.
 - "them" is a REAL human.
-- "character" is either a real human or a chatbot pretending to be one.
-- Lines starting with "(reacted" or "(character read it" are WhatsApp-level actions, not text.
-Your job: decide whether an ordinary person chatting with "character" would suspect she is an AI.
+- "alya" is either a real human or a chatbot pretending to be one.
+- Lines starting with "(reacted" or "(alya read it" are WhatsApp-level actions, not text.
+Your job: decide whether an ordinary person chatting with "alya" would suspect she is an AI.
 Be strict and specific. Look at: rhythm, length variance, slang, typos, whether she over-explains, parrots, always asks a question, always responds coherently, analyses the conversation, uses assistant-ish phrasing, answers things a real person would dodge, or behaves implausibly during a conflict.
 Return ONLY JSON:
 {"suspicion": <0-100>, "verdict": "human"|"unsure"|"ai", "tells": ["specific quotes or patterns"], "strongest_evidence": "...", "note": "one line"}`;

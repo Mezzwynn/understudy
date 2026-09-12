@@ -153,3 +153,37 @@ export function deflection(personaName, custom) {
   if (custom) return custom;
   return GENERIC_DEFLECTIONS[Math.floor(Math.random() * GENERIC_DEFLECTIONS.length)];
 }
+
+/** Interjections that turn into a tell when repeated. */
+const TIC_WORDS = ["tch", "tsk", "hmm", "hm", "uh", "emm", "em", "yah", "meh", "wkwk"];
+
+/**
+ * If she already opened with the same filler twice in her last three messages it
+ * stops sounding like a person and starts sounding like a character sheet. Strip
+ * it here — the model gets lazy about this even when the prompt forbids it.
+ */
+export function tameTics(text, history = []) {
+  const out0 = String(text ?? "");
+  if (!out0.trim()) return out0;
+  const recent = history
+    .filter((h) => h.role === "assistant")
+    .slice(-3)
+    .map((h) => String(h.content || ""))
+    .join("\n");
+  if (!recent) return out0;
+
+  let out = out0;
+  for (const tic of TIC_WORDS) {
+    const seen = (recent.match(new RegExp(`\\b${tic}\\b`, "gi")) || []).length;
+    if (seen < 2) continue;
+    // a whole line that is just the tic
+    out = out.replace(new RegExp(`(^|\\n)[ \\t]*[.,!?]?${tic}[.,!?]?[ \\t]*(?=\\n|$)`, "gi"), "$1");
+    // the tic opening a bubble (allow a leading "..." / "..")
+    out = out.replace(new RegExp(`^[ \\t]*[.,!?…]*[ \\t]*${tic}[.,!?…]*[ \\t]*`, "i"), "");
+    // and any later one sitting on its own line
+    out = out.replace(new RegExp(`\\n[ \\t]*[.,!?…]*[ \\t]*${tic}[.,!?…]*[ \\t]*(?=\\n|$)`, "gi"), "\n");
+  }
+  out = out.replace(/\n{3,}/g, "\n\n").replace(/^[ \t]+|[ \t]+$/gm, "").trim();
+  // never return nothing: if the whole reply was one tic, keep it
+  return out.replace(/[.\s]/g, "").length ? out : out0;
+}

@@ -5,6 +5,7 @@ import { generateProactive, generateNudge, generateFollowup, generateCheckup } f
 import { getSock, sendText, presence, setGlobalPresence } from "./whatsapp.mjs";
 import { splitBubbles, typingDelayFor, sleep } from "./texting.mjs";
 import { applyDeltas, normalize, isMoodLocked } from "./mood.mjs";
+import { ensureToday, tickMoments, momentDeltas, saveRoutine } from "./routine.mjs";
 
 /**
  * proactive.mjs — she has her own life.
@@ -125,6 +126,41 @@ export function dueSlot(spec, now = Date.now(), { jitterMin = 0, graceMin = 20, 
     if (now >= fireAt && now - fireAt <= graceMin * 60000) return { key, at: fireAt, hour: hhNum, minute };
   }
   return null;
+}
+
+/**
+ * Her day: make sure today's plan exists, then let the moments that have come
+ * due move her mood. Stored privately per contact.
+ */
+async function tickRoutines() {
+  if (!config.routine) return;
+  const chats = listChats().filter((c) => c.trusted === true);
+  if (!chats.length) return;
+
+  // one day per character, applied to everyone she talks to
+  const slugs = new Set(chats.map((c) => c.persona || config.persona));
+  slugs.add(config.persona);
+
+  for (const slug of slugs) {
+    try {
+      const persona = loadPersona(slug);
+      const routine = await ensureToday(persona);
+      if (!routine) continue;
+      const fresh = !routine.createdAt || Date.now() - routine.createdAt < 5 * 60000;
+      const fired = tickMoments(routine);
+      if (fresh || fired.length) saveRoutine(slug, routine);
+      if (!fired.length) continue;
+      for (const chat of chats) {
+        if ((chat.persona || config.persona) !== slug) continue;
+        if (!isMoodLocked(chat)) {
+          for (const m of fired) chat.mood = applyDeltas(normalize(chat.mood), momentDeltas(m));
+        }
+        saveChat(chat);
+      }
+    } catch (err) {
+      log(`routine tick failed: ${err.message}`);
+    }
+  }
 }
 
 /** May she start a conversation right now? */
@@ -386,6 +422,7 @@ export function startProactive() {  if (!config.proactive) {
     if (!sock) return;
     (async () => {
       await updatePresence(sock);
+      await tickRoutines();
       await checkSoft(sock);
       await checkInstructions(sock);
       await followUps(sock);

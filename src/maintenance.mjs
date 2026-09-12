@@ -72,5 +72,5 @@ export function startMaintenance() {
   };
   setTimeout(check, 60 * 1000); // shortly after boot
   setInterval(check, 60 * 60 * 1000); // then hourly (only fires once per day)
-  log(`backup: on → ${backupDir()} (simpan ${config.backupKeep} terakhir)`);
+  log(`backup: on → ${backupDir()} (keeping the last ${config.backupKeep})`);
 }
