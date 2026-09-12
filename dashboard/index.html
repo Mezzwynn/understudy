@@ -416,6 +416,7 @@ async function renderCharacter(force){
       </div>
     </div>
 
+    ${contextPanel(DATA.world)}
     ${worldPanel(DATA.world)}
     ${routinePanel(DATA.routine)}
   `;
@@ -448,6 +449,23 @@ async function renderCharacter(force){
     toast("Deleted"+ (r.switchedTo? " · now using "+r.switchedTo : ""));
     CHAR_SLUG = r.switchedTo || (DATA.personas[0]&&DATA.personas[0].slug) || null;
     DATA.personaCard = null; await refresh(true);
+  };
+  $("#btn-ctx-add").onclick = async ()=>{
+    const text = $("#ctx-text").value.trim();
+    if(!text) return;
+    const r = await api("/api/context",{ slug: CHAR_SLUG, text, until: $("#ctx-until").value });
+    toast(r.ok ? "Note added" : "Failed");
+    await refresh(true);
+  };
+  $("#tab-character").onclick = async (e)=>{
+    const b = e.target.closest("[data-ctx-remove]");
+    if(!b) return;
+    const list = (DATA.world && DATA.world.context) || [];
+    const item = list[Number(b.dataset.ctxRemove)];
+    if(!item) return;
+    await api("/api/context",{ slug: CHAR_SLUG, action:"remove", text: item.text });
+    toast("Note removed");
+    await refresh(true);
   };
   $("#btn-world-save").onclick = async ()=>{
     const w = collectWorld();
@@ -488,6 +506,26 @@ async function renderCharacter(force){
     toast(r.ok ? ("New routine: "+r.routine.theme) : ("Failed: "+(r.error||"")));
     await refresh(true);
   };
+}
+
+function contextPanel(w){
+  const list = (w && w.context) || [];
+  return `<div class="card">
+    <div class="row"><h2 style="margin:0">Extra context</h2><span class="grow"></span><span class="tiny">additive only</span></div>
+    <div class="hint" style="margin-top:6px">Anything you want her to keep in mind: "she is moving house this month", "it is rainy season here". These are <b>added on top</b> of the card, mood and rules — they never replace them.</div>
+    <div style="margin-top:10px">
+      ${list.map((c,i)=>`<div class="mrow" style="grid-template-columns:1fr 90px 30px;gap:8px;align-items:center;margin-bottom:6px">
+        <span style="font-size:12px">${esc(c.text)}</span>
+        <span class="tiny">${c.until?esc(c.until):"no expiry"}</span>
+        <button class="act" data-ctx-remove="${i}" style="padding:2px 8px">✕</button>
+      </div>`).join("") || '<div class="empty">Nothing extra right now.</div>'}
+    </div>
+    <div class="grid" style="margin-top:10px">
+      <div><label>New note</label><input id="ctx-text" placeholder="e.g. she is moving house this month"></div>
+      <div><label>Expires (optional)</label><input id="ctx-until" type="date"></div>
+    </div>
+    <div class="btns"><button class="act primary" id="btn-ctx-add">Add note</button></div>
+  </div>`;
 }
 
 const CAST_FIELDS = [["name","Name","e.g. Sari"],["relation","Who they are","older sister"],["vibe","What they are like","loud, nosy, kind"],["notes","Detail that keeps them consistent","calls her Fio to annoy her"]];
@@ -790,18 +828,87 @@ async function saveSettings(){
 /* ============================ schedule ============================ */
 function renderSchedule(){
   const root = $("#tab-schedule");
-  const next = DATA.schedule.find(s=>!s.passed && !s.quiet);
-  root.innerHTML = `<div class="card">
-    <h2>Today's schedule</h2>
-    <div class="slots">${DATA.schedule.map(s=>`<span class="slot ${s.passed?"past":""} ${next&&s.time===next.time?"next":""}">${s.time}${s.quiet?" (quiet)":""}</span>`).join("") || '<span class="muted">(not set)</span>'}</div>
-    <div class="muted" style="margin-top:11px">Next: <b style="color:#fff">${next?next.time:"—"}</b></div>
-    <div class="grid" style="margin-top:12px">
-      <div class="stat">she waits for <b>${DATA.bot.idleMin} min</b> of silence before starting a chat</div>
-      <div class="stat">gap between her own messages <b>${DATA.bot.gapMin} min</b></div>
-      <div class="stat">quiet hours <b>${DATA.bot.quiet[0]}:00–${DATA.bot.quiet[1]}:00</b></div>
+  const info = DATA.scheduleInfo || { slots: [], spec: "", activeHours: "", workHours: "" };
+  const slots = info.slots || [];
+  const rows = slots.map((sl,i)=>`
+    <div class="slot-row" data-i="${i}" style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+      <input class="slot-hour" type="number" min="0" max="23" value="${sl.hour}" style="width:70px" placeholder="hh">
+      <span class="muted">:</span>
+      <input class="slot-min" type="number" min="0" max="59" value="${sl.minute===null?"":sl.minute}" style="width:70px" placeholder="auto">
+      <span class="tiny">${sl.minute===null?"random minute each day":"fixed minute"}</span>
+      <span class="grow"></span>
+      <button class="act" data-slot-remove="${i}" style="padding:4px 10px">Remove</button>
+    </div>`).join("");
+
+  root.innerHTML = `
+    <div class="card">
+      <div class="row"><h2 style="margin:0">Message-first schedule</h2><span class="grow"></span>
+        <button class="act" id="btn-sched-gen">Auto-generate</button>
+      </div>
+      <div class="hint" style="margin-top:6px">When she is allowed to start a chat. <b>Hour only</b> = a random minute inside that hour (different every day). <b>hour:minute</b> = that exact time. Add or remove as many as you like.</div>
+      <div id="slot-list" style="margin-top:12px">${rows || '<div class="empty">No slots. She never messages first.</div>'}</div>
+      <div class="btns">
+        <button class="act" id="btn-slot-add">Add slot</button>
+        <button class="act primary" id="btn-sched-save">Save schedule</button>
+        <span class="muted" id="sched-hint"></span>
+      </div>
     </div>
-  </div>`;
+    <div class="card">
+      <h2>Her clock</h2>
+      <div class="grid">
+        <div><label>Active hours (online window)</label><input id="sched-active" value="${esc(info.activeHours||"")}" placeholder="11-14,17-19,21-2"></div>
+        <div><label>Work hours</label><input id="sched-work" value="${esc(info.workHours||"")}" placeholder="13-21"></div>
+      </div>
+      <div class="hint" style="margin-top:6px">Active hours decide when she appears online. Work hours stop her asking "what are you doing" during your job.</div>
+    </div>
+    <div class="card">
+      <h2>Today</h2>
+      <div class="slots">${DATA.schedule.map(s=>`<span class="slot ${s.passed?"past":""} ${nextSlot()&&s.time===nextSlot().time?"next":""}">${s.time}${s.quiet?" (quiet)":""}</span>`).join("") || '<span class="muted">(not set)</span>'}</div>
+      <div class="muted" style="margin-top:11px">Next: <b style="color:#fff">${nextSlot()?nextSlot().time:"—"}</b></div>
+      <div class="grid" style="margin-top:12px">
+        <div class="stat">she waits for <b>${DATA.bot.idleMin} min</b> of silence before starting a chat</div>
+        <div class="stat">gap between her own messages <b>${DATA.bot.gapMin} min</b></div>
+        <div class="stat">quiet hours <b>${DATA.bot.quiet[0]}:00–${DATA.bot.quiet[1]}:00</b></div>
+      </div>
+    </div>`;
+
+  const collect = ()=>$$("#slot-list .slot-row").map(r=>({
+    hour: Number($(".slot-hour",r).value),
+    minute: $(".slot-min",r).value === "" ? null : Number($(".slot-min",r).value),
+  }));
+
+  $("#btn-slot-add").onclick = ()=>{
+    const box = $("#slot-list");
+    if($(".empty", box)) box.innerHTML = "";
+    const i = $$("#slot-list .slot-row").length;
+    box.insertAdjacentHTML("beforeend", `<div class="slot-row" data-i="${i}" style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+      <input class="slot-hour" type="number" min="0" max="23" value="" style="width:70px" placeholder="hh">
+      <span class="muted">:</span>
+      <input class="slot-min" type="number" min="0" max="59" value="" style="width:70px" placeholder="auto">
+      <span class="tiny">random minute each day</span>
+      <span class="grow"></span>
+      <button class="act" data-slot-remove="${i}" style="padding:4px 10px">Remove</button>
+    </div>`);
+  };
+  $("#slot-list").onclick = (e)=>{
+    const b = e.target.closest("[data-slot-remove]");
+    if(!b) return;
+    b.closest(".slot-row")?.remove();
+  };
+  $("#btn-sched-save").onclick = async ()=>{
+    const r = await api("/api/schedule",{ slug: CHAR_SLUG, slots: collect(), activeHours: $("#sched-active").value.trim(), workHours: $("#sched-work").value.trim() });
+    toast(r.ok ? ("Schedule saved — "+r.count+" slots") : ("Failed: "+(r.error||"")));
+    if(r.ok) await refresh(true);
+  };
+  $("#btn-sched-gen").onclick = async ()=>{
+    const n = $$("#slot-list .slot-row").length || 5;
+    toast("Asking the model for a schedule that fits her…");
+    const r = await api("/api/schedule/gen",{ slug: CHAR_SLUG, apply:true, count:n });
+    toast(r.ok ? ("Generated: "+r.spec+(r.why?" — "+r.why:"")) : ("Failed: "+(r.error||"")));
+    if(r.ok) await refresh(true);
+  };
 }
+function nextSlot(){ return (DATA.schedule||[]).find(s=>!s.passed && !s.quiet); }
 
 /* ============================ quota ============================ */
 function renderQuota(){

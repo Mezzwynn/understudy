@@ -187,3 +187,53 @@ export function tameTics(text, history = []) {
   // never return nothing: if the whole reply was one tic, keep it
   return out.replace(/[.\s]/g, "").length ? out : out0;
 }
+
+/**
+ * Pull the first complete JSON object out of a model reply.
+ * Handles the usual mess: markdown fences, a sentence before the JSON, trailing
+ * commentary after it, and a reply that got cut off (returns null then).
+ */
+export function extractJsonObject(raw) {
+  let text = String(raw || "").trim();
+  if (!text) return null;
+
+  // strip ```json ... ``` fences
+  const fence = text.match(/```(?:json|JSON)?\s*([\s\S]*?)```/);
+  if (fence) text = fence[1].trim();
+
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+
+  // balanced scan so trailing prose cannot break the parse
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) {
+        const candidate = text.slice(start, i + 1);
+        try {
+          return JSON.parse(candidate);
+        } catch {
+          // a stray trailing comma is the most common small breakage
+          try {
+            return JSON.parse(candidate.replace(/,\s*([}\]])/g, "$1"));
+          } catch {
+            return null;
+          }
+        }
+      }
+    }
+  }
+  return null; // truncated mid-object
+}

@@ -21,11 +21,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { chat as llmChat } from "./llm.mjs";
+import { extractJsonObject } from "./guard.mjs";
 import { PERSONA_DIR, config, log } from "./config.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
 import { KNOBS, applyValues, currentValues } from "../scripts/_settings.mjs";
 import { ensureToday, tickMoments, saveRoutine, prune, loadRoutine, KINDS } from "./routine.mjs";
 import { RELATIONS, loadWorld, saveWorld } from "./world.mjs";
+import { generateSchedule, formatSchedule, parseSchedule, addContext, cleanContext } from "./schedule.mjs";
 
 const KNOB_KEYS = new Set(KNOBS.map((k) => k.key));
 
@@ -58,6 +60,10 @@ export const ACTION_TYPES = [
   "set_contact",
   "set_relation",
   "set_world",
+  "set_schedule",
+  "gen_schedule",
+  "add_context",
+  "remove_context",
   "switch_persona",
 ];
 
@@ -92,6 +98,15 @@ Actions you may use (nothing else exists):
    her history and the people around her. "cast" entries are MERGED by name (existing people are
    updated, new ones added) — it never wipes the rest. Omit "cast" to keep them all. Use "removeCast"
    to delete someone. Omit "backstory" to keep the current one.
+- {"type":"set_schedule","slug":"fiona","slots":"11,16,20:30"}
+   when she is allowed to message first. "11" = a random minute in that hour (differs each day),
+   "20:30" = that exact minute. Set it freely — add or remove as many as you like.
+- {"type":"gen_schedule","slug":"fiona","count":5}
+   let the model propose a schedule that fits her waking hours, her job and her personality.
+- {"type":"add_context","slug":"fiona","text":"she is moving house this month","until":"2026-10-01"}
+   an extra note she should keep in mind. ADDITIVE only: it can never replace the card, the mood
+   or the rules. "until" is optional (YYYY-MM-DD).
+- {"type":"remove_context","slug":"fiona","text":"..."} — drop that note again.
 - {"type":"switch_persona","slug":"fiona"} — make another character the active one
 
 Requests you must refuse (state the reason plainly in "say", send no action):
@@ -141,56 +156,6 @@ function checkTime(t) {
   })();
 }
 
-
-/**
- * Pull the first complete JSON object out of a model reply.
- * Handles the usual mess: markdown fences, a sentence before the JSON, trailing
- * commentary after it, and a reply that got cut off (returns null then).
- */
-export function extractJsonObject(raw) {
-  let text = String(raw || "").trim();
-  if (!text) return null;
-
-  // strip ```json ... ``` fences
-  const fence = text.match(/```(?:json|JSON)?\s*([\s\S]*?)```/);
-  if (fence) text = fence[1].trim();
-
-  const start = text.indexOf("{");
-  if (start === -1) return null;
-
-  // balanced scan so trailing prose cannot break the parse
-  let depth = 0;
-  let inStr = false;
-  let esc = false;
-  for (let i = start; i < text.length; i++) {
-    const c = text[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (c === "\\") esc = true;
-      else if (c === '"') inStr = false;
-      continue;
-    }
-    if (c === '"') inStr = true;
-    else if (c === "{") depth++;
-    else if (c === "}") {
-      depth--;
-      if (depth === 0) {
-        const candidate = text.slice(start, i + 1);
-        try {
-          return JSON.parse(candidate);
-        } catch {
-          // a stray trailing comma is the most common small breakage
-          try {
-            return JSON.parse(candidate.replace(/,\s*([}\]])/g, "$1"));
-          } catch {
-            return null;
-          }
-        }
-      }
-    }
-  }
-  return null; // truncated mid-object
-}
 
 /**
  * Validate one requested action. Returns { apply: fn, describe: string, undo }
@@ -409,6 +374,61 @@ function validate(action, { personas = [] } = {}) {
       describe: `world ${slug}: backstory ${String(backstory).length} chars, cast ${cast.length}`,
       reload: true,
       apply: () => ({ slug, ...saveWorld(slug, { backstory, cast, source: "agent" }) }),
+    };
+  }
+
+  if (t === "set_schedule") {
+    const slug = String(action.slug || config.persona).replace(/[^\w.-]/g, "");
+    const card = readCard(slug);
+    if (!card) return { refuse: `character "${slug}" does not exist` };
+    const spec = typeof action.slots === "string" ? action.slots : formatSchedule(action.slots);
+    const parsed = parseSchedule(spec);
+    if (!parsed.length) return { refuse: "that schedule has no valid hours" };
+    return {
+      describe: `${slug}.chat_schedule: "${card.meta.chat_schedule || ""}" → "${spec}" (${parsed.length} slots)`,
+      reload: true,
+      apply: () => {
+        writeCard(slug, { frontmatter: { ...card.meta, chat_schedule: spec }, body: card.body });
+        return { slug, slots: spec };
+      },
+    };
+  }
+
+  if (t === "gen_schedule") {
+    const slug = String(action.slug || config.persona).replace(/[^\w.-]/g, "");
+    const card = readCard(slug);
+    if (!card) return { refuse: `character "${slug}" does not exist` };
+    return {
+      describe: `generate a schedule for ${slug}`,
+      reload: true,
+      apply: async () => {
+        const p = loadPersona(slug);
+        const r = await generateSchedule(p, { count: Number(action.count) || 5, current: card.meta.chat_schedule || "" });
+        if (!r) return null;
+        writeCard(slug, { frontmatter: { ...card.meta, chat_schedule: r.spec }, body: card.body });
+        return { slug, slots: r.spec, why: r.why };
+      },
+    };
+  }
+
+  if (t === "add_context" || t === "remove_context") {
+    const slug = String(action.slug || config.persona).replace(/[^\w.-]/g, "");
+    const card = readCard(slug);
+    if (!card) return { refuse: `character "${slug}" does not exist` };
+    const text = String(action.text || "").trim().slice(0, 300);
+    if (!text) return { refuse: "no note text given" };
+    const isRemove = t === "remove_context";
+    return {
+      describe: isRemove ? `remove note from ${slug}: "${text.slice(0, 50)}"` : `note for ${slug}: "${text.slice(0, 60)}"`,
+      reload: true,
+      apply: () => {
+        const world = loadWorld(slug);
+        const list = isRemove
+          ? cleanContext(world.context).filter((c) => c.text.toLowerCase() !== text.toLowerCase())
+          : addContext(world, text, action.until);
+        saveWorld(slug, { ...world, context: list });
+        return { slug, context: list.length };
+      },
     };
   }
 

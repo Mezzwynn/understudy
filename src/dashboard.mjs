@@ -9,6 +9,7 @@ import { runAdmin } from "./admin.mjs";
 import { exportPersona, importPersona, deletePersona, listSlugs, trashContents, restoreFromTrash } from "./persona-io.mjs";
 import { tierOf, strangerState, unblock } from "./stranger.mjs";
 import { RELATIONS, loadWorld, saveWorld, ensureWorld, worldFile } from "./world.mjs";
+import { generateSchedule, formatSchedule, parseSchedule, addContext, cleanContext } from "./schedule.mjs";
 import { currentBlock, nextBlock, ensureToday, tickMoments, saveRoutine, prune, loadRoutine } from "./routine.mjs";
 import { normalize, cohere, label as moodLabel, newMood, baselineFor, KEYS as MOOD_KEYS } from "./mood.mjs";
 import { suggestMood } from "./affect.mjs";
@@ -245,6 +246,7 @@ async function summary() {
     personas: personaList(),
     relations: Object.entries(RELATIONS).map(([id, r]) => ({ id, label: r.label })),
     world: loadWorld(activeSlug),
+    scheduleInfo: { spec: persona.chat_schedule || "", slots: parseSchedule(persona.chat_schedule || ""), activeHours: persona.active_hours || "", workHours: persona.work_hours || "" },
     settings: {
       knobs: KNOBS.map((k) => ({ key: k.key, label: k.label, kind: k.kind, value: currentValues()[k.key] })),
       activeHours: persona.active_hours || "",
@@ -435,6 +437,7 @@ export function startDashboard() {
           const w = saveWorld(slug, {
             backstory: body.backstory,
             cast: Array.isArray(body.cast) ? body.cast : [],
+            context: body.context !== undefined ? cleanContext(body.context) : loadWorld(slug).context,
             generatedAt: Date.now(),
             source: "manual",
           });
@@ -450,6 +453,48 @@ export function startDashboard() {
             return json(res, 400, { ok: false, error: "the model could not build a world" });
           }
           return json(res, 200, { ok: true, world: w });
+        }
+
+        if (url.pathname === "/api/schedule") {
+          const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
+          if (!fs.existsSync(path.join(PERSONA_DIR, `${slug}.md`))) {
+            return json(res, 404, { ok: false, error: "character not found" });
+          }
+          const spec = typeof body.slots === "string" ? body.slots : formatSchedule(body.slots);
+          const parsed = parseSchedule(spec);
+          setPersonaField(slug, "chat_schedule", spec);
+          if (typeof body.activeHours === "string") setPersonaField(slug, "active_hours", body.activeHours);
+          if (typeof body.workHours === "string") setPersonaField(slug, "work_hours", body.workHours);
+          log(`dashboard: schedule ${slug} → ${spec} (${parsed.length} slots)`);
+          return json(res, 200, { ok: true, slots: spec, count: parsed.length });
+        }
+
+        if (url.pathname === "/api/schedule/gen") {
+          const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
+          const p = loadPersona(slug);
+          const r = await generateSchedule(p, {
+            count: Number(body.count) || 5,
+            current: p.chat_schedule || "",
+            quiet: [config.quietStart, config.quietEnd],
+          });
+          if (!r) return json(res, 400, { ok: false, error: "the model could not build a schedule" });
+          if (body.apply !== false) setPersonaField(slug, "chat_schedule", r.spec);
+          log(`dashboard: schedule generated for ${slug} → ${r.spec} (${r.why})`);
+          return json(res, 200, { ok: true, ...r });
+        }
+
+        if (url.pathname === "/api/context") {
+          const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
+          const world = loadWorld(slug);
+          if (body.action === "remove") {
+            const list = cleanContext(world.context).filter((c) => c.text !== String(body.text || ""));
+            saveWorld(slug, { ...world, context: list });
+            return json(res, 200, { ok: true, context: list });
+          }
+          const list = addContext(world, body.text, body.until);
+          saveWorld(slug, { ...world, context: list });
+          log(`dashboard: context added to ${slug}: ${String(body.text).slice(0, 60)}`);
+          return json(res, 200, { ok: true, context: list });
         }
 
         if (url.pathname === "/api/routine/new") {

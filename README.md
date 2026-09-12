@@ -190,6 +190,23 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## Schedule and extra context
+
+**Message-first schedule** (per character). The Schedule tab is an editor now: add or remove
+slots freely, with `11` meaning "a random minute inside that hour, different every day" and
+`20:30` meaning that exact minute. **Auto-generate** asks the model for a pattern that fits her
+waking hours, her job and her personality, and explains why. Active hours and work hours are
+editable there too.
+
+**Extra context** (per character, in the Character tab) — free-form notes you want her to keep
+in mind: *"she is moving house this month"*, *"it is rainy season here"*, with an optional
+expiry date. They are injected as **additive** context, and the prompt says so explicitly: the
+character card, the live mood, the relationship and every other rule still win. She is also
+told not to announce them or use them as an excuse to break character.
+
+Both, plus the backstory, the cast and the relationships, can also be set by telling the agent
+("move her schedule later", "she is touring this week", "let the model pick the hours").
+
 ## Backstory, cast and relationships
 
 Two things keep her consistent across a long conversation (and across contacts):

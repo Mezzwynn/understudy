@@ -7,6 +7,7 @@ import { languageDirective } from "./lang.mjs";
 import { needsIntroduction, tierOf } from "./stranger.mjs";
 import { openNotes, openVouches } from "./links.mjs";
 import { relationPromptBlock, worldForChat, worldPromptBlock } from "./world.mjs";
+import { contextBlock } from "./schedule.mjs";
 import { tasksBlock } from "./tasks.mjs";
 
 const ENGINE_FILE = path.join(PROMPT_DIR, "engine.md");
@@ -281,6 +282,7 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     trusted ? "" : tier === "acquaintance" ? acquaintanceBlock : strangerBlock,
     relationPromptBlock(chat),
     worldPromptBlock(world, {}),
+    contextBlock(world),
     crossBlock,
     vouchBlock,
     trusted ? tasksBlock(chat) : "",

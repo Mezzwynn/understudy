@@ -20,6 +20,7 @@ import path from "node:path";
 import { PERSONA_DIR, config, log } from "./config.mjs";
 import { chat as llmChat } from "./llm.mjs";
 import { languageDirective } from "./lang.mjs";
+import { cleanContext } from "./schedule.mjs";
 
 /* ----------------------------- relationships ---------------------------- */
 
@@ -146,7 +147,7 @@ export function relationPromptBlock(chat) {
 
 /* -------------------------------- world -------------------------------- */
 
-const EMPTY = { slug: "", backstory: "", cast: [], generatedAt: 0, source: "" };
+const EMPTY = { slug: "", backstory: "", cast: [], context: [], generatedAt: 0, source: "" };
 
 export function worldFile(slug) {
   return path.join(PERSONA_DIR, `${String(slug).replace(/[^\w.-]/g, "")}.world.json`);
@@ -157,7 +158,7 @@ export function loadWorld(slug) {
   if (!fs.existsSync(f)) return { ...EMPTY, slug };
   try {
     const w = JSON.parse(fs.readFileSync(f, "utf8"));
-    return { ...EMPTY, ...w, cast: Array.isArray(w.cast) ? w.cast : [] };
+    return { ...EMPTY, ...w, cast: Array.isArray(w.cast) ? w.cast : [], context: Array.isArray(w.context) ? w.context : [] };
   } catch {
     return { ...EMPTY, slug };
   }
@@ -177,6 +178,7 @@ export function saveWorld(slug, world) {
       }))
       .filter((c) => c.name)
       .slice(0, 24),
+    context: cleanContext(world.context),
     generatedAt: world.generatedAt || Date.now(),
     source: String(world.source || "manual").slice(0, 40),
   };
