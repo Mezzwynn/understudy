@@ -171,17 +171,87 @@ export function markIntroAsked(chat) {
  * Block the number on WhatsApp. Only ever called for a non-trusted contact,
  * after a warning was sent.
  */
+/**
+ * WhatsApp blocks are keyed by phone number, so a chat that only has a LID
+ * (the anonymous id new numbers arrive with) has to be resolved first — blocking
+ * the LID alone silently does nothing useful.
+ */
+export async function resolveBlockJid(sock, chatOrJid) {
+  const jid = typeof chatOrJid === "string" ? chatOrJid : chatOrJid?.jid;
+  const chat = typeof chatOrJid === "string" ? null : chatOrJid;
+  const raw = String(jid || "");
+  if (!raw.endsWith("@lid")) return { jid: raw, note: "already a phone-number jid" };
+
+  // 1. the owner typed the real number in (dashboard: "phone number if known")
+  const typed = String(chat?.profile?.phone || "").replace(/\D/g, "");
+  if (typed.length >= 8 && !String(chat?.profile?.number || "").startsWith(typed)) {
+    return { jid: `${typed}@s.whatsapp.net`, note: "from the number you entered" };
+  }
+
+  // 2. learned from a message (Baileys 7 exposes key.senderPn)
+  if (chat?.pn && String(chat.pn).endsWith("@s.whatsapp.net")) {
+    return { jid: chat.pn, note: "learned from an incoming message" };
+  }
+
+  // 3. LID_MAP in .env
+  const lid = raw.split("@")[0];
+  if (config.lidMap?.[lid]) {
+    return { jid: `${config.lidMap[lid].replace(/\D/g, "")}@s.whatsapp.net`, note: "from LID_MAP" };
+  }
+
+  // 4. Baileys 7 can ask WhatsApp for the number behind a LID
+  try {
+    const mapped = await sock?.signalRepository?.lidMapping?.getPNForLID?.(raw);
+    if (mapped) return { jid: String(mapped), note: "resolved by WhatsApp" };
+  } catch (err) {
+    log(`lid mapping failed for ${raw}: ${err.message}`);
+  }
+
+  return { jid: raw, note: "no phone number known for this lid yet" };
+}
+
+/**
+ * Block the number on WhatsApp. Only ever called for a non-trusted contact,
+ * after a warning was sent.
+ */
 export async function blockNumber(sock, chat, reason = "") {
   const st = strangerState(chat);
-  try {
-    await sock.updateBlockStatus(chat.jid, "block");
-  } catch (err) {
-    log(`block failed for ${chat.jid}: ${err.message}`);
-  }
-  st.blockedAt = Date.now();
+  const target = await resolveBlockJid(sock, chat);
+  st.blockJid = target.jid;
   st.blockReason = String(reason).slice(0, 200);
-  log(`BLOCKED ${chat.jid} — ${st.blockReason}`);
-  return true;
+  st.blockedAt = Date.now();
+
+  // a LID without a known phone number cannot be blocked: WhatsApp answers
+  // "bad-request". Say so instead of pretending it worked.
+  if (target.jid.endsWith("@lid")) {
+    st.blockConfirmed = false;
+    st.blockError = "WhatsApp needs the phone number, and this chat only has a hidden LID";
+    log(`ignoring ${chat.jid} in the bot — cannot block on WhatsApp: ${st.blockError}`);
+    return false;
+  }
+
+  try {
+    await sock.updateBlockStatus(target.jid, "block");
+    let confirmed = null;
+    try {
+      const list = await sock.fetchBlocklist();
+      confirmed = Array.isArray(list) ? list.some((j) => String(j).startsWith(target.jid.split("@")[0])) : null;
+    } catch {
+      confirmed = null;
+    }
+    st.blockConfirmed = confirmed;
+    delete st.blockError;
+    log(
+      `blocked on WhatsApp: ${target.jid} (${target.note})` +
+        (confirmed === true ? " · confirmed in the blocklist" : confirmed === false ? " · NOT in the blocklist" : ""),
+    );
+    return confirmed !== false;
+  } catch (err) {
+    st.blockConfirmed = false;
+    st.blockError = err.message;
+    log(`block failed for ${target.jid}: ${err.message}`);
+    return false;
+  }
 }
 
 export function unblock(chat) {

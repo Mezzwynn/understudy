@@ -849,6 +849,17 @@ export async function onMessage(sock, msg) {
   const senderJid = msg.key.participant || jid;
   const senderPhone = phoneFromJid(senderJid);
   if (config.debug) log(`inbound key: ${JSON.stringify(msg.key)}`);
+  // Baileys 7 tells us the phone number behind a LID — keep it, it is what
+  // WhatsApp needs to block someone who only arrives as an anonymous id
+  const senderPn = msg.key?.senderPn || msg.key?.participantPn || msg.senderPn;
+  if (senderPn && String(senderPn).endsWith("@s.whatsapp.net")) {
+    const c = loadChat(jid);
+    if (c.pn !== senderPn) {
+      c.pn = senderPn;
+      saveChat(c);
+      log(`learned phone number for ${jid}: ${senderPn}`);
+    }
+  }
   if (!allowed(jid, senderPhone)) {
     log(`ignored message from ${senderPhone} (not allowed) jid=${jid}`);
     return;

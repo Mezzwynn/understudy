@@ -9,6 +9,7 @@ import { runAdmin } from "./admin.mjs";
 import { exportPersona, importPersona, deletePersona, listSlugs, trashContents, restoreFromTrash } from "./persona-io.mjs";
 import { tierOf, strangerState, unblock } from "./stranger.mjs";
 import { RELATIONS, loadWorld, saveWorld, ensureWorld, worldFile } from "./world.mjs";
+import { resolveBlockJid } from "./stranger.mjs";
 import { generateSchedule, formatSchedule, parseSchedule, addContext, cleanContext } from "./schedule.mjs";
 import { currentBlock, nextBlock, ensureToday, tickMoments, saveRoutine, prune, loadRoutine } from "./routine.mjs";
 import { normalize, cohere, label as moodLabel, newMood, baselineFor, KEYS as MOOD_KEYS } from "./mood.mjs";
@@ -210,6 +211,9 @@ async function summary() {
     tier: tierOf(c),
     blocked: Boolean(c.stranger?.blockedAt),
     strikes: c.stranger?.strikes || 0,
+    phone: c.profile?.phone || "",
+    blockConfirmed: c.stranger?.blockConfirmed !== false,
+    blockError: c.stranger?.blockError || "",
     relation: c.relation?.type || "",
     relationNote: c.relation?.note || "",
     tasks: (c.tasks || []).slice(-3).map((t) => ({ to: t.to, text: t.text, status: t.status })),
@@ -338,6 +342,57 @@ export function startDashboard() {
           "cache-control": "no-store",
         });
         return res.end(body);
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/lidcheck") {
+        const sock = getSock();
+        if (!sock) return json(res, 200, { ok: false, error: "not connected" });
+        const sig = sock.signalRepository || {};
+        const out = {
+          ok: true,
+          signalRepository: Object.keys(sig),
+          hasLidMapping: Boolean(sig.lidMapping),
+          lidMappingMethods: sig.lidMapping ? Object.keys(sig.lidMapping) : [],
+          hasStore: Boolean(sock.store),
+          storeKeys: sock.store ? Object.keys(sock.store).slice(0, 20) : [],
+        };
+        try {
+          if (sig.lidMapping?.getPNForLID) out.sample = await sig.lidMapping.getPNForLID("276931085860958@lid");
+        } catch (err) {
+          out.sampleError = err.message;
+        }
+        return json(res, 200, out);
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/blocklist") {
+        const sock = getSock();
+        if (!sock) return json(res, 200, { ok: false, error: "WhatsApp is not connected", list: [] });
+        let list = [];
+        try {
+          list = await sock.fetchBlocklist();
+        } catch (err) {
+          return json(res, 200, { ok: false, error: err.message, list: [] });
+        }
+        const numbers = (Array.isArray(list) ? list : []).map((j) => String(j).split("@")[0]);
+        return json(res, 200, {
+          ok: true,
+          list,
+          numbers,
+          // which stored contacts are blocked on WhatsApp right now, and whether a
+          // LID-only chat can be mapped to a real number (needed to block it)
+          contacts: await Promise.all(
+            listChats().map(async (c) => {
+              const resolves = String(c.jid).endsWith("@lid") ? await resolveBlockJid(sock, c) : null;
+              return {
+                jid: c.jid,
+                blocked: numbers.includes(String(c.jid).split("@")[0]),
+                blockTarget: resolves ? resolves.jid : c.jid,
+                blockNote: resolves ? resolves.note : "",
+                inBlocklist: numbers.includes(String(resolves?.jid || c.jid).split("@")[0]),
+              };
+            }),
+          ),
+        });
       }
 
       if (req.method === "GET" && url.pathname === "/api/persona/trash") {
@@ -522,12 +577,13 @@ export function startDashboard() {
         if (url.pathname === "/api/block") {
           const chat = loadChat(body.jid);
           if (chat.trusted === true) return json(res, 400, { ok: false, error: "trusted contacts are never blocked" });
+          let confirmed = null;
           if (body.block) {
             const { getSock } = await import("./whatsapp.mjs");
             const sock = getSock();
             if (!sock) return json(res, 400, { ok: false, error: "WhatsApp is not connected" });
             const { blockNumber } = await import("./stranger.mjs");
-            await blockNumber(sock, chat, "manual, from the dashboard");
+            confirmed = await blockNumber(sock, chat, "manual, from the dashboard");
           } else {
             unblock(chat);
             try {
@@ -539,7 +595,12 @@ export function startDashboard() {
           }
           saveChat(chat);
           log(`dashboard: blocked=${Boolean(body.block)} for ${body.jid}`);
-          return json(res, 200, { ok: true, blocked: Boolean(body.block) });
+          return json(res, 200, {
+            ok: true,
+            blocked: Boolean(body.block),
+            onWhatsApp: confirmed !== false,
+            error: confirmed === false ? chat.stranger?.blockError || "WhatsApp refused the block" : "",
+          });
         }
 
         if (url.pathname === "/api/trust") {
@@ -612,7 +673,8 @@ export function startDashboard() {
             chat.relation = { type: RELATIONS[type] ? type : "", note: String(body.note || chat.relation?.note || "").slice(0, 160) };
           } else if (body.field === "relationNote") {
             chat.relation = { type: chat.relation?.type || "", note: String(body.value || "").slice(0, 160) };
-          } else if (["name", "nick", "number", "notes"].includes(body.field)) chat.profile[body.field] = body.value;
+          } else if (body.field === "phone") chat.profile.phone = String(body.value || "").replace(/[^\d+]/g, "");
+          else if (["name", "nick", "number", "notes"].includes(body.field)) chat.profile[body.field] = body.value;
           saveChat(chat);
           return json(res, 200, { ok: true });
         }

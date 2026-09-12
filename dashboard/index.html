@@ -318,7 +318,7 @@ function contactCard(c){
     ${(c.tasks||[]).length?`<div class="tiny" style="margin-top:7px">📤 ${c.tasks.map(t=>`to <b>${esc(t.to)}</b>: ${esc(t.text.slice(0,50))} <span class="tiny">(${esc(t.status)})</span>`).join(" · ")}</div>`:""}
     ${(c.crossNotes||[]).length?`<div class="tiny" style="margin-top:7px">🔗 ${c.crossNotes.map(n=>`<b>${esc(n.from)}</b>: ${esc(n.what.slice(0,90))}`).join(" · ")}</div>`:""}
     ${(c.vouches||[]).length?`<div class="tiny" style="margin-top:4px;color:var(--warn)">⏳ waiting for ${c.vouches.map(v=>esc(v.with)).join(", ")} to answer</div>`:""}
-    ${c.blocked?`<div class="locked" style="background:#241414;border-color:#5c2a2a;color:#ffb1b1">⛔ Blocked${c.blockReason?` — ${esc(c.blockReason)}`:""}</div>`:c.strikes?`<div class="tiny" style="margin-top:6px;color:var(--warn)">suspicion score ${c.strikes}</div>`:""}
+    ${c.blocked?`<div class="locked" style="background:#241414;border-color:#5c2a2a;color:#ffb1b1">⛔ ${c.blockConfirmed===false?"Ignored in the bot (WhatsApp refused — add the phone number)":"Blocked on WhatsApp"}${c.blockError?` — ${esc(c.blockError)}`:""}</div>`:c.strikes?`<div class="tiny" style="margin-top:6px;color:var(--warn)">suspicion score ${c.strikes}</div>`:""}
     ${commit}
     ${routineBox(c)}
     <details ${openCards.has(c.jid)?"open":""}>
@@ -332,6 +332,8 @@ function contactCard(c){
           <select class="f-relation" data-jid="${esc(c.jid)}">
             ${(DATA.relations||[]).map(r=>`<option value="${esc(r.id)}" ${r.id===(c.relation||"")?"selected":""}>${esc(r.label)}</option>`).join("")}
           </select></div>
+        <div><label>Phone number (if known)</label>
+          <input class="f-phone" data-jid="${esc(c.jid)}" value="${esc(c.phone||"")}" placeholder="+62… — needed to block a hidden LID"></div>
         <div><label>Relationship note (optional)</label>
           <input class="f-relation-note" data-jid="${esc(c.jid)}" value="${esc(c.relationNote||"")}" placeholder="e.g. we met at work"></div>
       </div>
@@ -1050,7 +1052,9 @@ document.addEventListener("click", async (e)=>{
     const want = b.dataset.v === "1";
     if(want && !confirm("Block this number on WhatsApp? They will no longer be able to message this account.")) return;
     const r = await api("/api/block",{ jid, block: want });
-    toast(r.ok ? (want?"Number blocked":"Number unblocked") : ("Failed: "+(r.error||"")));
+    if(!r.ok) toast("Failed: "+(r.error||""));
+    else if(want && r.onWhatsApp === false) toast("Ignored in the bot only — WhatsApp needs the real number. Fill in \"Phone number\" and try again.");
+    else toast(want?"Blocked on WhatsApp":"Unblocked on WhatsApp");
     await refresh(true);
   }
   if(act==="trust"){
@@ -1066,6 +1070,7 @@ document.addEventListener("click", async (e)=>{
     const card = b.closest(".card");
     await api("/api/contact",{ jid, field:"nick", value: $(".f-nick",card).value });
     await api("/api/contact",{ jid, field:"persona", value: $(".f-persona",card).value });
+    await api("/api/contact",{ jid, field:"phone", value: $(".f-phone",card).value });
     await api("/api/contact",{ jid, field:"relation", value: $(".f-relation",card).value, note: $(".f-relation-note",card).value });
     await api("/api/contact",{ jid, field:"relationNote", value: $(".f-relation-note",card).value });
     toast("Saved"); contactsDirty = false; await refresh(true);
