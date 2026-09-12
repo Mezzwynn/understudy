@@ -543,6 +543,7 @@ function drawAgent(){
         <div class="tiny">agent</div>
         <div>${esc(m.say||"")}</div>
         ${chips?`<div class="row" style="margin-top:8px">${chips}</div>`:""}
+        ${m.tookSec?`<div class="tiny" style="margin-top:5px">took ${m.tookSec}s</div>`:""}
       </div>`;
   }).join("");
   log.lastElementChild?.scrollIntoView({behavior:"smooth", block:"nearest"});
@@ -554,11 +555,57 @@ async function sendAgent(){
   if(!text) return;
   inp.value = "";
   AGENT_LOG.push({ role:"me", text });
-  AGENT_LOG.push({ role:"agent", say:"…sedang mikir…" });
+  const slot = AGENT_LOG.length;
+  AGENT_LOG.push({ role:"agent", say:"thinking…", pending:true, startedAt:Date.now() });
   drawAgent();
+
   const history = AGENT_LOG.slice(0,-1).slice(-6).map(m=>({role:m.role, text:m.text||m.say}));
-  const r = await api("/api/admin",{ message:text, history });
-  AGENT_LOG[AGENT_LOG.length-1] = { role:"agent", say:r.say||"(kosong)", applied:r.applied, refused:r.refused };
+
+  // start the job, then poll: a long model call must never look like a timeout
+  let started;
+  try {
+    started = await fetch("/api/admin",{
+      method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify({ message:text, history }),
+    }).then(r=>r.json());
+  } catch (err){
+    AGENT_LOG[slot] = { role:"agent", say:"Could not reach the dashboard: "+err.message };
+    drawAgent(); return;
+  }
+  if(!started || !started.jobId){
+    AGENT_LOG[slot] = { role:"agent", say: started && started.error ? "Failed: "+started.error : "The agent did not start." };
+    drawAgent(); return;
+  }
+
+  const t0 = Date.now();
+  const tick = setInterval(()=>{
+    const el = Math.round((Date.now()-t0)/1000);
+    AGENT_LOG[slot] = { role:"agent", say:`thinking… ${el}s`, pending:true, startedAt:t0 };
+    drawAgent();
+  }, 1000);
+
+  let r = null;
+  const deadline = Date.now() + 5*60*1000;
+  while(Date.now() < deadline){
+    await new Promise(res=>setTimeout(res,1200));
+    try {
+      r = await api("/api/admin/job?id="+encodeURIComponent(started.jobId));
+    } catch { continue; }
+    if(r && r.status && r.status !== "running") break;
+    r = null;
+  }
+  clearInterval(tick);
+
+  if(!r){
+    AGENT_LOG[slot] = { role:"agent", say:"Still running after five minutes. The model may be stuck — try again, or check the Log tab." };
+    drawAgent(); return;
+  }
+  const secs = Math.round((r.elapsedMs||0)/1000);
+  AGENT_LOG[slot] = {
+    role:"agent",
+    say: r.status === "error" ? "Failed: "+r.error : (r.say || "(empty reply)"),
+    applied: r.applied, refused: r.refused, tookSec: secs,
+  };
   drawAgent();
   if((r.applied||[]).length){
     SETTINGS_LOADED = false; DATA.personaCard = null; charDirty = false;
@@ -840,7 +887,7 @@ $("#btn-refresh").onclick = ()=>refresh(true);
 refresh();
 // never auto-refresh a tab that is being edited — this used to wipe
 // whatever was being typed, every five seconds
-setInterval(()=>{ if(tab!=="settings" && tab!=="character") refresh(); }, 5000);
+setInterval(()=>{ if(tab!=="settings" && tab!=="character" && tab!=="agent") refresh(); }, 5000);
 </script>
 </body>
 </html>

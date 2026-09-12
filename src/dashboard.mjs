@@ -140,6 +140,39 @@ function personaList() {
 let contacts = [];
 let SETTINGS_LOADED_HINT = false;
 
+/**
+ * The config agent can take a while (a routine injection makes two model calls).
+ * Holding an HTTP request open for that long is what makes a dashboard look like
+ * it "timed out", so the request starts a job and returns immediately; the page
+ * polls for the result.
+ */
+const adminJobs = new Map();
+let adminJobSeq = 0;
+function startAdminJob(fn) {
+  const id = `job${++adminJobSeq}-${Date.now().toString(36)}`;
+  const job = { id, status: "running", startedAt: Date.now(), result: null, error: null };
+  adminJobs.set(id, job);
+  // keep the map from growing
+  if (adminJobs.size > 20) {
+    const old = [...adminJobs.values()].sort((a, b) => a.startedAt - b.startedAt).slice(0, adminJobs.size - 20);
+    for (const j of old) adminJobs.delete(j.id);
+  }
+  Promise.resolve()
+    .then(fn)
+    .then((r) => {
+      job.status = "done";
+      job.result = r;
+      job.finishedAt = Date.now();
+    })
+    .catch((err) => {
+      job.status = "error";
+      job.error = err.message;
+      job.finishedAt = Date.now();
+      log(`admin job failed: ${err.message}`);
+    });
+  return job;
+}
+
 async function summary() {
   const persona = loadPersona();
   const st = loadState();
@@ -267,6 +300,20 @@ export function startDashboard() {
       }
 
 
+      if (req.method === "GET" && url.pathname === "/api/admin/job") {
+        const job = adminJobs.get(url.searchParams.get("id") || "");
+        if (!job) return json(res, 404, { ok: false, error: "unknown job" });
+        return json(res, 200, {
+          ok: true,
+          status: job.status,
+          elapsedMs: (job.finishedAt || Date.now()) - job.startedAt,
+          say: job.result?.say || "",
+          applied: job.result?.applied || [],
+          refused: job.result?.refused || [],
+          error: job.error || "",
+        });
+      }
+
       if (req.method === "GET" && url.pathname === "/api/persona/export") {
         const slug = url.searchParams.get("slug") || config.persona;
         const withSettings = url.searchParams.get("settings") !== "0";
@@ -358,13 +405,23 @@ export function startDashboard() {
         if (url.pathname === "/api/admin") {
           const msg = String(body.message || "").trim();
           if (!msg) return json(res, 400, { ok: false, error: "empty message" });
-          const r = await runAdmin({
-            message: msg,
-            history: Array.isArray(body.history) ? body.history : [],
-            context: { personas: personaList().map((p) => p.slug), contacts },
-          });
-          if (r.reload) SETTINGS_LOADED_HINT = true;
-          return json(res, 200, { ok: r.ok, say: r.say, applied: r.applied, refused: r.refused });
+          const run = () =>
+            runAdmin({
+              message: msg,
+              history: Array.isArray(body.history) ? body.history : [],
+              context: { personas: personaList().map((p) => p.slug), contacts },
+            }).then((r) => {
+              if (r.reload) SETTINGS_LOADED_HINT = true;
+              return r;
+            });
+
+          // sync=1 for scripts and tests; the dashboard polls instead
+          if (body.sync === true) {
+            const r = await run();
+            return json(res, 200, { ok: r.ok, say: r.say, applied: r.applied, refused: r.refused });
+          }
+          const job = startAdminJob(run);
+          return json(res, 202, { ok: true, jobId: job.id, status: "running" });
         }
 
         if (url.pathname === "/api/routine/new") {

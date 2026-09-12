@@ -298,6 +298,10 @@ rp turing          # humanness eval against an independent judge
 (`ReferenceError: decide is not defined`) passed `node --check` and every unit test, and the
 only symptom was that she silently stopped answering anyone — the bot looked alive.
 
+The config agent runs as a background job: the request returns immediately and the page polls
+for the result, so a slow model can never look like a timeout (the UI shows the elapsed
+seconds and how long the finished job took).
+
 `rp smoke` pushes real messages (owner, new stranger, spam, a mention of another contact)
 through the actual router with a fake WhatsApp socket, using a throwaway
 `UNDERSTUDY_DATA_DIR`, and fails if a case throws or produces no reply. It also asserts the
