@@ -129,6 +129,57 @@ function checkTime(t) {
   })();
 }
 
+
+/**
+ * Pull the first complete JSON object out of a model reply.
+ * Handles the usual mess: markdown fences, a sentence before the JSON, trailing
+ * commentary after it, and a reply that got cut off (returns null then).
+ */
+export function extractJsonObject(raw) {
+  let text = String(raw || "").trim();
+  if (!text) return null;
+
+  // strip ```json ... ``` fences
+  const fence = text.match(/```(?:json|JSON)?\s*([\s\S]*?)```/);
+  if (fence) text = fence[1].trim();
+
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+
+  // balanced scan so trailing prose cannot break the parse
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) {
+        const candidate = text.slice(start, i + 1);
+        try {
+          return JSON.parse(candidate);
+        } catch {
+          // a stray trailing comma is the most common small breakage
+          try {
+            return JSON.parse(candidate.replace(/,\s*([}\]])/g, "$1"));
+          } catch {
+            return null;
+          }
+        }
+      }
+    }
+  }
+  return null; // truncated mid-object
+}
+
 /**
  * Validate one requested action. Returns { apply: fn, describe: string, undo }
  * or { refuse: reason } — never a raw file operation.
@@ -354,18 +405,52 @@ export async function runAdmin({ message, history = [], context }) {
 
   let raw;
   try {
-    raw = await llmChat(messages, { json: true, temperature: 0.3, maxTokens: 1400 });
+    raw = await llmChat(messages, { json: true, temperature: 0.3, maxTokens: 2200 });
   } catch (err) {
-    return { ok: false, say: `model error: ${err.message}`, applied: [], refused: [] };
+    return { ok: false, say: `The model call failed: ${err.message}`, applied: [], refused: [] };
   }
 
-  let parsed = null;
-  try {
-    const s = raw.indexOf("{");
-    const e = raw.lastIndexOf("}");
-    parsed = JSON.parse(raw.slice(s, e + 1));
-  } catch {
-    return { ok: false, say: "I could not parse the model reply. Please try again, or be more specific.", applied: [], refused: [], raw: raw.slice(0, 300) };
+  let parsed = extractJsonObject(raw);
+
+  // one repair attempt: models occasionally answer in prose despite json mode
+  if (!parsed) {
+    log(`admin: reply was not JSON (${String(raw).slice(0, 120).replace(/\s+/g, " ")}…) — asking again`);
+    try {
+      const retry = await llmChat(
+        [
+          ...messages,
+          { role: "assistant", content: String(raw).slice(0, 1500) },
+          {
+            role: "user",
+            content:
+              "That reply was not valid JSON. Answer again with ONLY the JSON object described in your instructions: " +
+              '{"say":"...","actions":[...]}. No markdown, no prose before or after, and keep "say" under 3 sentences.',
+          },
+        ],
+        { json: true, temperature: 0, maxTokens: 900 },
+      );
+      parsed = extractJsonObject(retry);
+      if (!parsed) raw = retry;
+    } catch (err) {
+      log(`admin: repair call failed: ${err.message}`);
+    }
+  }
+
+  // still nothing usable: show the prose instead of an error, and change nothing
+  if (!parsed) {
+    const prose = String(raw || "")
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 600);
+    log("admin: giving up on JSON, replying with prose only (no changes applied)");
+    return {
+      ok: true,
+      degraded: true,
+      say: prose || "The model did not answer usefully. Try asking again in a different way.",
+      applied: [],
+      refused: [],
+    };
   }
 
   const say = String(parsed.say || "").trim().slice(0, 800);

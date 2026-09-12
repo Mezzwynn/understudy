@@ -543,6 +543,7 @@ function drawAgent(){
         <div class="tiny">agent</div>
         <div>${esc(m.say||"")}</div>
         ${chips?`<div class="row" style="margin-top:8px">${chips}</div>`:""}
+        ${m.degraded?`<div class="tiny" style="margin-top:6px;color:var(--warn)">the model answered in prose — nothing was changed</div>`:""}
         ${m.tookSec?`<div class="tiny" style="margin-top:5px">took ${m.tookSec}s</div>`:""}
       </div>`;
   }).join("");
@@ -604,7 +605,7 @@ async function sendAgent(){
   AGENT_LOG[slot] = {
     role:"agent",
     say: r.status === "error" ? "Failed: "+r.error : (r.say || "(empty reply)"),
-    applied: r.applied, refused: r.refused, tookSec: secs,
+    applied: r.applied, refused: r.refused, tookSec: secs, degraded: r.degraded,
   };
   drawAgent();
   if((r.applied||[]).length){

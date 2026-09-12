@@ -310,6 +310,7 @@ export function startDashboard() {
           say: job.result?.say || "",
           applied: job.result?.applied || [],
           refused: job.result?.refused || [],
+          degraded: job.result?.degraded === true,
           error: job.error || "",
         });
       }
@@ -418,7 +419,7 @@ export function startDashboard() {
           // sync=1 for scripts and tests; the dashboard polls instead
           if (body.sync === true) {
             const r = await run();
-            return json(res, 200, { ok: r.ok, say: r.say, applied: r.applied, refused: r.refused });
+            return json(res, 200, { ok: r.ok, say: r.say, applied: r.applied, refused: r.refused, degraded: r.degraded === true });
           }
           const job = startAdminJob(run);
           return json(res, 202, { ok: true, jobId: job.id, status: "running" });
