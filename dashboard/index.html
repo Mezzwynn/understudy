@@ -159,6 +159,7 @@
   <section id="tab-contacts">
     <div class="card tight" id="ctools">
       <input id="q" placeholder="Search contacts (name or number)…" autocomplete="off">
+      <div class="tiny" id="contacts-hint" style="margin-top:6px">auto-refresh pauses while you edit</div>
     </div>
     <div id="clist"></div>
   </section>
@@ -179,6 +180,10 @@ const esc = (s) => String(s??"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 const MOODKEYS = ["valence","energy","arousal","affection","patience","playfulness"];
 const MOODMIN = { valence:-1 };
 let DATA=null, tab="contacts", SETTINGS_LOADED=false, CHAR_LOADED=false, CHAR_SLUG=null, charDirty=false;
+// the contacts list is rebuilt every few seconds; without these two guards that
+// wipes whatever you are typing and closes any card you opened
+let contactsDirty = false;
+const openCards = new Set();
 const draft = {};       // jid -> values being edited
 let dragging = false;
 
@@ -289,7 +294,7 @@ function contactCard(c){
   const commit = (c.commitments&&c.commitments.length)
     ? `<div class="tiny" style="margin-top:8px">Promise: ${c.commitments.map(x=>`“${esc(x.what)}” <span class="tiny">(${new Date(x.due).toLocaleString("id-ID",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})})</span>`).join(" · ")}</div>`
     : "";
-  return `<div class="card ccard fadein">
+  return `<div class="card ccard fadein" data-jid="${esc(c.jid)}">
     <div class="row">
       <span class="avatar">${esc(initial)}</span>
       <div class="grow" style="min-width:120px">
@@ -316,7 +321,7 @@ function contactCard(c){
     ${c.blocked?`<div class="locked" style="background:#241414;border-color:#5c2a2a;color:#ffb1b1">⛔ Blocked${c.blockReason?` — ${esc(c.blockReason)}`:""}</div>`:c.strikes?`<div class="tiny" style="margin-top:6px;color:var(--warn)">suspicion score ${c.strikes}</div>`:""}
     ${commit}
     ${routineBox(c)}
-    <details>
+    <details ${openCards.has(c.jid)?"open":""}>
       <summary>Contact settings</summary>
       <div class="grid" style="margin-top:10px">
         <div><label>Name you go by for her</label>
@@ -847,7 +852,7 @@ function renderLog(){
 /* ============================ render ============================ */
 function renderAll(){
   renderHeader();
-  if(tab==="contacts" && !dragging) renderContacts();
+  if(tab==="contacts" && !dragging && !contactsDirty) renderContacts();
   if(tab==="character") renderCharacter();
   if(tab==="agent") renderAgent();
   if(tab==="settings") renderSettings();
@@ -864,6 +869,11 @@ async function refresh(forceSettings){
 /* ============================ events ============================ */
 document.addEventListener("input", (e)=>{
   const t = e.target;
+  if(t.closest && t.closest("#tab-contacts")){
+    contactsDirty = true;
+    const h = $("#contacts-hint");
+    if(h) h.innerHTML = '<span style="color:var(--warn)">● unsaved changes — press Save on that contact</span>';
+  }
   if(t.closest && t.closest("#tab-character")){
     charDirty = true;
     const h = $("#char-hint");
@@ -886,6 +896,15 @@ document.addEventListener("input", (e)=>{
 });
 document.addEventListener("pointerup", ()=>{ dragging = false; });
 document.addEventListener("pointercancel", ()=>{ dragging = false; });
+
+document.addEventListener("toggle", (e)=>{
+  const d = e.target.closest && e.target.closest("#tab-contacts details");
+  if(!d) return;
+  const jid = d.closest(".ccard")?.dataset.jid;
+  if(!jid) return;
+  if(d.open) openCards.add(jid);
+  else openCards.delete(jid);
+}, true);
 
 document.addEventListener("click", async (e)=>{
   const b = e.target.closest("[data-act]");
@@ -920,6 +939,7 @@ document.addEventListener("click", async (e)=>{
     await refresh(true);
   }
   if(act==="block"){
+    contactsDirty = false;
     const want = b.dataset.v === "1";
     if(want && !confirm("Block this number on WhatsApp? They will no longer be able to message this account.")) return;
     const r = await api("/api/block",{ jid, block: want });
@@ -927,6 +947,7 @@ document.addEventListener("click", async (e)=>{
     await refresh(true);
   }
   if(act==="trust"){
+    contactsDirty = false;
     const want = b.dataset.v === "1";
     if(!want && !confirm("Cabut kepercayaan? Dia bakal dingin lagi, panggilan sayang & mood-nya diresets ke mode asing.")) return;
     await api("/api/trust",{ jid, trusted: want });
@@ -934,12 +955,13 @@ document.addEventListener("click", async (e)=>{
     await refresh(true);
   }
   if(act==="save"){
+    contactsDirty = false;
     const card = b.closest(".card");
     await api("/api/contact",{ jid, field:"nick", value: $(".f-nick",card).value });
     await api("/api/contact",{ jid, field:"persona", value: $(".f-persona",card).value });
     await api("/api/contact",{ jid, field:"relation", value: $(".f-relation",card).value, note: $(".f-relation-note",card).value });
     await api("/api/contact",{ jid, field:"relationNote", value: $(".f-relation-note",card).value });
-    toast("Saved"); refresh();
+    toast("Saved"); contactsDirty = false; await refresh(true);
   }
   if(act==="proactive"){
     toast("Composing…");
@@ -958,6 +980,7 @@ $$("#tabs button").forEach(b=>{
     $$("#tabs button").forEach(x=>x.classList.remove("active"));
     b.classList.add("active");
     if(charDirty && tab==="character" && b.dataset.t!=="character" && !confirm("You have unsaved card changes. Leave this tab?")) return;
+    if(contactsDirty && tab==="contacts" && b.dataset.t!=="contacts" && !confirm("You have unsaved contact changes. Leave this tab?")) return;
     tab = b.dataset.t;
     $$("main > section").forEach(s=>s.hidden=true);
     $("#tab-"+tab).hidden=false;
@@ -969,7 +992,12 @@ $("#btn-refresh").onclick = ()=>refresh(true);
 refresh();
 // never auto-refresh a tab that is being edited — this used to wipe
 // whatever was being typed, every five seconds
-setInterval(()=>{ if(tab!=="settings" && tab!=="character" && tab!=="agent") refresh(); }, 5000);
+setInterval(()=>{
+  if(document.hidden) return;
+  if(["settings","character","agent"].includes(tab)) return;
+  if(tab==="contacts" && (contactsDirty || dragging)) return;
+  refresh();
+}, 8000);
 </script>
 </body>
 </html>
