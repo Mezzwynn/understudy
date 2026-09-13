@@ -208,6 +208,12 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 - **Usage** — rings for photos, voice characters and ElevenLabs remaining, plus per-provider
   token usage. **Log** — colour-coded, filterable.
 
+**Look**: four palettes, switchable from the dots in the header and remembered in the browser —
+**Violet** (default), **Mono** (graphite + a single cold accent, matching a monochrome character),
+**Aurora** (teal and rose), **Paper** (light, for daytime). The `⇕` button toggles a compact
+density. Every colour is a variable, so a theme is a palette swap and nothing is hard-coded.
+A look can also be linked: `?theme=t-mono&dense=1`.
+
 Saving applies immediately: `reloadConfig()` re-reads `.env` into the running process and the
 persona card is read from disk on every reply, so there is no restart step. The only restart
 button is in Settings.
