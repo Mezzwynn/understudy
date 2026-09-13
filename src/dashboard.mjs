@@ -486,6 +486,68 @@ export function startDashboard() {
         });
       }
 
+      // her face: the avatar and the candidates, served from her own folder
+      if (req.method === "GET" && url.pathname === "/face") {
+        const slug = loadPersona().slug;
+        const name = String(url.searchParams.get("f") || "avatar");
+        let file = "";
+        if (name === "avatar") file = avatarPath(slug);
+        else if (name.startsWith("cand-")) file = path.join(candidatesDir(slug), path.basename(name));
+        if (!file || !fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
+        res.writeHead(200, { "content-type": /\.png$/i.test(file) ? "image/png" : "image/jpeg", "cache-control": "no-store" });
+        return res.end(fs.readFileSync(file));
+      }
+      if (req.method === "GET" && url.pathname === "/api/face") {
+        const slug = loadPersona().slug;
+        const face = loadFace(slug);
+        let whatsappUrl = "";
+        try {
+          const { getSock } = await import("./whatsapp.mjs");
+          whatsappUrl = await currentAvatarUrl(getSock());
+        } catch {
+          /* WhatsApp may not be up yet */
+        }
+        return json(res, 200, {
+          slug,
+          hasAvatar: !!avatarPath(slug),
+          avatarMeta: face.updatedAt ? new Date(face.updatedAt).toLocaleString("id-ID") : "",
+          approved: (face.approved || []).length,
+          rejected: (face.rejected || []).length,
+          candidates: listCandidates(slug),
+          whatsappUrl,
+          faceModel: config.faceModel,
+          photoCandidateCount: config.photoCandidateCount,
+          prompt: facePrompt(loadPersona(slug)),
+        });
+      }
+      // the test galleries live in the Download folder; this serves them to the browser
+      if (req.method === "GET" && url.pathname === "/gallery") {
+        const rel = String(url.searchParams.get("p") || "");
+        const file = path.join("/sdcard/Download/Understudy", rel);
+        const safe = path.resolve(file).startsWith(path.resolve("/sdcard/Download/Understudy"));
+        if (!rel || !safe || !fs.existsSync(file) || !/\.html$/i.test(file)) return json(res, 404, { ok: false, error: "not found" });
+        const dir = path.posix.dirname(rel);
+        let html = fs.readFileSync(file, "utf8");
+        html = html.replace(/(src|href)="(?!http|\/|#)([^"]+)"/g, (_m, attr, target) => `${attr}="/gallery-file?p=${encodeURIComponent(path.posix.join(dir, target))}"`);
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+        return res.end(html);
+      }
+      if (req.method === "GET" && url.pathname === "/gallery-file") {
+        const rel = String(url.searchParams.get("p") || "");
+        const file = path.join("/sdcard/Download/Understudy", rel);
+        const safe = path.resolve(file).startsWith(path.resolve("/sdcard/Download/Understudy"));
+        if (!rel || !safe || !fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
+        const type = /\.png$/i.test(file)
+          ? "image/png"
+          : /\.md$/i.test(file)
+            ? "text/markdown; charset=utf-8"
+            : /\.json$/i.test(file)
+              ? "application/json"
+              : "image/jpeg";
+        res.writeHead(200, { "content-type": type, "cache-control": "public, max-age=300" });
+        return res.end(fs.readFileSync(file));
+      }
+
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
         const html = fs.readFileSync(HTML_FILE, "utf8");
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
