@@ -43,22 +43,65 @@ export function savePlan(slug, plan) {
     slug,
     date: String(plan.date || ""),
     items: (plan.items || [])
-      .map((i) => ({
+      .map((i, n) => ({
         at: String(i.at || "").slice(0, 5),
         text: String(i.text || "").trim().slice(0, 160),
         reason: String(i.reason || "").slice(0, 80),
+        color: nearestPaletteColor(i.color) || pickColor(n),
+        font: Math.max(1, Math.min(5, Number(i.font) || 1 + (n % 3))),
         postedAt: Number(i.postedAt) || 0,
         id: String(i.id || ""),
       }))
       .filter((i) => i.text && /^\d{1,2}:\d{2}$/.test(i.at))
       .slice(0, 8),
     history: (plan.history || [])
-      .map((h) => ({ at: Number(h.at) || 0, text: String(h.text || "").slice(0, 160) }))
+      .map((h) => ({ at: Number(h.at) || 0, text: String(h.text || "").slice(0, 160), color: String(h.color || "") }))
       .slice(-40),
   };
   fs.writeFileSync(fileFor(slug), JSON.stringify(clean, null, 2));
   return clean;
 }
+
+/**
+ * WhatsApp's own text-status colours (the ones you get when you tap the palette).
+ * No pure black: a black status is what you get when no colour is sent at all, and
+ * it reads like a broken post.
+ */
+export const STATUS_COLORS = [
+  "#0A7CFF", // blue
+  "#00A884", // green
+  "#7F66FF", // purple
+  "#E91E63", // pink
+  "#FF7A00", // orange
+  "#F4B400", // amber
+  "#546E7A", // blue grey
+  "#00695C", // teal
+  "#5E35B1", // deep purple
+  "#D84315", // deep orange
+  "#37474F", // dark slate
+  "#6D4C41", // brown
+];
+
+/**
+ * Snap a colour to the nearest one WhatsApp actually offers. The model likes to pick
+ * greys for her ("monochrome, obviously"), which is not in the palette and would land
+ * as an ugly off-white card. Nearest-match keeps the intent while staying standard.
+ */
+export function nearestPaletteColor(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ""));
+  if (!m) return "";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  let best = "", bestD = Infinity;
+  for (const c of STATUS_COLORS) {
+    const v = parseInt(c.slice(1), 16);
+    const dr = r - ((v >> 16) & 255), dg = g - ((v >> 8) & 255), db = b - (v & 255);
+    const d = dr * dr + dg * dg + db * db;
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}
+const pickColor = (i = 0) => STATUS_COLORS[Math.abs(Number(i) || 0) % STATUS_COLORS.length];
 
 const todayKey = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -69,12 +112,12 @@ function planFromRoutine(routine, persona) {
   const moments = (routine?.moments || []).filter((m) => m.share !== false);
   for (const m of moments.slice(0, config.statusPerDay)) {
     const text = String(m.what || "").split(/\s+/).slice(0, 12).join(" ");
-    if (text) out.push({ at: m.at, text, reason: `taken from her day (${m.kind})` });
+    if (text) out.push({ at: m.at, text, color: pickColor(out.length), reason: `taken from her day (${m.kind})` });
   }
   if (out.length < 2) {
     for (const b of (routine?.blocks || []).slice(0, 3)) {
       const text = String(b.what || "").split(/\s+/).slice(0, 10).join(" ");
-      if (text) out.push({ at: b.start, text, reason: "taken from her routine" });
+      if (text) out.push({ at: b.start, text, color: pickColor(out.length + 3), reason: "taken from her routine" });
     }
   }
   return out.sort((a, b) => a.at.localeCompare(b.at)).slice(0, config.statusPerDay);
@@ -83,9 +126,10 @@ function planFromRoutine(routine, persona) {
 const SYSTEM = `You write the WhatsApp Status ("story") posts of a roleplay character for one day.
 
 Answer with ONE JSON object and nothing else:
-{"items":[{"at":"HH:MM","text":"one short status line, max 12 words","reason":"how it fits her day"}]}
+{"items":[{"at":"HH:MM","text":"one short status line, max 12 words","color":"#RRGGBB","reason":"how it fits her day"}]}
 
 Between 3 and 4 items, spread across her waking hours and matching what she is doing then.
+For "color", pick from exactly these: PALETTE.
 A status is what someone posts without being asked: a one-liner, a complaint, a small win, something she noticed. It is not a message to anyone and not a reply.
 They must read as one arc across the day, in order, not four unrelated lines.
 Write in her language and her voice: if she is terse and cold, the statuses are terse and cold. Lowercase is fine. At most one emoji, and only if it fits her.
@@ -234,15 +278,21 @@ export function statusAudience() {
 /**
  * Post it. WhatsApp requires the recipient list; without it the status is invisible.
  */
-export async function postStatus(sock, text, { audience = null } = {}) {
+export async function postStatus(sock, text, { audience = null, color = "", font = 1 } = {}) {
   const list = audience || statusAudience();
   if (!list.length) {
     log("status skipped: nobody in the audience list");
     return false;
   }
+  // no colour is what produces the plain black card, so always send one
+  const bg = nearestPaletteColor(color) || pickColor(Date.now());
   try {
-    await sock.sendMessage("status@broadcast", { text: String(text).slice(0, 300) }, { statusJidList: list });
-    log(`status posted → ${list.length} contact(s): ${String(text).slice(0, 60)}`);
+    await sock.sendMessage(
+      "status@broadcast",
+      { text: String(text).slice(0, 300) },
+      { statusJidList: list, backgroundColor: bg, font: Math.max(1, Math.min(5, Number(font) || 1)) },
+    );
+    log(`status posted → ${list.length} contact(s) [${bg}]: ${String(text).slice(0, 60)}`);
     return true;
   } catch (err) {
     log(`status post failed: ${err.message}`);

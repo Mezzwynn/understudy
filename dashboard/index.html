@@ -889,9 +889,13 @@ async function renderCharacter(force){
     toast(r.ok?("Status terkirim: "+r.posted):("Failed: "+(r.error||"")));
     await refresh(true);
   };
+  const scRow=$("#status-colors");
+  if(scRow) scRow.onclick=(e)=>{ const b=e.target.closest("[data-color]"); if(!b) return;
+    $$("#status-colors .ctile").forEach(x=>x.classList.remove("sel")); b.classList.add("sel"); };
+  const chosenColor=()=>$("#status-colors .ctile.sel")?.dataset.color||"";
   const spc=$("#btn-status-custom"); if(spc) spc.onclick=async ()=>{
     const text=$("#status-custom").value.trim(); if(!text) return;
-    const r=await api("/api/status",{ slug:CHAR_SLUG, action:"post", text });
+    const r=await api("/api/status",{ slug:CHAR_SLUG, action:"post", text, color:chosenColor() });
     toast(r.ok?"Status terkirim":("Failed: "+(r.error||"")));
     $("#status-custom").value="";
     await refresh(true);
@@ -1022,6 +1026,10 @@ function statusPanel(st, audience){
       <button class="act" id="btn-status-post">Post the next one now</button>
       <input id="status-custom" placeholder="or type one to post…" style="flex:1;min-width:130px">
       <button class="act" id="btn-status-custom">Post it</button>
+      <div class="row" id="status-colors" style="margin-top:8px">
+        <span class="tiny">background:</span>
+        ${(DATA.statusColors||[]).map((c,i)=>`<button class="ctile ${i===0?"sel":""}" data-color="${c}" style="background:${c}" title="${c}"></button>`).join("")}
+      </div>
     </div>
     ${hist.length?`<details style="margin-top:10px"><summary>Already posted (${(st.history||[]).length})</summary>
       <div style="margin-top:8px">${hist.map(h=>`<div class="tiny" style="margin-bottom:5px">${new Date(h.at).toLocaleString("id-ID",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})} · "${esc(h.text)}"</div>`).join("")}</div></details>`:""}

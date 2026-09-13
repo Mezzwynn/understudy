@@ -14,7 +14,7 @@ import { loadTraits, saveTraits, generateTraits } from "./traits.mjs";
 import { listEvents, recentEvents, clearEvents } from "./events.mjs";
 import { buildWeekDigest } from "./week.mjs";
 import { listChanges } from "./changes.mjs";
-import { loadPlan, ensurePlan, postStatus, statusAudience, dueStatus, markPosted } from "./status.mjs";
+import { loadPlan, ensurePlan, postStatus, statusAudience, dueStatus, markPosted, STATUS_COLORS } from "./status.mjs";
 import { RELATIONS, loadWorld, saveWorld, ensureWorld, worldFile } from "./world.mjs";
 import { resolveBlockJid } from "./stranger.mjs";
 import { generateSchedule, formatSchedule, parseSchedule, addContext, cleanContext } from "./schedule.mjs";
@@ -266,6 +266,7 @@ async function summary() {
     changes: listChanges().slice(-12).reverse(),
     status: loadPlan(activeSlug),
     statusAudienceCount: statusAudience().length,
+    statusColors: STATUS_COLORS,
     evals: { ...evalSummary(), running: isEvalRunning(), due: dueForEval(), everyDays: config.evalEveryDays },
     paused: { active: isPausedDash(), minutesLeft: pausedFor(), reason: loadPause().reason || "" },
     featureKeys: FEATURES.map((f) => f.key),
@@ -575,7 +576,11 @@ export function startDashboard() {
             if (!sock) return json(res, 400, { ok: false, error: "WhatsApp is not connected" });
             const text = String(body.text || "").trim() || dueStatus(slug)?.text || "";
             if (!text) return json(res, 400, { ok: false, error: "nothing to post" });
-            const ok = await postStatus(sock, text, { audience: body.everyone ? null : statusAudience() });
+            const ok = await postStatus(sock, text, {
+              audience: body.everyone ? null : statusAudience(),
+              color: body.color || "",
+              font: Number(body.font) || 1,
+            });
             const plan = loadPlan(slug);
             const due = dueStatus(slug);
             if (ok && due && body.text === undefined) markPosted(slug, due);
