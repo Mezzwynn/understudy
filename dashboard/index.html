@@ -17,7 +17,7 @@
     --r-lg:20px; --r:14px; --r-sm:10px;
     --shadow:0 18px 50px -22px rgba(0,0,0,.9);
     --blur:blur(18px) saturate(140%);
-    --pad:16px; --gap:18px; --fs:15px;
+    --pad:16px; --gap:18px; --fs:15px; --on-accent:#ffffff;
     --glow-1:rgba(106,86,240,.22); --glow-2:rgba(61,220,151,.07);
     --header-bg:rgba(7,8,12,.86); --header-bg2:rgba(7,8,12,.62);
     --card-2:rgba(14,16,22,.66); --input-bg:rgba(9,10,15,.72);
@@ -121,6 +121,9 @@
   .chip.accent{color:#cfc6ff;border-color:rgba(139,123,255,.45);background:rgba(139,123,255,.12)}
 
   .themebar{display:flex;gap:6px;align-items:center}
+  .swatchbtn{position:relative;width:30px;height:30px;border-radius:10px;border:1px solid var(--line-2);cursor:pointer;padding:0;transition:.16s}
+  .swatchbtn:hover{transform:translateY(-2px) scale(1.05);border-color:var(--accent)}
+  .swatchbtn.sel{box-shadow:0 0 0 2px var(--accent),0 8px 20px -10px var(--accent-glow)}
   .tdot{width:22px;height:22px;border-radius:8px;border:1px solid var(--line-2);cursor:pointer;padding:0;transition:.16s}
   .tdot:hover{transform:translateY(-1px) scale(1.06)}
   .tdot[data-theme=""]{background:linear-gradient(135deg,#8b7bff,#6a56f0)}
@@ -128,8 +131,6 @@
   .tdot[data-theme="t-aurora"]{background:linear-gradient(135deg,#3ddcc0,#22b39c)}
   .tdot[data-theme="t-paper"]{background:linear-gradient(135deg,#ffffff,#d7dae2)}
   .tdot.sel{box-shadow:0 0 0 2px var(--accent),0 6px 18px -8px var(--accent-glow)}
-  body.t-mono button.act.primary{color:#111}
-  body.t-mono .avatar,body.t-mono .pavatar{color:#111}
   body.t-mono .bub.her{color:var(--tx)}
   .tdot#btn-dense{color:var(--dim);font-size:12px;display:grid;place-items:center}
 
@@ -178,7 +179,7 @@
     border-radius:11px;font-size:12.5px;font-family:inherit;cursor:pointer;transition:.16s}
   button.act:hover{border-color:rgba(139,123,255,.5);background:rgba(139,123,255,.1);transform:translateY(-1px)}
   button.act:active{transform:translateY(0) scale(.985)}
-  button.act.primary{background:linear-gradient(180deg,var(--accent),var(--accent-2));border-color:transparent;color:#fff;font-weight:600;
+  button.act.primary{background:linear-gradient(180deg,var(--accent),var(--accent-2));border-color:transparent;color:var(--on-accent);font-weight:600;
     box-shadow:0 10px 26px -14px var(--accent-glow)}
   button.act.primary:hover{filter:brightness(1.08)}
   button.act.ghost{background:transparent}
@@ -200,7 +201,7 @@
   /* ─────────────────────────────  person card  ───────────────────────────── */
   .person{display:flex;gap:13px;align-items:flex-start}
   .pavatar{width:54px;height:54px;border-radius:18px;flex:none;display:grid;place-items:center;font-size:20px;font-weight:700;
-    background:linear-gradient(155deg,var(--accent),var(--accent-2));color:#fff;
+    background:linear-gradient(155deg,var(--accent),var(--accent-2));color:var(--on-accent);
     box-shadow:0 14px 34px -16px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.2)}
   .pname{font-size:17px;font-weight:660;letter-spacing:-.3px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60vw}
   .visuals{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;margin-top:14px}
@@ -257,7 +258,7 @@
   .slot.next{border-color:rgba(139,123,255,.7);background:rgba(139,123,255,.14);color:#fff;font-weight:600}
   .slot.past{opacity:.32}
   .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);background:linear-gradient(180deg,var(--accent),var(--accent-2));
-    color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;opacity:0;transition:.26s cubic-bezier(.2,.8,.2,1);
+    color:var(--on-accent);padding:11px 18px;border-radius:999px;font-size:13px;opacity:0;transition:.26s cubic-bezier(.2,.8,.2,1);
     pointer-events:none;z-index:60;max-width:90vw;text-align:center;box-shadow:0 18px 40px -18px rgba(0,0,0,.9)}
   .toast.show{opacity:1;transform:translate(-50%,0)}
   .castcard{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:var(--r);background:var(--ghost)}
@@ -966,6 +967,27 @@ function renderSettings(){
   const rest=s.knobs.filter(k=>!seen.has(k.key)).map(knobField).join("");
   root.innerHTML=`
     <div class="card">
+      <h2>Appearance</h2>
+      <div class="kick" style="margin-bottom:8px">theme</div>
+      <div class="row" id="theme-row">
+        ${[["","Violet"],["t-mono","Mono"],["t-aurora","Aurora"],["t-paper","Paper"]].map(([t,label])=>
+          `<button class="act" data-set-theme="${t}">${label}</button>`).join("")}
+      </div>
+      <div class="kick" style="margin:14px 0 8px">accent</div>
+      <div class="row" id="accent-row">
+        ${["#8b7bff","#3ddcc0","#ff6b9d","#ffb454","#4fa3ff","#e8e8ea","#c084fc","#22c55e"].map(c=>
+          `<button class="swatchbtn" data-accent="${c}" style="background:${c}" title="${c}"></button>`).join("")}
+        <label class="swatchbtn" style="display:grid;place-items:center;cursor:pointer;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red)" title="custom colour">
+          <input type="color" id="accent-custom" style="opacity:0;position:absolute" value="#8b7bff">
+          <span style="font-size:13px;filter:drop-shadow(0 1px 2px #0009)">✚</span>
+        </label>
+        <button class="act" id="accent-reset">Reset accent</button>
+      </div>
+      <div class="kick" style="margin:14px 0 8px">density</div>
+      <div class="row"><button class="act" id="density-toggle">Comfortable / compact</button></div>
+      <div class="hint" style="margin-top:10px">The accent also colours avatars, tabs, bubbles and buttons. Text on top flips between black and white automatically so it stays readable.</div>
+    </div>
+    <div class="card">
       <h2>Search</h2>
       <input id="knob-q" placeholder="filter settings…">
     </div>
@@ -980,6 +1002,11 @@ function renderSettings(){
       <div class="muted" id="save-hint" style="margin-top:9px"></div>
     </div>`;
   $("#btn-save-settings").onclick=()=>saveSettings();
+  $("#theme-row").onclick=(e)=>{ const b=e.target.closest("[data-set-theme]"); if(!b) return; localStorage.setItem("us-theme", b.dataset.setTheme); applyLook(); toast("Theme: "+b.textContent.trim()); };
+  $("#accent-row").onclick=(e)=>{ const b=e.target.closest("[data-accent]"); if(!b) return; setAccent(b.dataset.accent); localStorage.setItem("us-accent", b.dataset.accent); toast("Accent "+b.dataset.accent); };
+  const ac=$("#accent-custom"); if(ac) ac.oninput=(e)=>{ setAccent(e.target.value); localStorage.setItem("us-accent", e.target.value); };
+  const ar=$("#accent-reset"); if(ar) ar.onclick=()=>{ localStorage.removeItem("us-accent"); applyLook(); SETTINGS_LOADED=false; refresh(true); toast("Accent reset"); };
+  const dt=$("#density-toggle"); if(dt) dt.onclick=()=>{ localStorage.setItem("us-dense", localStorage.getItem("us-dense")==="1"?"0":"1"); applyLook(); toast("Density changed"); };
   $("#btn-auto").onclick=async ()=>{
     toast("The model is deciding…");
     const r=await api("/api/auto",{apply:true});
@@ -1166,19 +1193,51 @@ $$("#tabs button").forEach(b=>{
 $("#btn-refresh").onclick=()=>refresh(true);
 
 /* appearance */
+function hexToRgb(hex){
+  const h=String(hex||"").replace("#","");
+  const v=h.length===3 ? h.split("").map(c=>c+c).join("") : h;
+  const n=parseInt(v,16);
+  return Number.isFinite(n) && v.length===6 ? { r:(n>>16)&255, g:(n>>8)&255, b:n&255 } : null;
+}
+function shade(hex, amount){
+  const c=hexToRgb(hex); if(!c) return hex;
+  const f=(v)=>Math.max(0,Math.min(255, Math.round(v*amount)));
+  return "#"+[f(c.r),f(c.g),f(c.b)].map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+/** Apply an accent everywhere, and flip the text on top so it stays readable. */
+function setAccent(hex){
+  const c=hexToRgb(hex); if(!c) return;
+  const lum=(0.2126*c.r + 0.7152*c.g + 0.0722*c.b)/255;
+  document.body.style.setProperty("--accent", hex);
+  document.body.style.setProperty("--accent-2", shade(hex, .78));
+  document.body.style.setProperty("--accent-glow", `rgba(${c.r},${c.g},${c.b},.38)`);
+  document.body.style.setProperty("--on-accent", lum > 0.62 ? "#101217" : "#ffffff");
+  $$("#accent-row .swatchbtn[data-accent]").forEach(b=>b.classList.toggle("sel", b.dataset.accent.toLowerCase()===String(hex).toLowerCase()));
+  const custom=$("#accent-custom"); if(custom && custom.value.toLowerCase()!==String(hex).toLowerCase()) custom.value = hex.length===7?hex:"#8b7bff";
+}
 function applyLook(){
   // ?theme=t-mono&dense=1 also works, so a look can be shared as a link
   const params = new URLSearchParams(location.search);
   if(params.has("theme")) localStorage.setItem("us-theme", params.get("theme") || "");
   if(params.has("dense")) localStorage.setItem("us-dense", params.get("dense") === "1" ? "1" : "0");
+  if(params.has("accent")) localStorage.setItem("us-accent", params.get("accent"));
   const theme = localStorage.getItem("us-theme") || "";
   const dense = localStorage.getItem("us-dense") === "1";
+  const accent = localStorage.getItem("us-accent") || "";
   document.body.classList.remove("t-mono","t-aurora","t-paper");
   if(theme) document.body.classList.add(theme);
   document.body.classList.toggle("dense", dense);
   $$("#themebar .tdot[data-theme]").forEach(b=>b.classList.toggle("sel", b.dataset.theme===theme));
   const d=$("#btn-dense"); if(d) d.classList.toggle("sel", dense);
   const t=$("#theme-name"); if(t) t.textContent = (theme || "violet").replace("t-","");
+  document.body.style.removeProperty("--accent");
+  if(accent){
+    document.body.style.setProperty("--accent", accent);
+    document.body.style.setProperty("--accent-2", shade(accent, .78));
+    const c=hexToRgb(accent) || {r:139,g:123,b:255};
+    document.body.style.setProperty("--accent-glow", `rgba(${c.r},${c.g},${c.b},.38)`);
+  }
+  if($("#accent-row")) setAccent(accent || getComputedStyle(document.body).getPropertyValue("--accent").trim() || "#8b7bff");
 }
 document.addEventListener("click",(e)=>{
   const dot=e.target.closest("#themebar .tdot[data-theme]");
