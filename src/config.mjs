@@ -104,6 +104,10 @@ function buildConfig() {
   skipLowEnergyChance: num(envGet("SKIP_LOW_ENERGY_CHANCE", "0.35"), 0.35),
   skipColdChance: num(envGet("SKIP_COLD_CHANCE", "0.3"), 0.3),
   skipCarryingChance: num(envGet("SKIP_CARRYING_CHANCE", "0.25"), 0.25),
+  // WhatsApp Status (the story feed)
+  waStatus: envFlag("WA_STATUS", true),
+  statusPerDay: num(envGet("STATUS_PER_DAY", "3"), 3),
+  statusAudience: envGet("STATUS_AUDIENCE", "all"),
   topicFatigue: envFlag("TOPIC_FATIGUE", true),
   lateReplyNote: envFlag("LATE_REPLY_NOTE", true),
   lateReplyMinMin: num(envGet("LATE_REPLY_MIN_MIN", "90"), 90),

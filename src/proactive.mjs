@@ -5,11 +5,12 @@ import { generateProactive, generateNudge, generateFollowup, generateCheckup } f
 import { getSock, sendText, presence, setGlobalPresence } from "./whatsapp.mjs";
 import { splitBubbles, typingDelayFor, sleep } from "./texting.mjs";
 import { applyDeltas, normalize, isMoodLocked } from "./mood.mjs";
-import { ensureToday, tickMoments, momentDeltas, saveRoutine } from "./routine.mjs";
+import { ensureToday, tickMoments, momentDeltas, saveRoutine, loadRoutine } from "./routine.mjs";
 import { isPaused } from "./pause.mjs";
 import { dueForEval, isEvalRunning, runAndRecord } from "./evals.mjs";
 import { weekNotifyDue, markWeekNotified, weekText } from "./week.mjs";
 import { watchFiles } from "./changes.mjs";
+import { ensurePlan, dueStatus, markPosted, postStatus } from "./status.mjs";
 
 /**
  * proactive.mjs — she has her own life.
@@ -130,6 +131,26 @@ export function dueSlot(spec, now = Date.now(), { jitterMin = 0, graceMin = 20, 
     if (now >= fireAt && now - fireAt <= graceMin * 60000) return { key, at: fireAt, hour: hhNum, minute };
   }
   return null;
+}
+
+/**
+ * WhatsApp Status: plan the day's arc once, then post each item when its time comes.
+ * Never during quiet hours — a story at 4am is not a thing she would do.
+ */
+async function maybePostStatus(sock) {
+  if (!config.waStatus || inQuietHours()) return;
+  try {
+    const persona = loadPersona();
+    const slug = persona.slug || config.persona;
+    const routine = loadRoutine(slug);
+    await ensurePlan(persona, routine, null);
+    const due = dueStatus(slug);
+    if (!due) return;
+    const ok = await postStatus(sock, due.text);
+    if (ok) markPosted(slug, due);
+  } catch (err) {
+    log(`status tick failed: ${err.message}`);
+  }
 }
 
 /** Sunday evening: a short recap of her week, for the owner. */
@@ -475,6 +496,7 @@ export function startProactive() {  if (!config.proactive) {
       await maybeRunEval();
       await maybeWeekDigest();
       watchFiles({ personaDir: PERSONA_DIR, promptDir: PROMPT_DIR, slug: config.persona });
+      await maybePostStatus(sock);
     })().catch((err) => log(`proactive error: ${err.message}`));
   }, config.proactiveTickSec * 1000);
 

@@ -447,6 +447,23 @@ hand-edit the file. `rp test` includes `scripts/featuretest.mjs`, which proves e
 changes the prompt (it once did not: `.env` said `WORLD=true` while the running process read
 `false`, because the dashboard wrote `1` and the config compared against the string `"true"`).
 
+## WhatsApp Status (her story)
+
+`WA_STATUS` gives her a story feed: 3-4 posts a day, planned as an arc from her routine and
+moments, so scrolling her status tells the story of that day rather than showing four unrelated
+lines.
+
+- each item carries a time and goes out when that time comes (nothing to trigger, no model call
+  at post time)
+- if the model refuses to return JSON, the plan falls back to the moments of her own routine —
+  the feature cannot end up empty
+- she can mention it in chat ("did u see my status"), the way people do
+- the dashboard has a card: today's arc, what has been posted, and buttons to replan, post the
+  next one, or post something written by hand
+
+⚠️ **A status is public to her contacts** — everyone she has talked to, including strangers.
+`STATUS_AUDIENCE=trusted` limits it to the people you trust.
+
 ## Installable panel (PWA)
 
 The dashboard registers a service worker and ships a manifest, so Chrome can **Add to home

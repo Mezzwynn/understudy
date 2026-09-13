@@ -14,6 +14,7 @@ import { loadTraits, saveTraits, generateTraits } from "./traits.mjs";
 import { listEvents, recentEvents, clearEvents } from "./events.mjs";
 import { buildWeekDigest } from "./week.mjs";
 import { listChanges } from "./changes.mjs";
+import { loadPlan, ensurePlan, postStatus, statusAudience, dueStatus, markPosted } from "./status.mjs";
 import { RELATIONS, loadWorld, saveWorld, ensureWorld, worldFile } from "./world.mjs";
 import { resolveBlockJid } from "./stranger.mjs";
 import { generateSchedule, formatSchedule, parseSchedule, addContext, cleanContext } from "./schedule.mjs";
@@ -263,6 +264,8 @@ async function summary() {
     events: { recent: recentEvents(24).slice(-8), total: listEvents().length },
     week: buildWeekDigest(activeSlug),
     changes: listChanges().slice(-12).reverse(),
+    status: loadPlan(activeSlug),
+    statusAudienceCount: statusAudience().length,
     evals: { ...evalSummary(), running: isEvalRunning(), due: dueForEval(), everyDays: config.evalEveryDays },
     paused: { active: isPausedDash(), minutesLeft: pausedFor(), reason: loadPause().reason || "" },
     featureKeys: FEATURES.map((f) => f.key),
@@ -557,6 +560,28 @@ export function startDashboard() {
             return json(res, 200, { ok: true, events: [] });
           }
           return json(res, 200, { ok: true, events: recentEvents(24).slice(-12) });
+        }
+
+        if (url.pathname === "/api/status") {
+          const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
+          const persona = loadPersona(slug);
+          if (body.action === "plan") {
+            const fresh = await ensurePlan(persona, null, null, { force: true });
+            return json(res, 200, { ok: true, status: fresh });
+          }
+          if (body.action === "post") {
+            const { getSock } = await import("./whatsapp.mjs");
+            const sock = getSock();
+            if (!sock) return json(res, 400, { ok: false, error: "WhatsApp is not connected" });
+            const text = String(body.text || "").trim() || dueStatus(slug)?.text || "";
+            if (!text) return json(res, 400, { ok: false, error: "nothing to post" });
+            const ok = await postStatus(sock, text, { audience: body.everyone ? null : statusAudience() });
+            const plan = loadPlan(slug);
+            const due = dueStatus(slug);
+            if (ok && due && body.text === undefined) markPosted(slug, due);
+            return json(res, 200, { ok, posted: ok ? text : "", plan: loadPlan(slug) });
+          }
+          return json(res, 200, { ok: true, status: loadPlan(slug), audience: statusAudience().length });
         }
 
         if (url.pathname === "/api/traits") {

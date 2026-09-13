@@ -16,6 +16,7 @@ import { weekPromptBlock } from "./week.mjs";
 import { crisisPromptBlock } from "./crisis.mjs";
 import { changePromptBlock } from "./changes.mjs";
 import { busyPromptBlock, topicFatigue, lateReplyNote, oddHourNote } from "./natural.mjs";
+import { statusPromptBlock } from "./status.mjs";
 import { tasksBlock } from "./tasks.mjs";
 
 const ENGINE_FILE = path.join(PROMPT_DIR, "engine.md");
@@ -310,6 +311,7 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     topicFatigue(chat),
     lateReplyNote(chat),
     oddHourNote(),
+    statusPromptBlock(chat.persona || config.persona),
     pausePromptBlock(),
     sleepy ? sleepPromptBlock() : morningNote(chat),
     lifePromptBlock(chat),
