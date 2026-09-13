@@ -8,6 +8,7 @@ import { needsIntroduction, tierOf } from "./stranger.mjs";
 import { openNotes, openVouches } from "./links.mjs";
 import { relationPromptBlock, worldForChat, worldPromptBlock } from "./world.mjs";
 import { contextBlock } from "./schedule.mjs";
+import { pausePromptBlock } from "./pause.mjs";
 import { tasksBlock } from "./tasks.mjs";
 
 const ENGINE_FILE = path.join(PROMPT_DIR, "engine.md");
@@ -283,6 +284,7 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     relationPromptBlock(chat),
     config.world ? worldPromptBlock(world, {}) : "",
     config.world ? contextBlock(world) : "",
+    pausePromptBlock(),
     config.crossChat ? crossBlock : "",
     config.crossChat ? vouchBlock : "",
     trusted ? tasksBlock(chat) : "",

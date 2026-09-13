@@ -8,6 +8,8 @@ import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
 import { runAdmin } from "./admin.mjs";
 import { exportPersona, importPersona, deletePersona, listSlugs, trashContents, restoreFromTrash } from "./persona-io.mjs";
 import { tierOf, strangerState, unblock } from "./stranger.mjs";
+import { loadPause, pauseFor, resume as resumeBot, pausedFor } from "./pause.mjs";
+import { evalSummary, isEvalRunning, dueForEval } from "./evals.mjs";
 import { RELATIONS, loadWorld, saveWorld, ensureWorld, worldFile } from "./world.mjs";
 import { resolveBlockJid } from "./stranger.mjs";
 import { generateSchedule, formatSchedule, parseSchedule, addContext, cleanContext } from "./schedule.mjs";
@@ -177,6 +179,7 @@ function startAdminJob(fn) {
 }
 
 let APP_VERSION = null;
+const isPausedDash = () => loadPause().until > Date.now();
 /** Version from package.json — shown in the header. */
 function appVersion() {
   if (APP_VERSION) return APP_VERSION;
@@ -252,6 +255,8 @@ async function summary() {
   return {
     routine: routineSummary,
     version: appVersion(),
+    evals: { ...evalSummary(), running: isEvalRunning(), due: dueForEval(), everyDays: config.evalEveryDays },
+    paused: { active: isPausedDash(), minutesLeft: pausedFor(), reason: loadPause().reason || "" },
     featureKeys: FEATURES.map((f) => f.key),
     // what the RUNNING process actually has switched on (not just what's in .env)
     liveFlags: {
@@ -411,6 +416,60 @@ export function startDashboard() {
           out.sampleError = err.message;
         }
         return json(res, 200, out);
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/memory") {
+        const jid = url.searchParams.get("jid") || "";
+        if (!jid) return json(res, 400, { ok: false, error: "jid is required" });
+        const chat = loadChat(jid);
+        const m = chat.memory || {};
+        const world = loadWorld(chat.persona || config.persona);
+        return json(res, 200, {
+          ok: true,
+          summary: m.summary || "",
+          relationship: m.relationship || "",
+          facts: m.facts || [],
+          boundaries: m.boundaries || [],
+          plans: m.plans || [],
+          jokes: m.jokes || [],
+          pinned: m.pinned || [],
+          factDates: m.factDates || {},
+          highlights: (world.highlights || []).slice(-12),
+          vouches: (chat.vouches || []).map((v) => ({ with: v.referrerName, status: v.status, answer: v.answer || "" })),
+          tasks: (chat.tasks || []).slice(-5).map((t) => ({ to: t.to, text: t.text, status: t.status })),
+        });
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/chat") {
+        const jid = url.searchParams.get("jid") || "";
+        if (!jid) return json(res, 400, { ok: false, error: "jid is required" });
+        const chat = loadChat(jid);
+        const q = (url.searchParams.get("q") || "").trim().toLowerCase();
+        const limit = Math.min(1000, Number(url.searchParams.get("limit")) || 400);
+        let msgs = (chat.history || []).map((h) => ({
+          role: h.role,
+          text: String(h.content || ""),
+          ts: h.ts || 0,
+          deleted: Boolean(h.deleted),
+          viaTask: Boolean(h.viaTask),
+        }));
+        const total = msgs.length;
+        if (q) msgs = msgs.filter((m) => m.text.toLowerCase().includes(q));
+        const trimmed = msgs.slice(-limit);
+        return json(res, 200, {
+          ok: true,
+          total,
+          shown: trimmed.length,
+          matched: q ? msgs.length : total,
+          contact: {
+            jid,
+            name: chat.profile?.name || "",
+            number: chat.profile?.number || jid.split("@")[0],
+            nick: chat.profile?.nick || "",
+            persona: chat.persona || "",
+          },
+          messages: trimmed,
+        });
       }
 
       if (req.method === "GET" && url.pathname === "/api/blocklist") {
@@ -587,6 +646,43 @@ export function startDashboard() {
           return json(res, 200, { ok: true, ...r });
         }
 
+        if (url.pathname === "/api/memory") {
+          const chat = loadChat(body.jid);
+          chat.memory ||= {};
+          const m = chat.memory;
+          const list = ["facts", "boundaries", "plans", "jokes"].includes(body.list) ? body.list : "";
+          const value = String(body.value || "").trim().slice(0, 300);
+          m[list] ||= [];
+          m.pinned ||= [];
+
+          if (body.action === "add" && list && value) {
+            if (!m[list].some((x) => String(x).toLowerCase() === value.toLowerCase())) m[list].push(value);
+          } else if (body.action === "delete" && list) {
+            const i = Number(body.index);
+            if (Number.isFinite(i) && i >= 0) {
+              const [gone] = m[list].splice(i, 1);
+              m.pinned = m.pinned.filter((p) => !(p.list === list && p.text === gone));
+            }
+          } else if (body.action === "pin" && list && value) {
+            if (!m.pinned.some((p) => p.list === list && p.text === value)) m.pinned.push({ list, text: value });
+            if (!m[list].some((x) => String(x) === value)) m[list].push(value);
+          } else if (body.action === "unpin" && list && value) {
+            m.pinned = m.pinned.filter((p) => !(p.list === list && p.text === value));
+          } else if (body.action === "summary") {
+            m.summary = String(body.value || "").slice(0, 1200);
+          } else if (body.action === "relationship") {
+            m.relationship = String(body.value || "").slice(0, 200);
+          } else if (body.action === "clear" && list) {
+            m[list] = [];
+            m.pinned = m.pinned.filter((p) => p.list !== list);
+          } else {
+            return json(res, 400, { ok: false, error: "unknown memory action" });
+          }
+          saveChat(chat);
+          log(`dashboard: memory ${body.action} ${list || ""} for ${body.jid}`);
+          return json(res, 200, { ok: true, memory: { facts: m.facts, boundaries: m.boundaries, plans: m.plans, jokes: m.jokes, pinned: m.pinned, summary: m.summary, relationship: m.relationship } });
+        }
+
         if (url.pathname === "/api/context") {
           const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
           const world = loadWorld(slug);
@@ -744,6 +840,31 @@ export function startDashboard() {
           const { forceProactiveNow } = await import("./proactive.mjs");
           const result = await forceProactiveNow(body.jid || undefined);
           return json(res, result.ok ? 200 : 400, result);
+        }
+
+        if (url.pathname === "/api/eval") {
+          if (isEvalRunning()) return json(res, 200, { ok: false, error: "already running" });
+          const { execFile } = await import("node:child_process");
+          log("dashboard: humanness check started");
+          execFile(process.execPath, ["scripts/eval.mjs", "--quick"], { cwd: ROOT, timeout: 20 * 60000 }, (err, stdout) => {
+            if (err) log(`dashboard eval failed: ${err.message}`);
+            else {
+              const m = /suspicion\s*:\s*(\d+)\/100/.exec(stdout);
+              log(`dashboard eval done: ${m ? m[1] + "/100" : "no score"}`);
+            }
+          });
+          return json(res, 202, { ok: true, started: true });
+        }
+
+        if (url.pathname === "/api/pause") {
+          if (body.resume) {
+            const st = resumeBot();
+            return json(res, 200, { ok: true, paused: false, wasAway: st.lastReason || "" });
+          }
+          const minutes = Number(body.minutes) || 0;
+          if (minutes <= 0) return json(res, 400, { ok: false, error: "minutes must be greater than zero" });
+          const st = pauseFor(minutes, body.reason);
+          return json(res, 200, { ok: true, paused: true, until: st.until, minutes, reason: st.reason });
         }
 
         if (url.pathname === "/api/restart") {

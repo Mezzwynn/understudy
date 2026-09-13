@@ -45,6 +45,8 @@ export function defaultChat(jid) {
     persona: "",
     history: [],
     memory: {
+      // entries you pinned by hand — the consolidator always keeps them
+      pinned: [],
       summary: "",
       relationship: "",
       facts: [],

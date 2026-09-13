@@ -106,6 +106,14 @@
   .switch.on span{left:25px;background:var(--accent);box-shadow:0 0 12px var(--accent-glow)}
   .switch:active span{width:24px}
 
+  .chatwrap{max-height:62vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;background:var(--conv)}
+  .chatrow{display:flex}
+  .chatrow.her{justify-content:flex-start}
+  .chatrow.them{justify-content:flex-end}
+  .chatday{align-self:center;font-size:10.5px;color:var(--dim-2);background:var(--ghost);border:1px solid var(--line);
+    padding:3px 10px;border-radius:999px;margin:10px 0 4px}
+  .chatrow .bub{margin:0;max-width:82%}
+
   /* tabs */
   nav{display:flex;gap:3px;margin:12px 0 0;overflow-x:auto;padding-bottom:11px;scrollbar-width:none;position:relative;
     scroll-behavior:smooth;-webkit-overflow-scrolling:touch;
@@ -260,12 +268,14 @@
           <span class="chip" id="pstate">—</span>
           <span class="chip" id="chip-up">—</span>
           <span class="chip accent" id="chip-next">—</span>
+          <span class="chip warn" id="chip-pause" style="display:none">—</span>
         </div>
       </div>
       <button class="act ghost" id="btn-refresh" title="Reload" style="padding:9px 12px">↻</button>
     </div>
     <nav id="tabs">
       <button data-t="contacts" class="active">Contacts</button>
+      <button data-t="chat">Chat</button>
       <button data-t="character">Character</button>
       <button data-t="agent">Agent</button>
       <button data-t="schedule">Schedule</button>
@@ -284,6 +294,7 @@
     </div>
     <div id="clist"></div>
   </section>
+  <section id="tab-chat" hidden></section>
   <section id="tab-character" hidden></section>
   <section id="tab-agent" hidden></section>
   <section id="tab-schedule" hidden></section>
@@ -556,6 +567,142 @@ function renderContacts(){
   $("#clist").innerHTML = list.length ? list.map(personCard).join("")
     : `<div class="card"><div class="empty">${DATA.contacts.length?"No matches.":"No contacts yet."}</div></div>`;
 }
+
+/* ═══════════════════════════════ chat ═══════════════════════════════ */
+let CHAT_JID = null, CHAT_Q = "";
+
+async function renderChat(){
+  const root = $("#tab-chat");
+  if(!DATACHAT_INIT){
+    root.innerHTML = `
+      <div class="card tight">
+        <div class="row">
+          <select id="chat-pick" style="max-width:200px">
+            ${DATA.contacts.map(c=>`<option value="${esc(c.jid)}">${esc(c.name||c.number)}</option>`).join("")}
+          </select>
+          <input id="chat-search" placeholder="Search this conversation…" style="flex:1;min-width:140px">
+          <button class="act" id="chat-reload">↻</button>
+        </div>
+        <div class="tiny" id="chat-meta" style="margin-top:7px"></div>
+      </div>
+      <div id="chat-view"></div>
+      <div id="chat-memory"></div>`;
+    DATACHAT_INIT = true;
+    $("#chat-pick").onchange = (e)=>{ CHAT_JID = e.target.value; loadChatView(); };
+    $("#chat-search").oninput = (e)=>{ CHAT_Q = e.target.value; loadChatView(); };
+    $("#chat-reload").onclick = ()=>loadChatView();
+  }
+  const pick = $("#chat-pick");
+  // keep the list fresh without stealing focus
+  if(pick && !pick.dataset.built){
+    pick.innerHTML = DATA.contacts.map(c=>`<option value="${esc(c.jid)}">${esc(c.name||c.number)}</option>`).join("");
+    pick.dataset.built = "1";
+    CHAT_JID = CHAT_JID || DATA.contacts[0]?.jid;
+    pick.value = CHAT_JID;
+  }
+  if(!CHAT_JID && DATA.contacts[0]) CHAT_JID = DATA.contacts[0].jid;
+  if(!$("#chat-view").dataset.loaded) await loadChatView();
+  if(!$("#chat-memory").dataset.loaded) await renderMemory();
+}
+
+const MEM_LISTS = [["facts","Facts"],["boundaries","Boundaries"],["plans","Plans & promises"],["jokes","Jokes"]];
+async function renderMemory(){
+  if(!CHAT_JID) return;
+  const m = await api("/api/memory?jid="+encodeURIComponent(CHAT_JID));
+  const box = $("#chat-memory");
+  if(!m.ok){ box.innerHTML=""; return; }
+  const pinnedKey = (l,t)=>`${l}::${t}`;
+  const isPinned = (l,t)=> (m.pinned||[]).some(p=>pinnedKey(p.list,p.text)===pinnedKey(l,t));
+  box.innerHTML = `
+    <div class="card">
+      <div class="row"><h2 style="margin:0">What she remembers</h2><span class="grow"></span>
+        <button class="act" id="mem-sum-save">Save note</button></div>
+      <div style="margin-top:11px"><label>Relationship note</label>
+        <input id="mem-rel" value="${esc(m.relationship||"")}" placeholder="how she sees this person"></div>
+      <div style="margin-top:9px"><label>Running summary (rewritten as you talk)</label>
+        <textarea id="mem-sum" rows="4">${esc(m.summary||"")}</textarea></div>
+
+      ${MEM_LISTS.map(([key,label])=>`
+        <div style="margin-top:14px">
+          <div class="row"><span class="kick">${esc(label)} (${(m[key]||[]).length})</span><span class="grow"></span>
+            <button class="act" data-mem-clear="${key}" style="padding:4px 10px">Clear</button></div>
+          ${(m[key]||[]).map((v,i)=>`<div class="mrow" style="grid-template-columns:1fr 30px 30px;gap:7px;align-items:center;margin-top:6px">
+            <span style="font-size:12.5px">${esc(v)}</span>
+            <button class="act" data-mem-pin="${key}" data-i="${i}" title="${isPinned(key,v)?"pinned — survives rewrites":"pin it"}"
+              style="padding:3px 7px;${isPinned(key,v)?"border-color:var(--accent);color:var(--accent)":""}">${isPinned(key,v)?"★":"☆"}</button>
+            <button class="act" data-mem-del="${key}" data-i="${i}" style="padding:3px 7px">✕</button>
+          </div>`).join("") || '<div class="tiny" style="margin-top:5px">nothing yet</div>'}
+          <div class="row" style="margin-top:7px">
+            <input data-mem-add="${key}" placeholder="add to ${esc(label.toLowerCase())}…" style="flex:1">
+            <button class="act" data-mem-addbtn="${key}">Add</button>
+          </div>
+        </div>`).join("")}
+
+      ${(m.highlights||[]).length?`<div style="margin-top:14px"><span class="kick">Highlights (from her own days)</span>
+        ${m.highlights.map(h=>`<div class="tiny" style="margin-top:4px">${KINDICON[h.kind]||"•"} ${esc(h.what)} <span class="tiny">· ${esc(h.date||"")}</span></div>`).join("")}</div>`:""}
+      ${(m.tasks||[]).length?`<div style="margin-top:12px"><span class="kick">Errands</span>
+        ${m.tasks.map(t=>`<div class="tiny" style="margin-top:4px">→ ${esc(t.to)}: ${esc(t.text.slice(0,60))} <span class="tiny">(${esc(t.status)})</span></div>`).join("")}</div>`:""}
+    </div>`;
+  box.dataset.loaded = "1";
+
+  const act = async (payload)=>{ await api("/api/memory",{ jid:CHAT_JID, ...payload }); box.dataset.loaded=""; await renderMemory(); };
+  box.onclick = async (e)=>{
+    const del=e.target.closest("[data-mem-del]"), pin=e.target.closest("[data-mem-pin]"), clr=e.target.closest("[data-mem-clear]"), addb=e.target.closest("[data-mem-addbtn]");
+    if(del) return act({ action:"delete", list:del.dataset.memDel, index:Number(del.dataset.i) });
+    if(pin){
+      const list=pin.dataset.memPin, i=Number(pin.dataset.i);
+      const value=(m[list]||[])[i];
+      return act({ action: isPinned(list,value)?"unpin":"pin", list, value });
+    }
+    if(clr){ if(!confirm("Clear this list?")) return; return act({ action:"clear", list:clr.dataset.memClear }); }
+    if(addb){
+      const input=box.querySelector(`[data-mem-add="${addb.dataset.memAddbtn}"]`);
+      const value=(input.value||"").trim(); if(!value) return;
+      return act({ action:"add", list:addb.dataset.memAddbtn, value });
+    }
+    if(e.target.id==="mem-sum-save"){
+      await act({ action:"summary", value:$("#mem-sum").value });
+      await act({ action:"relationship", value:$("#mem-rel").value });
+      toast("Memory saved");
+    }
+  };
+  box.onkeydown = (e)=>{ if(e.key==="Enter" && e.target.dataset.memAdd) e.target.nextElementSibling.click(); };
+}
+
+async function loadChatView(){
+  if(!CHAT_JID) return;
+  const r = await api(`/api/chat?jid=${encodeURIComponent(CHAT_JID)}&q=${encodeURIComponent(CHAT_Q)}&limit=400`);
+  const view = $("#chat-view");
+  if(!r.ok){ view.innerHTML = `<div class="card"><div class="empty">Could not load: ${esc(r.error||"")}</div></div>`; return; }
+  const meta = $("#chat-meta");
+  if(meta) meta.innerHTML = `${esc(r.contact.name||r.contact.number)} · ${r.total} messages stored${CHAT_Q?` · <b>${r.matched}</b> match “${esc(CHAT_Q)}”`:""}`;
+  if(!r.messages.length){ view.innerHTML = `<div class="card"><div class="empty">Nothing here.</div></div>`; view.dataset.loaded="1"; return; }
+  let lastDay = "";
+  const parts = [];
+  for(const m of r.messages){
+    const d = new Date(m.ts||0);
+    const day = d.toDateString();
+    if(day !== lastDay){
+      lastDay = day;
+      parts.push(`<div class="chatday">${emptyDay(d)}</div>`);
+    }
+    const time = d.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"});
+    const cls = m.role==="user" ? "them" : "her";
+    const flags = `${m.deleted?'<span class="tiny"> · deleted by her</span>':""}${m.viaTask?'<span class="tiny"> · sent for you</span>':""}`;
+    parts.push(`<div class="chatrow ${cls}"><div class="bub ${cls}">${esc(m.text)}<div class="tiny" style="margin-top:4px;opacity:.7">${time}${flags}</div></div></div>`);
+  }
+  view.innerHTML = `<div class="card tight chatwrap">${parts.join("")}</div>`;
+  view.dataset.loaded = "1";
+  view.querySelector(".chatwrap").scrollTop = view.querySelector(".chatwrap").scrollHeight;
+}
+function emptyDay(d){
+  const today = new Date();
+  const y = new Date(Date.now()-86400000);
+  if(d.toDateString()===today.toDateString()) return "Today";
+  if(d.toDateString()===y.toDateString()) return "Yesterday";
+  return d.toLocaleDateString("id-ID",{weekday:"long", day:"numeric", month:"short", year:"numeric"});
+}
+let DATACHAT_INIT = false;
 
 /* ═══════════════════════════════ character ═══════════════════════════════ */
 const CHAR_FIELDS = [
@@ -973,6 +1120,22 @@ function renderSettings(){
       </div>
     </div>
     <div class="card">
+      <h2>Take her offline</h2>
+      <div class="hint">While paused she reads but never answers, never messages first and stops all check-ups. The reason is remembered, so when you switch her back on she knows she was away.</div>
+      <div class="row" style="margin-top:11px">
+        ${[[60,"1 hour"],[480,"8 hours"],[1440,"1 day"],[4320,"3 days"]].map(([m,label])=>
+          `<button class="act" data-pause="${m}">${label}</button>`).join("")}
+        <input id="pause-reason" placeholder="why (optional) — e.g. out of town" style="flex:1;min-width:150px">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="act primary" id="btn-pause-custom">Pause…</button>
+        <input id="pause-min" type="number" min="1" placeholder="minutes" style="width:110px">
+        <span class="grow"></span>
+        <button class="act" id="btn-resume">Switch her back on</button>
+      </div>
+      <div class="tiny" id="pause-state" style="margin-top:9px"></div>
+    </div>
+    <div class="card">
       <h2>Search</h2>
       <input id="knob-q" placeholder="filter settings…">
     </div>
@@ -993,6 +1156,27 @@ function renderSettings(){
     if(r.ok){ toast("Automatic settings applied"); SETTINGS_LOADED=false; await refresh(true); } else toast("Failed: "+(r.error||"?"));
   };
   $("#btn-restart").onclick=async ()=>{ await api("/api/restart",{}); toast("Restarting…"); };
+  const pauseState = ()=>{
+    const pz = DATA.paused || {};
+    const el = $("#pause-state");
+    if(el) el.innerHTML = pz.active
+      ? `<span style="color:var(--warn)">⏸ paused now · ${pz.minutesLeft} min left</span>${pz.reason?` · ${esc(pz.reason)}`:""}`
+      : "she is awake";
+  };
+  pauseState();
+  const doPause = async (minutes, reason)=>{
+    const r = await api("/api/pause",{ minutes, reason });
+    if(!r.ok){ toast("Failed: "+(r.error||"")); return; }
+    toast(`Paused for ${minutes} min${reason?` — ${reason}`:""}`);
+    await refresh(true);
+  };
+  $$("#tab-settings [data-pause]").forEach(b=>{ b.onclick=()=>doPause(Number(b.dataset.pause), $("#pause-reason").value.trim()); });
+  const pc=$("#btn-pause-custom"); if(pc) pc.onclick=()=>{ const m=Number($("#pause-min").value); if(!m) return toast("Give a number of minutes"); doPause(m, $("#pause-reason").value.trim()); };
+  const br=$("#btn-resume"); if(br) br.onclick=async ()=>{
+    const r=await api("/api/pause",{ resume:true });
+    toast(r.wasAway?`She is back — and knows she was away: ${r.wasAway}`:"She is back");
+    await refresh(true);
+  };
   $("#feat-list").onclick=async (e)=>{
     const b=e.target.closest("[data-toggle]"); if(!b) return;
     const key=b.dataset.toggle;
@@ -1019,6 +1203,35 @@ async function saveSettings(){
 }
 
 /* ═══════════════════════════════ usage ═══════════════════════════════ */
+function evalPanel(e){
+  if(!e) return "";
+  const h = e.history || [];
+  const spark = h.length>1 ? `<svg viewBox="0 0 300 60" preserveAspectRatio="none" style="width:100%;height:60px;margin-top:8px">
+      ${(()=>{const pts=h.map((p,i)=>[6+(i*(288))/(h.length-1), 54-(Math.min(100,p.score)/100)*48]);
+        const line=pts.map(([x,y],i)=>`${i?"L":"M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+        const area=`${line} L${pts[pts.length-1][0].toFixed(1)},54 L6,54 Z`;
+        return `<path d="${area}" fill="color-mix(in srgb,var(--accent) 18%,transparent)"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+          ${pts.map(([x,y])=>`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.4" fill="var(--accent)"/>`).join("")}`;})()}
+    </svg>` : "";
+  const last = e.last;
+  return `<div class="card">
+    <div class="row"><h2 style="margin:0">Humanness check</h2><span class="grow"></span>
+      ${e.running?'<span class="chip warn">running…</span>':(e.due?'<span class="chip accent">due</span>':'<span class="chip">weekly</span>')}
+      <button class="act" id="btn-eval">Run now</button></div>
+    <div class="hint" style="margin-top:6px">An independent judge reads an adversarial conversation and scores how detectable she is. Lower is better (0 = nobody would guess).</div>
+    ${last?`<div class="row" style="margin-top:12px">
+        <span style="font-size:26px;font-weight:650">${last.score}<span class="tiny">/100</span></span>
+        <span class="chip ${last.score<=20?"ok":last.score<=45?"warn":""}">${esc(last.verdict)}</span>
+        <span class="grow"></span><span class="tiny">${ago(last.at)} · ${esc(last.model||"")}</span>
+      </div>
+      ${h.length>1?`<div class="legend"><span>${e.runs} runs</span><span>best <b>${e.best}</b></span><span>worst <b>${e.worst}</b></span><span>avg <b>${e.average}</b></span></div>${spark}`:""}
+      ${last.tells&&last.tells.length?`<details style="margin-top:8px"><summary>What the judge flagged last time</summary>
+        <div style="margin-top:8px">${last.tells.map(t=>`<div class="tiny" style="margin-bottom:4px">• ${esc(t)}</div>`).join("")}</div></details>`:""}
+      <div class="tiny" style="margin-top:8px">next automatic run in ${Math.max(0, e.everyDays - Math.floor((Date.now()-last.at)/86400000))} day(s)</div>`
+      :`<div class="empty">No runs yet. Press Run now, or wait for the weekly check.</div>`}
+  </div>`;
+}
+
 function renderQuota(){
   const q=DATA.quota, root=$("#tab-quota");
   const rows=Object.entries(q.usage||{}).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v.calls}</td><td>${v.in}</td><td>${v.out}</td></tr>`).join("");
@@ -1032,6 +1245,7 @@ function renderQuota(){
       </div>
       ${q.eleven&&q.eleven.reset?`<div class="tiny" style="text-align:center;margin-top:10px">ElevenLabs resets ${esc(q.eleven.reset)}</div>`:""}
     </div>
+    ${evalPanel(DATA.evals)}
     <div class="card">
       <h2>Tokens ${q.usageDay?`· ${esc(q.usageDay)}`:""}</h2>
       <table><tr><th>provider</th><th>calls</th><th>in</th><th>out</th></tr>${rows||'<tr><td colspan=4 class="muted">none yet</td></tr>'}</table>
@@ -1061,6 +1275,7 @@ function renderLog(){
 function renderAll(){
   renderHeader();
   if(tab==="contacts" && !dragging && !contactsDirty) renderContacts();
+  if(tab==="chat") renderChat();
   if(tab==="character") renderCharacter();
   if(tab==="agent") renderAgent();
   if(tab==="schedule") renderSchedule();
@@ -1180,6 +1395,12 @@ $$("#tabs button").forEach(b=>{
   };
 });
 $("#btn-refresh").onclick=()=>refresh(true);
+document.addEventListener("click", async (e)=>{
+  if(!e.target.closest("#btn-eval")) return;
+  const r = await api("/api/eval",{});
+  toast(r.ok ? "Humanness check started — it takes a couple of minutes" : ("Failed: "+(r.error||"")));
+  if(r.ok) setTimeout(()=>refresh(true), 8000);
+});
 
 /* appearance */
 refresh();

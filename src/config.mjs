@@ -88,6 +88,9 @@ function buildConfig() {
   // the sulking escalation (nudge -> dry -> silent) and cross-chat notes are
   // features in their own right, so they can be switched off
   sulking: envFlag("SULKING", true),
+  // weekly humanness check (an independent judge scores how detectable she is)
+  evalWeekly: envFlag("EVAL_WEEKLY", true),
+  evalEveryDays: num(envGet("EVAL_EVERY_DAYS", "7"), 7),
   crossChat: envFlag("CROSS_CHAT", true),
   // suspicion points: link 2, scam wording 3, code/password 4, sexual 3, flood 2, repeats 2 ...
   strangerWarnScore: num(envGet("STRANGER_WARN_SCORE", "3"), 3),

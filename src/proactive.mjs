@@ -1,4 +1,4 @@
-import { config, log } from "./config.mjs";
+import { config, log, ROOT } from "./config.mjs";
 import { listChats, saveChat, loadChat } from "./store.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { generateProactive, generateNudge, generateFollowup, generateCheckup } from "./engine.mjs";
@@ -6,6 +6,8 @@ import { getSock, sendText, presence, setGlobalPresence } from "./whatsapp.mjs";
 import { splitBubbles, typingDelayFor, sleep } from "./texting.mjs";
 import { applyDeltas, normalize, isMoodLocked } from "./mood.mjs";
 import { ensureToday, tickMoments, momentDeltas, saveRoutine } from "./routine.mjs";
+import { isPaused } from "./pause.mjs";
+import { dueForEval, isEvalRunning, runAndRecord } from "./evals.mjs";
 
 /**
  * proactive.mjs — she has her own life.
@@ -126,6 +128,30 @@ export function dueSlot(spec, now = Date.now(), { jitterMin = 0, graceMin = 20, 
     if (now >= fireAt && now - fireAt <= graceMin * 60000) return { key, at: fireAt, hour: hhNum, minute };
   }
   return null;
+}
+
+/**
+ * The weekly humanness check: run it in the background at a quiet hour, so the
+ * score trend does not depend on someone remembering to run it.
+ */
+async function maybeRunEval() {
+  if (!dueForEval() || isEvalRunning()) return;
+  const hour = new Date().getHours();
+  if (hour < 3 || hour > 6) return; // only in the small hours
+  log("weekly humanness check starting");
+  const { default: _ } = { default: null };
+  const runner = async () => {
+    const { execFile } = await import("node:child_process");
+    return await new Promise((resolve, reject) => {
+      execFile(process.execPath, ["scripts/eval.mjs", "--quick"], { cwd: ROOT, timeout: 15 * 60000 }, (err, stdout) => {
+        if (err) return reject(err);
+        const m = /suspicion\s*:\s*(\d+)\/100/.exec(stdout);
+        if (!m) return reject(new Error("no score in the eval output"));
+        resolve({ score: Number(m[1]), verdict: /→\s*(\w+)/.exec(stdout)?.[1] || "unsure", model: "scheduled", notes: "run from the scheduler" });
+      });
+    });
+  };
+  await runAndRecord(runner);
 }
 
 /**
@@ -422,6 +448,7 @@ export function startProactive() {  if (!config.proactive) {
     const sock = getSock();
     if (!sock) return;
     (async () => {
+      if (isPaused()) return; // switched off: nothing first, nothing scheduled
       if (config.presence) await updatePresence(sock);
       await tickRoutines();
       await checkSoft(sock);
@@ -429,6 +456,7 @@ export function startProactive() {  if (!config.proactive) {
       await followUps(sock);
       await escalate(sock);
       await initiate(sock);
+      await maybeRunEval();
     })().catch((err) => log(`proactive error: ${err.message}`));
   }, config.proactiveTickSec * 1000);
 

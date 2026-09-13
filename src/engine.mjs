@@ -254,6 +254,13 @@ export async function consolidateMemory(chat, { force = false } = {}) {
 
   const summary = (sections.summary || []).join("\n").replace(/^#+\s*/gm, "").slice(0, 1200).trim();
   if (summary) mem.summary = summary;
+  // whatever you pinned in the dashboard survives the rebuild
+  for (const p of mem.pinned || []) {
+    const target = ["facts", "boundaries", "plans", "jokes"].includes(p.list) ? p.list : null;
+    if (!target) continue;
+    mem[target] ||= [];
+    if (!mem[target].some((x) => String(x).toLowerCase() === String(p.text).toLowerCase())) mem[target].push(p.text);
+  }
   if (sections.facts) mem.facts = clean(sections.facts, 20, 0.5, true);
   if (sections.boundaries) mem.boundaries = clean(sections.boundaries, 12, 0.45);
   if (sections.plans) mem.plans = clean(sections.plans, 10, 0.5);

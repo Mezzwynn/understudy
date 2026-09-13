@@ -1,5 +1,6 @@
 import { config, log } from "./config.mjs";
 import { loadChat, saveChat, loadState, saveState } from "./store.mjs";
+import { isPaused, pausedFor } from "./pause.mjs";
 import { generateReply, generateDryReply } from "./engine.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst } from "./texting.mjs";
@@ -325,6 +326,17 @@ function takePhotoBudget() {
 }
 
 async function respond(sock, jid, p) {
+  // she is switched off (out of town, asleep on a trip…): read it, answer nothing
+  if (isPaused()) {
+    const chat = loadChat(jid);
+    chat.history.push({ role: "user", content: p.parts.filter(Boolean).join("\n"), ts: Date.now() });
+    chat.stats.inbound = (chat.stats.inbound || 0) + 1;
+    chat.lastInteraction = Date.now();
+    saveChat(chat);
+    log(`paused (${pausedFor()} min left) — read, no reply → ${jid}`);
+    return;
+  }
+
   const incoming = p.parts.join("\n").trim();
   if (!incoming) return;
 

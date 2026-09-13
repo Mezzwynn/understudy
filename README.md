@@ -193,6 +193,43 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## Reading and steering her head
+
+**Chat tab** — the whole stored conversation per contact, searchable, with day separators and
+markers for what she deleted or sent on your behalf. (Older messages get folded into the
+running summary, so what you see is what she can still recall verbatim.)
+
+**Memory editor** — the same tab, under the conversation: her facts, boundaries, plans and
+jokes, each one deletable, plus the relationship note and the running summary. Press ★ to **pin**
+an entry — pinned lines survive the automatic memory rewrite, so a fact you care about cannot be
+quietly dropped when the transcript ages out.
+
+## Taking her offline
+
+Settings → **Take her offline**: pause for an hour, eight hours, a day or three days, with an
+optional reason. While paused she reads but never answers, never messages first and stops all
+check-ups. The reason is remembered, so when you switch her back on she knows she was away
+("out of town, bad signal") instead of pretending nothing happened.
+
+```bash
+rp pause 8h "out of town"     # or 30m, 2d
+rp resume
+```
+
+## Humanness check
+
+`rp eval` runs a short adversarial conversation through the real reply path and has an
+independent judge score how detectable she is (lower is better). The score is stored, so the
+dashboard shows a trend in the Usage tab, and a **weekly automatic run** happens in the small
+hours unless you switch `EVAL_WEEKLY` off.
+
+```
+suspicion : 22/100  →  human
+tells     : deflects the accusation with a joke instead of earnestly denying
+            short, clipped replies ("hm", "lol", "fine.") with high length variance
+            stonewalls a conflict ("then stop texting me") instead of de-escalating
+```
+
 ## Feature switches
 
 Settings → **Features**: twenty switches, each of which actually gates its code path rather than
