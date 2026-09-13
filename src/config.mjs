@@ -94,7 +94,13 @@ function buildConfig() {
   // safety valve: stop making calls when the day's budget is spent
   budgetGuard: envFlag("BUDGET_GUARD", true),
   llmDailyCallsMax: num(envGet("LLM_DAILY_CALLS_MAX", "400"), 400),
+  // when someone writes something that is no longer roleplay
+  crisisWatch: envFlag("CRISIS_WATCH", true),
+  crisisNotify: envFlag("CRISIS_NOTIFY", true),
   weekDigest: envFlag("WEEK_DIGEST", true),
+  // small human imperfections
+  misrememberChance: num(envGet("MISREMEMBER_CHANCE", "0.06"), 0.06),
+  moodResidue: envFlag("MOOD_RESIDUE", true),
   sleepMode: envFlag("SLEEP_MODE", true),
   sleepReplyChance: num(envGet("SLEEP_REPLY_CHANCE", "0.25"), 0.25),
   humor: envFlag("HUMOR", true),

@@ -346,7 +346,7 @@ function reDrift(session) {
 /**
  * Produce one in-character reply and update the chat state.
  */
-export async function generateReply(chat, incoming, persona, { displayName, voice, startedIt, thawed, injection, worried, sleepy, hotTopic, boredTopic } = {}) {
+export async function generateReply(chat, incoming, persona, { displayName, voice, startedIt, thawed, injection, worried, sleepy, crisis, hotTopic, boredTopic } = {}) {
   chat.mood = normalize(chat.mood);
   reDrift(chat);
 

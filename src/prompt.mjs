@@ -13,6 +13,7 @@ import { traitsForChat, humorPromptBlock, interestPromptBlock, topicReaction, to
 import { lifePromptBlock } from "./events.mjs";
 import { sleepPromptBlock, morningNote } from "./sleep.mjs";
 import { weekPromptBlock } from "./week.mjs";
+import { crisisPromptBlock } from "./crisis.mjs";
 import { tasksBlock } from "./tasks.mjs";
 
 const ENGINE_FILE = path.join(PROMPT_DIR, "engine.md");
@@ -136,7 +137,7 @@ function factsWithAge(mem) {
   );
 }
 
-export function buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled, worried, sleepy, hotTopic = [], boredTopic = [] } = {}) {
+export function buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled, worried, sleepy, crisis, hotTopic = [], boredTopic = [] } = {}) {
   // always have a mood object, even for a chat that was never used
   const mood = normalize(chat.mood || newMood(baselineFor(chat)));
   chat.mood = mood;
@@ -301,9 +302,20 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     relationPromptBlock(chat),
     config.world ? worldPromptBlock(world, {}) : "",
     config.world ? contextBlock(world) : "",
+    crisis ? crisisPromptBlock() : "",
     pausePromptBlock(),
     sleepy ? sleepPromptBlock() : morningNote(chat),
     lifePromptBlock(chat),
+    (() => {
+      // perfect recall is a machine tell. Occasionally she is fuzzy about small
+      // things — never about names, health or boundaries.
+      if (Math.random() > config.misrememberChance) return "";
+      return [
+        "## Hari ini kamu agak lupa detail kecil",
+        "Kalau nyambung, kamu boleh salah inget hal kecil (jam, hari, urutan kejadian) atau nanya ulang detail sepele yang dulu dia bilang.",
+        "TAPI: jangan salah soal nama, kesehatan, hal sensitif, atau batasan. Yang boleh lupa cuma hal kecil.",
+      ].join("\n");
+    })(),
     weekPromptBlock(chat.persona || config.persona),
     (() => {
       const asked = (chat.asked || []).filter((a) => Date.now() - a.at < 7 * 24 * 3600 * 1000).slice(-6);

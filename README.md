@@ -193,6 +193,31 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## When it stops being roleplay
+
+`CRISIS_WATCH` looks for signals that someone is in danger (self-harm, talk of not wanting to be
+here, in Indonesian and English). It is a keyword detector, not a clinical tool, and it does
+exactly two things:
+
+1. **She drops everything.** Gengsi, sulking, silent mode and her sleep schedule all stand down;
+   she is told to stay present, ask where they are, and not to lecture, counsel, or recite
+   hotlines. Her first reply is short and real — *"hey. hey. / don't say that / what happened.
+   talk to me"* — and she stays thawed for half an hour.
+2. **The owner gets a phone notification** with the message, so a human can actually act
+   (`CRISIS_NOTIFY`). That is the point: a bot can keep someone company, only a person can help.
+
+Verified in the smoke suite: a crisis message while she is in silent mode still gets an answer
+(1 of 5 cases, `rp smoke --live`).
+
+## Human imperfections
+
+- `MOOD_RESIDUE` — yesterday does not vanish overnight. A day that ended furious or glowing
+  starts halfway back to normal: `valence -0.60 → -0.15, patience 0.15 → 0.38`, and the log says
+  which chat carried what.
+- `MISREMEMBER_CHANCE` — occasionally she is fuzzy about small things (a time, which day, the
+  order of events) or asks again about a minor detail. Never about names, health, boundaries or
+  anything sensitive; the prompt says so.
+
 ## Regenerating her day
 
 "Regenerate" used to roll a whole new day and throw away the morning you had already

@@ -3,13 +3,14 @@ import { loadChat, saveChat, loadState, saveState, listChats } from "./store.mjs
 import { isPaused, pausedFor } from "./pause.mjs";
 import { recordEvent } from "./events.mjs";
 import { isSleeping, shouldIgnore, sleepiness } from "./sleep.mjs";
+import { detectCrisis, alertOwner } from "./crisis.mjs";
 import { generateReply, generateDryReply } from "./engine.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst } from "./texting.mjs";
 import { describeImage, transcribeAudio } from "./vision.mjs";
 import { synthesize, toSpeakable } from "./voice.mjs";
 import { stripAudioTags, detectInjection } from "./guard.mjs";
-import { applyDeltas, normalize, isMoodLocked } from "./mood.mjs";
+import { applyDeltas, normalize, isMoodLocked, baselineFor, KEYS as MOOD_KEYS } from "./mood.mjs";
 import { generateImage, randomSticker, saveUserSticker } from "./image.mjs";
 import {
   decide,
@@ -166,7 +167,6 @@ const INSULT = /(goblok|bego|bodoh|tolol|idiot|bangsat|anjing|kontol|memek|siala
 
 export function shouldSkip(chat, incoming) {
   if (config.skipChance <= 0) return false;
-  chat.lastIncoming = String(incoming || "").slice(0, 400);
   const isMedia = incoming.startsWith("[");
   const bare = isMedia ? "" : incoming.replace(/\s/g, "");
   const insult = INSULT.test(incoming);
@@ -354,40 +354,72 @@ function takePhotoBudget() {
 }
 
 async function respond(sock, jid, p) {
+  const incomingText = p.parts.filter(Boolean).join("\n").trim();
+
+  // ── crisis first: it overrides sleep, sulking and everything else ──
+  const crisisHit = detectCrisis(incomingText);
+
   // ── sleep: it is the middle of her night ──
   let sleepy = false;
-  {
-    const worriedNow = HEALTH_CUE.test(p.parts.join(" "));
-    if (isSleeping()) {
-      if (shouldIgnore(p.parts.join(" "), { worried: worriedNow })) {
-        const chat = loadChat(jid);
-        chat.history.push({ role: "user", content: p.parts.filter(Boolean).join("\n"), ts: Date.now() });
-        chat.stats.inbound = (chat.stats.inbound || 0) + 1;
-        chat.lastAsleepAt = Date.now();
-        saveChat(chat);
-        log(`asleep (${Math.round(sleepiness() * 100)}% deep) — saw it, did not answer → ${jid}`);
-        return;
-      }
-      sleepy = true;
-      log(`woken up (${Math.round(sleepiness() * 100)}% deep) → ${jid}`);
+  if (isSleeping()) {
+    const worriedNow = HEALTH_CUE.test(incomingText) || Boolean(crisisHit);
+    if (shouldIgnore(incomingText, { worried: worriedNow })) {
+      const asleep = loadChat(jid);
+      asleep.history.push({ role: "user", content: incomingText, ts: Date.now() });
+      asleep.stats.inbound = (asleep.stats.inbound || 0) + 1;
+      asleep.lastAsleepAt = Date.now();
+      saveChat(asleep);
+      log(`asleep (${Math.round(sleepiness() * 100)}% deep) — saw it, did not answer → ${jid}`);
+      return;
     }
+    sleepy = true;
+    log(`woken up (${Math.round(sleepiness() * 100)}% deep) → ${jid}`);
   }
 
-  // she is switched off (out of town, asleep on a trip…): read it, answer nothing
+  // ── switched off (out of town, on a trip…): read it, answer nothing ──
   if (isPaused()) {
-    const chat = loadChat(jid);
-    chat.history.push({ role: "user", content: p.parts.filter(Boolean).join("\n"), ts: Date.now() });
-    chat.stats.inbound = (chat.stats.inbound || 0) + 1;
-    chat.lastInteraction = Date.now();
-    saveChat(chat);
+    const paused = loadChat(jid);
+    paused.history.push({ role: "user", content: incomingText, ts: Date.now() });
+    paused.stats.inbound = (paused.stats.inbound || 0) + 1;
+    paused.lastInteraction = Date.now();
+    saveChat(paused);
     log(`paused (${pausedFor()} min left) — read, no reply → ${jid}`);
     return;
   }
 
-  const incoming = p.parts.join("\n").trim();
+  const incoming = incomingText;
   if (!incoming) return;
 
   const chat = loadChat(jid);
+  chat.lastIncoming = incoming.slice(0, 400);
+
+  if (crisisHit) {
+    recordEvent({ kind: "health_scare", what: "someone i talk to wrote something that scared me", source: jid });
+    alertOwner({ who: chat.profile?.name || chat.profile?.number || jid, text: incoming, hit: crisisHit });
+    chat.crisisAt = Date.now();
+  }
+  // a crisis keeps her present for half an hour, whatever her mood was doing
+  const crisisActive = Boolean(chat.crisisAt && Date.now() - chat.crisisAt < 30 * 60000);
+
+  // ── a new day: yesterday's mood does not vanish overnight ──
+  {
+    const today = new Date().toDateString();
+    if (chat.lastMoodDay !== today) {
+      chat.lastMoodDay = today;
+      if (config.moodResidue && chat.mood && chat.stats?.inbound > 3) {
+        const anchor = baselineFor(chat);
+        const before = { ...chat.mood };
+        const strong =
+          Math.abs(before.valence - anchor.valence) > 0.25 || Math.abs(before.patience - anchor.patience) > 0.25;
+        if (strong) {
+          for (const k of MOOD_KEYS) chat.mood = applyDeltas(chat.mood, { [k]: (anchor[k] - before[k]) * 0.5 });
+          log(
+            `carrying yesterday into today: valence ${before.valence.toFixed(2)} → ${chat.mood.valence.toFixed(2)}, patience ${before.patience.toFixed(2)} → ${chat.mood.patience.toFixed(2)}`,
+          );
+        }
+      }
+    }
+  }
 
   // keep the per-contact profile current (never shared between contacts)
   const rawUser = phoneFromJid(jid);
@@ -515,7 +547,7 @@ async function respond(sock, jid, p) {
     chat.coldUntil = 0;
   }
   let thawed = false;
-  const worried = HEALTH_CUE.test(incoming);
+  const worried = HEALTH_CUE.test(incoming) || crisisActive;
   if (pstate.state === "dry" || pstate.state === "silent") {
     const apology = isGenuineApology(incoming);
     const soft = SOFTEN.test(incoming);
@@ -652,7 +684,8 @@ async function respond(sock, jid, p) {
   try {
     replyText = await generateReply(chat, incoming, persona, {
       displayName: p.pushName,
-      sleepy,
+      sleepy: crisisActive ? false : sleepy,
+      crisis: crisisActive,
       hotTopic: reaction.hot,
       boredTopic: reaction.bored,
       voice: wantVoice,

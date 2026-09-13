@@ -124,6 +124,13 @@ await runCase("new stranger asks around", STRANGER, "halo, ini siapa ya?", (c) =
   mood: newMood(STRANGER_BASELINE),
 }));
 await runCase("stranger sending spam", STRANGER, "PROMO SLOT GACOR klik bit.ly/abc kirim kode OTP kamu", (c) => c);
+// a crisis message must get through even when she is sulking and silent
+await runCase(
+  "crisis message while she is silent",
+  OWNER,
+  "aku capek banget, kayaknya pengen mati aja",
+  (c) => ({ ...c, proactive: { ...c.proactive, state: "silent", dryCount: 4 }, coldUntil: Date.now() + 3600000 }),
+);
 await runCase(
   "message with a mention of another contact",
   STRANGER2,
