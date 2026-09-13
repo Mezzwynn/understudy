@@ -38,11 +38,12 @@ function setFlags(pairs) {
 /** Ask a fresh process whether the prompt contains a line, and what a flag reads as. */
 function probe(needle, flag, inject = "") {
   const script = `
+    ${inject.startsWith("globalThis") ? inject : ""}
     const P = await import("./src/prompt.mjs");
     const S = await import("./src/store.mjs");
     const { config } = await import("./src/config.mjs");
     const chat = S.loadChat("215341758152901@lid");
-    ${inject}
+    ${inject.startsWith("globalThis") ? "" : inject}
     const text = P.buildSystem(chat, P.loadPersona());
     console.log(JSON.stringify({ has: text.includes(${JSON.stringify(needle)}), flag: ${flag ? `config.${flag}` : "null"} }));
   `;
@@ -53,16 +54,18 @@ function probe(needle, flag, inject = "") {
 console.log("\n  Understudy · feature switches\n");
 
 // a cross-chat block only renders when there IS a note, so the test injects one
+const EVENT = 'globalThis.__ev = true; const { recordEvent } = await import("./src/events.mjs"); recordEvent({ kind: "spam", what: "a test event happened", source: "test" });';
 const NOTE = 'chat.crossNotes = [{ at: Date.now(), kind: "mention", fromJid: "t@s.whatsapp.net", fromName: "Tester", what: "said hi", done: false }];';
 const CASES = [
   ["WORLD", "Dunia kamu", "backstory & cast", ""],
   ["ROUTINE", "Hari kamu sendiri", "daily routine", ""],
   ["CROSS_CHAT", "nyangkut sama ORANG LAIN", "cross-chat notes", NOTE],
+  ["LIFE_EVENTS", "Yang BARU kejadian sama kamu", "real events", EVENT],
 ];
 
 try {
   for (const [flag, needle, label, inject] of CASES) {
-    const prop = flag === "WORLD" ? "world" : flag === "ROUTINE" ? "routine" : "crossChat";
+    const prop = { WORLD:"world", ROUTINE:"routine", CROSS_CHAT:"crossChat", LIFE_EVENTS:"lifeEvents" }[flag];
     setFlags([[flag, false]]);
     const off = probe(needle, prop, inject);
     setFlags([[flag, true]]);

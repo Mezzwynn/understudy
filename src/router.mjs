@@ -1,6 +1,7 @@
 import { config, log } from "./config.mjs";
-import { loadChat, saveChat, loadState, saveState } from "./store.mjs";
+import { loadChat, saveChat, loadState, saveState, listChats } from "./store.mjs";
 import { isPaused, pausedFor } from "./pause.mjs";
+import { recordEvent } from "./events.mjs";
 import { generateReply, generateDryReply } from "./engine.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst } from "./texting.mjs";
@@ -20,7 +21,7 @@ import {
 } from "./stranger.mjs";
 import { detectMention, addCrossNote, addVouch, resolveNotes } from "./links.mjs";
 import { runTask, notifyTaskReply } from "./tasks.mjs";
-import { ensureToday, tickMoments, momentDeltas, saveRoutine } from "./routine.mjs";
+import { ensureToday, tickMoments, momentDeltas, saveRoutine, loadRoutine } from "./routine.mjs";
 import {
   phoneFromJid,
   sendText,
@@ -280,6 +281,30 @@ const DRY_LINES = ["y.", "h.", "k.", "ok.", "sure.", "mhm.", "yeah.", "nothing."
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
+/** Life events land on every chat she has, and can join today's routine. */
+function lifeEvent(kind, what, source = "", personaSlug = null) {
+  if (!config.lifeEvents) return;
+  return recordEvent({
+    kind,
+    what,
+    source,
+    applyToChats: () =>
+      listChats()
+        .filter((c) => c.trusted === true && c.jid !== source)
+        .map((c) => loadChat(c.jid)),
+    saveChats: (chats) => chats.forEach((c) => saveChat(c)),
+    addMoment: ({ what: w, kind: mkind }) => {
+      const slug = personaSlug || config.persona;
+      const routine = loadRoutine(slug);
+      if (!routine || routine.date !== new Date().toISOString().slice(0, 10)) return;
+      routine.moments = [...(routine.moments || []), { at: nowHHMM(), kind: mkind, what: w, intensity: 0.6, share: true, firedAt: Date.now(), live: true }].slice(-8);
+      routine.highlights = [...(routine.highlights || []), { date: routine.date, kind: mkind, what: w, intensity: 0.6 }].slice(-10);
+      saveRoutine(slug, routine);
+    },
+  });
+}
+const nowHHMM = () => `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`;
+
 /**
  * A voice note that is too short sounds broken when spoken out loud — short
  * belongs in a text message. The exception is a genuinely flustered delivery:
@@ -382,10 +407,12 @@ async function respond(sock, jid, p) {
       }
     }
     await blockNumber(sock, chat, strangerVerdict.reasons.join(", "));
+    lifeEvent("blocked", `someone weird messaged me (${strangerVerdict.reasons.slice(0, 2).join(", ")}) and i blocked them`, chat.jid);
     saveChat(chat);
     return;
   }
   if (strangerVerdict.action === "warn" && !chat.stranger?.warnedAt) {
+    lifeEvent("spam", "a stranger sent me something that looked like spam", chat.jid);
     const line = pick(WARN_LINES);
     chat.stranger.warnedAt = Date.now();
     try {
@@ -448,6 +475,12 @@ async function respond(sock, jid, p) {
   const bare = isMedia ? "" : incoming.replace(/\s/g, "");
   const mm = moodMultipliers(chat.mood);
   if (config.milestones) detectMilestones(chat, incoming);
+  if (/\b(ai|bot|robot|chatbot|gpt|mesin)\b/i.test(incoming) && /\b(kamu|you|u|lu|kamu ini|are you)\b/i.test(incoming) && /(\?|ya\b|kan\b|bukan|really|serius)/i.test(incoming)) {
+    lifeEvent("ai_accused", "someone asked me straight out if i'm an ai. annoying.", chat.jid);
+  }
+  if (HEALTH_CUE.test(incoming)) {
+    lifeEvent("health_scare", "he told me he's not okay and i can't do anything about it from here", chat.jid);
+  }
   const injection = config.injectionGuard && detectInjection(incoming);
   if (injection) log(`possible prompt-injection from ${jid}`);
 

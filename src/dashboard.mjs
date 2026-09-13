@@ -11,6 +11,7 @@ import { tierOf, strangerState, unblock } from "./stranger.mjs";
 import { loadPause, pauseFor, resume as resumeBot, pausedFor } from "./pause.mjs";
 import { evalSummary, isEvalRunning, dueForEval } from "./evals.mjs";
 import { loadTraits, saveTraits, generateTraits } from "./traits.mjs";
+import { listEvents, recentEvents, clearEvents } from "./events.mjs";
 import { RELATIONS, loadWorld, saveWorld, ensureWorld, worldFile } from "./world.mjs";
 import { resolveBlockJid } from "./stranger.mjs";
 import { generateSchedule, formatSchedule, parseSchedule, addContext, cleanContext } from "./schedule.mjs";
@@ -257,6 +258,7 @@ async function summary() {
     routine: routineSummary,
     version: appVersion(),
     traits: loadTraits(activeSlug),
+    events: { recent: recentEvents(24).slice(-8), total: listEvents().length },
     evals: { ...evalSummary(), running: isEvalRunning(), due: dueForEval(), everyDays: config.evalEveryDays },
     paused: { active: isPausedDash(), minutesLeft: pausedFor(), reason: loadPause().reason || "" },
     featureKeys: FEATURES.map((f) => f.key),
@@ -532,6 +534,14 @@ export function startDashboard() {
             log("dashboard: auto settings applied");
           }
           return json(res, 200, { ok: true, suggested });
+        }
+
+        if (url.pathname === "/api/events") {
+          if (body.clear) {
+            clearEvents();
+            return json(res, 200, { ok: true, events: [] });
+          }
+          return json(res, 200, { ok: true, events: recentEvents(24).slice(-12) });
         }
 
         if (url.pathname === "/api/traits") {

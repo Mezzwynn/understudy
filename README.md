@@ -193,6 +193,32 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## Real things happen to her
+
+Conversations are not the only input. `src/events.mjs` records things that happen *to her*,
+and they change her state immediately rather than being shrugged off:
+
+| Event | When it fires |
+|---|---|
+| `spam` / `blocked` | a stranger sends something weird; and again if it ends in a block |
+| `ai_accused` | someone asks her straight out whether she is an AI |
+| `health_scare` | you tell her you are not okay |
+| `promoted` | a stranger behaves and turns out to be alright |
+| `milestone` / `errand` | anniversaries, and errands she ran for you |
+
+Each one nudges the mood of **every** trusted chat (a manual mood lock still wins), can drop a
+**live moment into today's routine** — so "someone weird messaged me" becomes part of her day
+rather than a footnote — and is fed to the prompt for the next few hours, so she can bring it up
+with anyone, in her own words. Durable events also land in memory through the tracker.
+
+```bash
+rp events                       # what has happened to her
+rp events --add "the neighbour started drilling" spam
+rp events --clear
+```
+
+The Character tab shows the same list. `LIFE_EVENTS` in Features switches the whole thing off.
+
 ## Humour and interest
 
 Two character traits that shape how she talks, stored per character in

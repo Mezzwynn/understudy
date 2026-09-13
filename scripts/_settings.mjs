@@ -63,6 +63,7 @@ export const FEATURES = [
   { key: "SAVE_USER_STICKERS", label: "Keep stickers people send", kind: "bool", def: 1, hint: "off: she never reuses your stickers" },
   { key: "INJECTION_GUARD", label: "Prompt-injection guard", kind: "bool", def: 1, hint: "keep on unless you are testing" },
   { key: "NICK_ACCEPT_WARM", label: "Accepts pet names when warm", kind: "bool", def: 1, hint: "off: she refuses them even when close" },
+  { key: "LIFE_EVENTS", label: "Real things happen to her", kind: "bool", def: 1, hint: "a weird stranger or a scare colours her mood, her day and what she talks about" },
   { key: "HUMOR", label: "She has a sense of humour", kind: "bool", def: 1, hint: "editable per character in the Character tab" },
   { key: "INTEREST", label: "She gets interested (and bored)", kind: "bool", def: 1, hint: "what lights her up, and what makes her switch off" },
   { key: "EVAL_WEEKLY", label: "Weekly humanness check", kind: "bool", def: 1, hint: "an independent judge scores how detectable she is, and the trend is kept" },

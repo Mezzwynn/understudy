@@ -773,6 +773,7 @@ async function renderCharacter(force){
     ${traitsPanel()}
     ${contextPanel(w)}
     ${worldPanel(w)}
+    ${eventsPanel(DATA.events)}
     ${routinePanel(DATA.routine)}`;
 
   $("#char-picker").onchange=(e)=>{
@@ -868,6 +869,7 @@ async function renderCharacter(force){
     await api("/api/context",{ slug:CHAR_SLUG, action:"remove", text:item.text });
     toast("Note removed"); await refresh(true);
   };
+  const ec=$("#btn-events-clear"); if(ec) ec.onclick=async ()=>{ if(!confirm("Clear the event log?")) return; await api("/api/events",{clear:true}); toast("Cleared"); await refresh(true); };
   $("#btn-world-save").onclick=async ()=>{
     const cast=$$("#world-cast .world-row").map(row=>{ const o={}; $$(".world-field",row).forEach(i=>{ o[i.dataset.k]=i.value.trim(); }); return o; }).filter(c=>c.name);
     await api("/api/world",{ slug:CHAR_SLUG, backstory:$("#world-backstory").value.trim(), cast });
@@ -975,6 +977,19 @@ function renderTraitList(key){
   box.innerHTML = arr.map((v,i)=>`<div class="mrow" style="grid-template-columns:1fr 30px;gap:7px;align-items:center;margin-bottom:5px">
       <span style="font-size:12.5px">${esc(v)}</span>
       <button class="act" data-trait-del="${key}" data-i="${i}" style="padding:3px 7px">✕</button></div>`).join("") || '<div class="tiny">none yet</div>';
+}
+
+function eventsPanel(e){
+  const list = (e && e.recent) || [];
+  return `<div class="card">
+    <div class="row"><h2 style="margin:0">What happened to her</h2><span class="grow"></span>
+      <span class="badge">${e?e.total:0} recorded</span>
+      ${list.length?'<button class="act" id="btn-events-clear" style="padding:4px 10px">Clear</button>':""}</div>
+    <div class="hint" style="margin-top:6px">Real events (a weird stranger, an AI accusation, a scare) change her mood, join the story of her day and are fed to every conversation for a few hours. They fade on their own.</div>
+    ${list.length?list.slice().reverse().map(v=>`<div class="mrow" style="grid-template-columns:44px 1fr;gap:8px;margin-top:8px">
+        <span class="tiny">${new Date(v.at).toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"})}</span>
+        <span style="font-size:12.5px">${esc(v.what)}</span></div>`).join(""):'<div class="empty">Nothing recorded yet.</div>'}
+  </div>`;
 }
 
 function contextPanel(w){

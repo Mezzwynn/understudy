@@ -89,6 +89,7 @@ function buildConfig() {
   // features in their own right, so they can be switched off
   sulking: envFlag("SULKING", true),
   // her sense of humour and what she is interested in (traits.mjs)
+  lifeEvents: envFlag("LIFE_EVENTS", true),
   humor: envFlag("HUMOR", true),
   interest: envFlag("INTEREST", true),
   // weekly humanness check (an independent judge scores how detectable she is)

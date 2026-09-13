@@ -16,6 +16,7 @@
 #   rp smoke [--live] reply path end to end with a fake socket
 #   rp pause [8h|30m|2d] [reason]   ·   rp resume
 #   rp eval [--quick|--history]      humanness check + trend
+#   rp events [--clear]              real things that happened to her
 #   rp voice "..."    generate a voice note (preview)
 #   rp number         show the linked WhatsApp number
 #   rp sync           git commit + push (GitHub)
@@ -42,7 +43,7 @@ cmd="${1:-status}"
 case "$cmd" in
   routine|rout)  node scripts/routine.mjs "$@" ;;
   pause)
-    node -e '
+    node --input-type=module -e '
       const { pauseFor } = await import("./src/pause.mjs");
       const arg = process.argv[1] || "8h";
       const m = /^([0-9.]+)(m|h|d)?$/.exec(arg);
@@ -52,12 +53,13 @@ case "$cmd" in
       console.log("⏸ paused until", new Date(st.until).toLocaleString(), st.reason ? "· " + st.reason : "");
     ' -- "$@" ;;
   resume)
-    node -e '
+    node --input-type=module -e '
       const { resume, loadPause } = await import("./src/pause.mjs");
       const before = loadPause();
       const st = resume();
       console.log(before.until > Date.now() ? "▶ switched back on" : "she was not paused", st.lastReason ? "· she was away: " + st.lastReason : "");
     ' ;;
+  events)   node scripts/events.mjs "$@" ;;
   eval)     node scripts/eval.mjs "$@" ;;
   smoke)    node scripts/smoke.mjs "$@" ;;
   lint)     node scripts/lint.mjs "$@" ;;
