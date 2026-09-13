@@ -29,6 +29,7 @@ import { ensureToday, tickMoments, saveRoutine, prune, loadRoutine, KINDS } from
 import { RELATIONS, loadWorld, saveWorld } from "./world.mjs";
 import { generateSchedule, formatSchedule, parseSchedule, addContext, cleanContext } from "./schedule.mjs";
 import { loadTraits, saveTraits, generateTraits } from "./traits.mjs";
+import { recordChange } from "./changes.mjs";
 
 const KNOB_KEYS = new Set(KNOBS.map((k) => k.key));
 
@@ -591,6 +592,22 @@ export async function runAdmin({ message, history = [], context }) {
       const result = await check.apply();
       if (!result) throw new Error("no result");
       applied.push({ type: action.type, describe: check.describe, result });
+      // push it to every conversation, with the diff, and tell the owner what the
+      // agent just changed behind their back
+      recordChange({
+        scope: "agent",
+        target: action.type,
+        source: "agent",
+        lines: [check.describe],
+        summary: check.describe,
+      });
+      if (config.changeNotify) {
+        import("node:child_process")
+          .then(({ execFile }) =>
+            execFile("termux-notification", ["-t", "Understudy — agent edit", "-c", check.describe], () => {}),
+          )
+          .catch(() => {});
+      }
       if (check.reload) reload = true;
       log(`admin: applied ${action.type} — ${check.describe}`);
     } catch (err) {

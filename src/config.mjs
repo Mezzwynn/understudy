@@ -95,6 +95,10 @@ function buildConfig() {
   budgetGuard: envFlag("BUDGET_GUARD", true),
   llmDailyCallsMax: num(envGet("LLM_DAILY_CALLS_MAX", "400"), 400),
   // when someone writes something that is no longer roleplay
+  // push character changes to every conversation, with a diff
+  changeFeed: envFlag("CHANGE_FEED", true),
+  changeWatchFiles: envFlag("CHANGE_WATCH_FILES", true),
+  changeNotify: envFlag("CHANGE_NOTIFY", true),
   crisisWatch: envFlag("CRISIS_WATCH", true),
   crisisNotify: envFlag("CRISIS_NOTIFY", true),
   weekDigest: envFlag("WEEK_DIGEST", true),

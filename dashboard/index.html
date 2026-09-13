@@ -774,6 +774,7 @@ async function renderCharacter(force){
     ${traitsPanel()}
     ${contextPanel(w)}
     ${worldPanel(w)}
+    ${changesPanel(DATA.changes)}
     ${weekPanel(DATA.week)}
     ${eventsPanel(DATA.events)}
     ${routinePanel(DATA.routine)}`;
@@ -979,6 +980,23 @@ function renderTraitList(key){
   box.innerHTML = arr.map((v,i)=>`<div class="mrow" style="grid-template-columns:1fr 30px;gap:7px;align-items:center;margin-bottom:5px">
       <span style="font-size:12.5px">${esc(v)}</span>
       <button class="act" data-trait-del="${key}" data-i="${i}" style="padding:3px 7px">✕</button></div>`).join("") || '<div class="tiny">none yet</div>';
+}
+
+function changesPanel(list){
+  if(!list || !list.length) return "";
+  return `<div class="card">
+    <div class="row"><h2 style="margin:0">Recent changes</h2><span class="grow"></span>
+      <span class="badge">${list.length}</span></div>
+    <div class="hint" style="margin-top:6px">Every edit to her card, traits, world or voice rules — pushed to every conversation the moment it happens, with what actually changed.</div>
+    ${list.map(c=>`<div style="margin-top:11px;border-top:1px solid var(--line);padding-top:9px">
+      <div class="row"><span class="chip ${c.source==="agent"?"accent":""}">${esc(c.source)}</span>
+        <span style="font-size:12.5px">${esc(c.scope)}${c.target?` · ${esc(c.target)}`:""}</span>
+        <span class="grow"></span><span class="tiny">${ago(c.at)}</span></div>
+      ${(c.lines||[]).length?`<div style="margin-top:6px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;line-height:1.5">
+        ${c.lines.map(l=>`<div style="color:${l.startsWith("+")?"#b8dd8a":l.startsWith("-")?"#ff9a8a":"var(--dim)"}">${esc(l)}</div>`).join("")}
+      </div>`:`<div class="tiny" style="margin-top:5px">${esc(c.summary)}</div>`}
+    </div>`).join("")}
+  </div>`;
 }
 
 function weekPanel(w){

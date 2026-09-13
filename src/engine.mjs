@@ -6,6 +6,7 @@ import { extractControl, clean, looksBroken, deflection, stripAudioTags, tameTic
 import { drift, applyDeltas, heuristicNudge, normalize, baselineFor, isMoodLocked, lockValue } from "./mood.mjs";
 import { analyzeAffect } from "./affect.mjs";
 import { needsIntroduction, markIntroAsked } from "./stranger.mjs";
+import { markSeen } from "./changes.mjs";
 import { validateTask } from "./tasks.mjs";
 import { learnTopics } from "./traits.mjs";
 import { config, log } from "./config.mjs";
@@ -371,6 +372,8 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
   const messages = buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled, worried, sleepy, hotTopic, boredTopic });
   // she just asked a stranger who they are — do not ask again next message
   if (needsIntroduction(chat)) markIntroAsked(chat);
+  // the change block is news, not a standing instruction: mark it read
+  markSeen(chat);
 
   let raw = await llmChat(messages);
   if (config.debug) log(`RAW:\n${raw}`);

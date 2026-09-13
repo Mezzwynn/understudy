@@ -193,6 +193,24 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## Character changes are pushed everywhere, with a diff
+
+Edit her card — from the dashboard, from the agent, or by hand in a text editor — and every
+conversation learns about it immediately, including **what** changed:
+
+- `src/changes.mjs` keeps a feed (`data/changes.json`) of line-level diffs
+- a **file watcher** in the scheduler notices edits made outside the dashboard (persona card,
+  traits, world, `prompt/voice.md`) — one `stat()` per file per tick, a read only when the mtime
+  moved
+- each conversation is shown the changes it has not seen yet, with the before/after lines:
+  *"persona card (fiona): 2 lines changed — − vibe: warm… / + vibe: cold, quietly protective"* —
+  then it is marked read, so it is news, not a standing instruction
+- changes made by the **agent** also send a phone notification with the diff, so you can see what
+  it did while you were not looking
+- the dashboard shows the same feed as a card, colour-coded by source
+
+Switches: `CHANGE_FEED`, `CHANGE_WATCH_FILES`, `CHANGE_NOTIFY`.
+
 ## When it stops being roleplay
 
 `CRISIS_WATCH` looks for signals that someone is in danger (self-harm, talk of not wanting to be

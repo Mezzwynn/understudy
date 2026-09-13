@@ -1,4 +1,4 @@
-import { config, log, ROOT } from "./config.mjs";
+import { config, log, ROOT, PERSONA_DIR, PROMPT_DIR } from "./config.mjs";
 import { listChats, saveChat, loadChat, loadState, saveState } from "./store.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { generateProactive, generateNudge, generateFollowup, generateCheckup } from "./engine.mjs";
@@ -9,6 +9,7 @@ import { ensureToday, tickMoments, momentDeltas, saveRoutine } from "./routine.m
 import { isPaused } from "./pause.mjs";
 import { dueForEval, isEvalRunning, runAndRecord } from "./evals.mjs";
 import { weekNotifyDue, markWeekNotified, weekText } from "./week.mjs";
+import { watchFiles } from "./changes.mjs";
 
 /**
  * proactive.mjs — she has her own life.
@@ -473,6 +474,7 @@ export function startProactive() {  if (!config.proactive) {
       await initiate(sock);
       await maybeRunEval();
       await maybeWeekDigest();
+      watchFiles({ personaDir: PERSONA_DIR, promptDir: PROMPT_DIR, slug: config.persona });
     })().catch((err) => log(`proactive error: ${err.message}`));
   }, config.proactiveTickSec * 1000);
 
