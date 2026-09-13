@@ -1,7 +1,7 @@
 {
   "name": "understudy",
-  "version": "1.0.0",
-  "description": "Standalone WhatsApp roleplay agent — strong persona that never breaks character, live mood, human texting habits, media in/out.",
+  "version": "1.2.0",
+  "description": "Understudy — a standalone WhatsApp roleplay agent: one character with a life of her own, who texts like a person.",
   "type": "module",
   "license": "MIT",
   "main": "src/index.mjs",

@@ -176,6 +176,18 @@ function startAdminJob(fn) {
   return job;
 }
 
+let APP_VERSION = null;
+/** Version from package.json — shown in the header. */
+function appVersion() {
+  if (APP_VERSION) return APP_VERSION;
+  try {
+    APP_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || "0.0.0";
+  } catch {
+    APP_VERSION = "0.0.0";
+  }
+  return APP_VERSION;
+}
+
 async function summary() {
   const persona = loadPersona();
   const st = loadState();
@@ -239,6 +251,7 @@ async function summary() {
 
   return {
     routine: routineSummary,
+    version: appVersion(),
     bot: {
       connected: isConnected(),
       number: getSock()?.user?.id ? String(getSock().user.id).split(":")[0].split("@")[0] : null,
@@ -292,6 +305,16 @@ export function startDashboard() {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
     try {
       if (!authorized(req, url)) return json(res, 401, { error: "unauthorized" });
+
+      // static files from the dashboard folder (logo, favicon) — whitelisted only
+      if (req.method === "GET" && ["/logo.png", "/favicon.ico", "/logo.svg"].includes(url.pathname)) {
+        const name = url.pathname === "/favicon.ico" ? "logo.png" : url.pathname.slice(1);
+        const file = path.join(ROOT, "dashboard", name);
+        if (!fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
+        const type = name.endsWith(".svg") ? "image/svg+xml" : "image/png";
+        res.writeHead(200, { "content-type": type, "cache-control": "public, max-age=3600" });
+        return res.end(fs.readFileSync(file));
+      }
 
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
         const html = fs.readFileSync(HTML_FILE, "utf8");

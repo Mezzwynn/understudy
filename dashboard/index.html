@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#07080c" />
+<meta name="theme-color" content="#131109" />
+<link rel="icon" href="/logo.png" />
 <title>Understudy — Control Panel</title>
 <style>
   /* ─────────────────────────────  design tokens  ───────────────────────────── */
@@ -63,10 +64,17 @@
     background:linear-gradient(180deg,var(--header-bg),var(--header-bg2));border-bottom:1px solid var(--line)}
   .hwrap{max-width:1080px;margin:0 auto;padding:14px 16px 0}
   .brandrow{display:flex;align-items:center;gap:12px}
-  .avatar{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;font-size:22px;flex:none;
-    background:linear-gradient(150deg,var(--accent),var(--accent-2));box-shadow:0 10px 30px -12px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.18)}
+  .logobox{position:relative;flex:none;width:50px;height:50px;border-radius:16px;overflow:hidden;
+    border:1px solid var(--line-2);box-shadow:0 12px 30px -14px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.08);
+    background:linear-gradient(150deg,var(--panel-2),var(--card-2));display:block}
+  .logobox img{width:100%;height:100%;object-fit:cover;display:block}
+  .logobox::after{content:"";position:absolute;inset:0;border-radius:16px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+  .namerow{display:flex;align-items:center;gap:8px;min-width:0}
+  .ver{font-size:10.5px;font-weight:600;letter-spacing:.4px;color:var(--accent);
+    border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent);
+    padding:2px 7px;border-radius:999px;flex:none}
   .brandtxt{min-width:0}
-  h1{font-size:19px;margin:0;font-weight:650;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  h1{font-size:19px;margin:0;font-weight:650;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .subline{display:flex;align-items:center;gap:7px;margin-top:2px;flex-wrap:wrap}
   .pulse{width:8px;height:8px;border-radius:50%;background:var(--bad);position:relative;flex:none}
   .pulse::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1px solid currentColor;opacity:0}
@@ -83,6 +91,12 @@
   .chip.accent{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
 
   body.t-mono .bub.her{color:var(--tx)}
+
+  @media (max-width:430px){
+    #chip-up{display:none}
+    .namerow h1{font-size:17.5px}
+    .logobox{width:44px;height:44px;border-radius:14px}
+  }
 
   /* tabs */
   nav{display:flex;gap:3px;margin:12px 0 0;overflow-x:auto;padding-bottom:11px;scrollbar-width:none;position:relative;
@@ -224,9 +238,14 @@
 <header>
   <div class="hwrap">
     <div class="brandrow">
-      <div class="avatar" id="brand-av">🖤</div>
+      <a class="logobox" href="/" title="Understudy">
+        <img src="/logo.png" alt="Understudy" />
+      </a>
       <div class="brandtxt grow">
-        <h1 id="pname">Understudy</h1>
+        <div class="namerow">
+          <h1 id="pname">Understudy</h1>
+          <span class="ver" id="chip-ver">v—</span>
+        </div>
         <div class="subline">
           <span class="pulse" id="dot"></span>
           <span class="tiny" id="num">—</span>
@@ -413,6 +432,7 @@ function renderHeader(){
   const b=DATA.bot;
   $("#brand-av").textContent = b.persona.emoji || "🖤";
   $("#pname").textContent = `${b.persona.emoji||""} ${b.persona.name}`.trim();
+  $("#chip-ver").textContent = "v" + (DATA.version || "0.0.0");
   $("#dot").className = "pulse" + (b.connected ? " on" : "");
   $("#num").textContent = b.number ? "+"+b.number : "not connected";
   $("#pstate").textContent = b.connected ? "online" : "disconnected";

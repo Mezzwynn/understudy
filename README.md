@@ -1,5 +1,8 @@
 # Understudy
 
+![Understudy](dashboard/logo.png)
+
+
 A standalone **WhatsApp roleplay agent** — no framework, just Node + Baileys + any
 OpenAI-compatible LLM.
 
