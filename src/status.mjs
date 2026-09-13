@@ -45,27 +45,129 @@ export function savePlan(slug, plan) {
     items: (plan.items || [])
       .map((i, n) => ({
         at: String(i.at || "").slice(0, 5),
-        text: String(i.text || "").trim().slice(0, 160),
+        text: String(i.text || "").trim().slice(0, 220),
         reason: String(i.reason || "").slice(0, 80),
         color: nearestPaletteColor(i.color) || pickColor(n),
         font: Math.max(1, Math.min(5, Number(i.font) || 1 + (n % 3))),
+        media: String(i.media || ""),
         postedAt: Number(i.postedAt) || 0,
-        id: String(i.id || ""),
+        key: i.key && i.key.id ? { id: String(i.key.id), remoteJid: String(i.key.remoteJid || "status@broadcast"), fromMe: true, participant: i.key.participant ? String(i.key.participant) : undefined } : null,
+        id: String(i.id || newId()),
       }))
-      .filter((i) => i.text && /^\d{1,2}:\d{2}$/.test(i.at))
-      .slice(0, 8),
+      // an item is a status line, a photo with a caption, or a photo on its own
+      .filter((i) => (i.text || i.media) && /^\d{1,2}:\d{2}$/.test(i.at))
+      .slice(0, 12),
     history: (plan.history || [])
-      .map((h) => ({ at: Number(h.at) || 0, text: String(h.text || "").slice(0, 160), color: String(h.color || "") }))
-      .slice(-40),
+      .map((h) => ({
+        at: Number(h.at) || 0,
+        text: String(h.text || "").slice(0, 220),
+        color: String(h.color || ""),
+        media: String(h.media || ""),
+        key: h.key && h.key.id ? { id: String(h.key.id), remoteJid: String(h.key.remoteJid || "status@broadcast"), fromMe: true } : null,
+      }))
+      .slice(-60),
   };
-  fs.writeFileSync(fileFor(slug), JSON.stringify(clean, null, 2));
+  try {
+    fs.writeFileSync(fileFor(slug), JSON.stringify(clean, null, 2));
+  } catch (err) {
+    log(`status plan save failed: ${err.message}`);
+  }
   return clean;
+}
+
+const newId = () => Math.random().toString(36).slice(2, 8);
+
+/** Everything the dashboard needs to draw the tab. */
+export function statusState(slug = config.persona) {
+  const plan = loadPlan(slug);
+  return {
+    ...plan,
+    colors: STATUS_COLORS,
+    window: statusWindow(),
+    minGapMin: Number(config.statusMinGapMin) || 0,
+    perDay: Number(config.statusPerDay) || 3,
+    audience: statusAudience(),
+    audienceMode: config.statusAudience,
+    mediaAllowed: !!config.statusMedia,
+    enabled: !!config.waStatus,
+  };
+}
+
+/** Edit one item (by id) or add a new one when there is no id. */
+export function upsertItem(slug, patch = {}) {
+  const plan = loadPlan(slug);
+  if (!plan.date) plan.date = todayKey();
+  const at = String(patch.at || "").slice(0, 5);
+  if (!/^\d{1,2}:\d{2}$/.test(at)) return { ok: false, error: "time must look like 14:30" };
+  const id = String(patch.id || "");
+  const textGiven = Object.prototype.hasOwnProperty.call(patch, "text");
+  const text = String(patch.text ?? "").trim().slice(0, 220);
+  const mediaGiven = Object.prototype.hasOwnProperty.call(patch, "media");
+  const media = String(patch.media ?? "").trim();
+  if (!text && !media) return { ok: false, error: "a status needs a line of text or a photo" };
+  if (id) {
+    const item = plan.items.find((i) => i.id === id);
+    if (!item) return { ok: false, error: "that item is no longer in the plan" };
+    Object.assign(item, { at, text: textGiven ? text : item.text });
+    if (mediaGiven) item.media = media;
+    if (patch.color) item.color = String(patch.color);
+    if (patch.font) item.font = Number(patch.font);
+  } else {
+    plan.items.push({ at, text, media, color: patch.color || "", font: Number(patch.font) || 0, id: "" });
+  }
+  plan.items.sort((a, b) => a.at.localeCompare(b.at));
+  const saved = savePlan(slug, plan);
+  return { ok: true, plan: saved };
+}
+
+export function removeItem(slug, id) {
+  const plan = loadPlan(slug);
+  const before = plan.items.length;
+  plan.items = plan.items.filter((i) => i.id !== String(id));
+  if (plan.items.length === before) return { ok: false, error: "not found" };
+  return { ok: true, plan: savePlan(slug, plan) };
+}
+
+/** Clear the plan for today. Posted ones stay in the history unless asked otherwise. */
+export function clearPlan(slug) {
+  const plan = loadPlan(slug);
+  plan.items = [];
+  plan.date = todayKey();
+  return { ok: true, plan: savePlan(slug, plan) };
+}
+
+/** Copy yesterday's shape into today: same times, rewritten lines. */
+export function copyPlanForward(slug) {
+  const plan = loadPlan(slug);
+  const fresh = plan.items.filter((i) => !i.postedAt);
+  if (!fresh.length) return { ok: false, error: "nothing left to copy" };
+  plan.history = [...(plan.history || []), ...plan.items.filter((i) => i.postedAt).map((i) => ({ at: i.postedAt, text: i.text, color: i.color, media: i.media, key: i.key }))].slice(-60);
+  plan.items = fresh.map((i) => ({ ...i, postedAt: 0, key: null, id: "" }));
+  plan.date = todayKey();
+  return { ok: true, plan: savePlan(slug, plan) };
+}
+
+/** Keep a photo for a status. Returns the path the plan should store. */
+export function saveMedia(base64, ext = "jpg") {
+  const dir = path.join(dirFor(), "media");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const clean = String(base64 || "").replace(/^data:[^,]+,/, "");
+  if (!clean || clean.length < 100) return "";
+  const safeExt = ["jpg", "jpeg", "png", "webp", "mp4"].includes(String(ext).toLowerCase()) ? String(ext).toLowerCase() : "jpg";
+  const file = path.join(dir, `status-${Date.now()}.${safeExt}`);
+  try {
+    fs.writeFileSync(file, Buffer.from(clean, "base64"));
+    log(`status media saved: ${path.basename(file)}`);
+    return file;
+  } catch (err) {
+    log(`status media failed: ${err.message}`);
+    return "";
+  }
 }
 
 /**
  * WhatsApp's own text-status colours (the ones you get when you tap the palette).
- * No pure black: a black status is what you get when no colour is sent at all, and
- * it reads like a broken post.
+ * No pure black: a black status is what you get when no colour is sent at all.
  */
 export const STATUS_COLORS = [
   "#0A7CFF", // blue
@@ -82,11 +184,6 @@ export const STATUS_COLORS = [
   "#6D4C41", // brown
 ];
 
-/**
- * Snap a colour to the nearest one WhatsApp actually offers. The model likes to pick
- * greys for her ("monochrome, obviously"), which is not in the palette and would land
- * as an ugly off-white card. Nearest-match keeps the intent while staying standard.
- */
 export function nearestPaletteColor(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ""));
   if (!m) return "";
@@ -223,18 +320,62 @@ export async function ensurePlan(persona, routine, chat, { force = false } = {})
 }
 
 /** The next planned status whose time has come. */
+export function statusWindow() {
+  return { start: Number(config.statusQuietStart) || 0, end: Number(config.statusQuietEnd) || 0 };
+}
+
+/** Inside the window she is allowed to post (quiet hours are the opposite of it). */
+export function inStatusWindow(now = new Date()) {
+  const h = now.getHours();
+  const { start, end } = statusWindow();
+  if (start === end) return true;
+  if (start < end) return !(h >= start && h < end);
+  return !(h >= start || h < end);
+}
+
+const toMin = (hhmm) => {
+  const [h, m] = String(hhmm || "").split(":").map(Number);
+  return (Number(h) || 0) * 60 + (Number(m) || 0);
+};
+
+/** When did she last post anything? (items and history both count) */
+export function lastPostedAt(slug) {
+  const plan = loadPlan(slug);
+  const stamps = [...(plan.items || []).map((i) => i.postedAt), ...(plan.history || []).map((h) => h.at)].filter(Boolean);
+  return stamps.length ? Math.max(...stamps) : 0;
+}
+
+/**
+ * The next status whose time has come. Respects the allowed window and the minimum
+ * gap, so a plan whose times bunch up cannot come out as three posts in ten minutes.
+ */
 export function dueStatus(slug, now = new Date()) {
   const plan = loadPlan(slug);
   if (plan.date !== todayKey(now)) return null;
-  const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  return plan.items.find((i) => !i.postedAt && i.at <= hhmm) || null;
+  if (!inStatusWindow(now)) return null;
+  const gap = Number(config.statusMinGapMin) || 0;
+  if (gap > 0 && !plan.items.some((i) => i.postedAt === 0 && false)) {
+    const last = lastPostedAt(slug);
+    if (last && Date.now() - last < gap * 60000) return null;
+  }
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const due = plan.items
+    .filter((i) => !i.postedAt && toMin(i.at) <= mins)
+    .sort((a, b) => toMin(a.at) - toMin(b.at));
+  return due[0] || null;
 }
 
-export function markPosted(slug, item, now = Date.now()) {
+export function markPosted(slug, item, key = null, now = Date.now()) {
   const plan = loadPlan(slug);
-  const target = plan.items.find((i) => i.id === item.id);
-  if (target) target.postedAt = now;
-  plan.history = [...plan.history, { at: now, text: item.text }];
+  const target = plan.items.find((i) => i.id === item?.id);
+  if (target) {
+    target.postedAt = now;
+    if (key && key.id) target.key = key;
+  }
+  plan.history = [
+    ...(plan.history || []),
+    { at: now, text: String(item?.text || ""), color: String(item?.color || ""), media: String(item?.media || ""), key: key && key.id ? key : null },
+  ].slice(-60);
   return savePlan(slug, plan);
 }
 
@@ -264,7 +405,6 @@ export function statusAudience() {
       continue;
     }
     const num = String(c.profile?.number || "").replace(/\D/g, "");
-    // a plausible phone number, and not just the LID repeated back at us
     if (num && num !== lid && num.length >= 8 && num.length <= 16) {
       out.push(`${num}@s.whatsapp.net`);
       continue;
@@ -275,32 +415,60 @@ export function statusAudience() {
   return [...new Set(out)];
 }
 
-/**
- * Post it. WhatsApp requires the recipient list; without it the status is invisible.
- */
-export async function postStatus(sock, text, { audience = null, color = "", font = 1 } = {}) {
-  const list = audience || statusAudience();
-  if (!list.length) {
-    log("status skipped: nobody in the audience list");
-    return false;
-  }
-  // no colour is what produces the plain black card, so always send one
-  const bg = nearestPaletteColor(color) || pickColor(Date.now());
+/** Delete a status from WhatsApp (the poster can always take their own back). */
+export async function revokeStatus(sock, key) {
+  if (!key || !key.id) return false;
   try {
-    await sock.sendMessage(
-      "status@broadcast",
-      { text: String(text).slice(0, 300) },
-      { statusJidList: list, backgroundColor: bg, font: Math.max(1, Math.min(5, Number(font) || 1)) },
-    );
-    log(`status posted → ${list.length} contact(s) [${bg}]: ${String(text).slice(0, 60)}`);
+    await sock.sendMessage("status@broadcast", { delete: key });
+    log(`status deleted from WhatsApp: ${String(key.id).slice(0, 12)}`);
     return true;
   } catch (err) {
-    log(`status post failed: ${err.message}`);
+    log(`status delete failed: ${err.message}`);
     return false;
   }
 }
 
-/** Prompt line: she may bring up what she posted, the way people do ("did u see my status"). */
+/** Forget a history entry (with or without deleting it from WhatsApp). */
+export function forgetHistory(slug, at) {
+  const plan = loadPlan(slug);
+  const before = (plan.history || []).length;
+  plan.history = (plan.history || []).filter((h) => Number(h.at) !== Number(at));
+  if (plan.history.length === before) return { ok: false, error: "not found" };
+  return { ok: true, plan: savePlan(slug, plan) };
+}
+
+export async function postStatus(sock, text, { audience = null, color = "", font = 1, media = "" } = {}) {
+  const list = audience || statusAudience();
+  if (!list.length) {
+    log("status skipped: nobody in the audience list");
+    return "";
+  }
+  // no colour is what produces the plain black card, so always send one
+  const bg = nearestPaletteColor(color) || pickColor(Date.now());
+  const line = String(text || "").slice(0, 300);
+  let content;
+  let kind = "text";
+  try {
+    if (media && fs.existsSync(media)) {
+      const buf = fs.readFileSync(media);
+      content = /\.(mp4|mov)$/i.test(media) ? { video: buf, caption: line } : { image: buf, caption: line };
+      kind = /mp4|mov$/i.test(media) ? "video" : "photo";
+    } else {
+      content = { text: line };
+    }
+    const key = await sock.sendMessage("status@broadcast", content, {
+      statusJidList: list,
+      backgroundColor: bg,
+      font: Math.max(1, Math.min(5, Number(font) || 1)),
+    });
+    log(`status posted (${kind}) → ${list.length} contact(s) [${bg}]: ${line.slice(0, 60)}`);
+    return key?.key || "";
+  } catch (err) {
+    log(`status post failed: ${err.message}`);
+    return "";
+  }
+}
+
 export function statusPromptBlock(slug = config.persona) {
   if (!config.waStatus) return "";
   const plan = loadPlan(slug);

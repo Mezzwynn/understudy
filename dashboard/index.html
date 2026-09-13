@@ -281,6 +281,7 @@
     <nav id="tabs">
       <button data-t="contacts" class="active">Contacts</button>
       <button data-t="chat">Chat</button>
+      <button data-t="status">Status</button>
       <button data-t="character">Character</button>
       <button data-t="agent">Agent</button>
       <button data-t="schedule">Schedule</button>
@@ -300,6 +301,7 @@
     <div id="clist"></div>
   </section>
   <section id="tab-chat" hidden></section>
+  <section id="tab-status" hidden></section>
   <section id="tab-character" hidden></section>
   <section id="tab-agent" hidden></section>
   <section id="tab-schedule" hidden></section>
@@ -779,7 +781,6 @@ async function renderCharacter(force){
     ${traitsPanel()}
     ${contextPanel(w)}
     ${worldPanel(w)}
-    ${statusPanel(DATA.status, DATA.statusAudienceCount)}
     ${changesPanel(DATA.changes)}
     ${weekPanel(DATA.week)}
     ${eventsPanel(DATA.events)}
@@ -1155,6 +1156,150 @@ const AGENT_IDEAS = [
   "Make today's routine more interesting",
   "Add a note that she is moving house this month",
 ];
+/* ═══════════════════════════ status tab ═══════════════════════════ */
+function statusMediaRow(it){
+  if(!it.media) return "";
+  const name = String(it.media).split("/").pop();
+  return `<span class="chip" title="${esc(it.media)}">📎 ${esc(name.slice(0,22))}</span>`;
+}
+
+function renderStatus(){
+  const root=$("#tab-status"); if(!root) return;
+  const st = DATA.status || { items:[], history:[], colors:[] };
+  const w = st.window || {start:2,end:8};
+  const items = st.items || [];
+  const hist = (st.history || []).slice().reverse();
+  const posted = items.filter(i=>i.postedAt).length;
+
+  root.innerHTML = `
+  <div class="card tight fadein">
+    <div class="row"><h2 style="margin:0">Her story feed</h2><span class="grow"></span>
+      <span class="badge">${st.audienceCount ?? (st.audience||[]).length} penerima</span>
+      <button class="act" data-sact="plan">New arc</button>
+      <button class="act" data-sact="copy">Reuse leftover</button>
+      <button class="act" data-sact="clear">Clear day</button></div>
+    <div class="hint" style="margin-top:6px">Rencana hari ini: <b>${posted}/${items.length}</b> terkirim.
+      Yang <b>New arc</b> itu minta dia nyusun ulang cerita hari ini dari rutinitasnya (pakai model).
+      Status tanpa warna = kartu hitam polos, jadi warnanya selalu dikirim.</div>
+
+    <div class="rows" style="margin-top:12px">
+      ${items.length? items.map(i=>`
+        <div class="mrow" data-item="${esc(i.id)}" style="grid-template-columns:96px 1fr;gap:10px;align-items:start">
+          <div>
+            <input type="time" class="sin" data-k="at" value="${esc(i.at)}" ${i.postedAt?"disabled":""}>
+            <div class="tiny" style="margin-top:5px">${i.postedAt?("✓ "+new Date(i.postedAt).toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"})):"belum"}</div>
+          </div>
+          <div>
+            <textarea class="sin" data-k="text" rows="2" style="width:100%;resize:vertical">${esc(i.text)}</textarea>
+            <div class="row" style="margin-top:6px;flex-wrap:wrap;gap:5px">
+              ${(st.colors||[]).map(c=>`<button class="ctile ${String(i.color||"").toUpperCase()===c?"sel":""}" data-k="color" data-v="${c}" style="background:${c};width:20px;height:20px;border-radius:6px" title="${c}"></button>`).join("")}
+              <span class="grow"></span>
+              ${statusMediaRow(i)}
+              <label class="act" style="cursor:pointer">Photo<input type="file" accept="image/*" data-k="file" hidden></label>
+              ${i.media?`<button class="act" data-k="nofile">Drop photo</button>`:""}
+              <button class="act" data-k="save">Save</button>
+              <button class="act" data-k="post">${i.postedAt?"Post again":"Post now"}</button>
+              <button class="act" data-k="del" style="color:var(--bad)">Delete</button>
+            </div>
+          </div>
+        </div>`).join("") : '<div class="empty">Belum ada rencana hari ini. Tekan <b>New arc</b> biar dia nyusun sendiri.</div>'}
+    </div>
+    <div class="btns">
+      <button class="act" data-sact="add">+ Tambah status</button>
+      <span class="tiny">waktu, teks, warna, foto — semuanya bisa diubah</span>
+    </div>
+  </div>
+
+  <div class="card tight fadein">
+    <h2 style="margin:0 0 8px">Setelan</h2>
+    <div class="rows">
+      <div class="mrow2"><span>Status aktif</span><label class="sw"><input type="checkbox" class="sn" data-k="WA_STATUS" ${st.enabled?"checked":""}><span></span></label></div>
+      <div class="mrow2"><span>Jumlah per hari</span><input class="nin" data-k="STATUS_PER_DAY" type="number" min="0" max="12" value="${st.perDay??3}"></div>
+      <div class="mrow2"><span>Yang bisa lihat</span>
+        <select class="sin" data-k="STATUS_AUDIENCE">
+          <option value="all" ${st.audienceMode==="all"?"selected":""}>semua kontak</option>
+          <option value="trusted" ${st.audienceMode==="trusted"?"selected":""}>cuma yang dipercaya</option>
+        </select></div>
+      <div class="mrow2"><span>Jam dilarang posting (mulai–selesai)</span>
+        <span class="row"><input class="nin" data-k="STATUS_QUIET_START" type="number" min="0" max="23" value="${w.start}"><span class="tiny">s/d</span><input class="nin" data-k="STATUS_QUIET_END" type="number" min="0" max="23" value="${w.end}"></span></div>
+      <div class="mrow2"><span>Jarak minimal antar status (menit)</span><input class="nin" data-k="STATUS_MIN_GAP_MIN" type="number" min="0" max="1440" value="${st.minGapMin??150}"></div>
+      <div class="mrow2"><span>Boleh kirim foto/video</span><label class="sw"><input type="checkbox" class="sn" data-k="STATUS_MEDIA" ${st.mediaAllowed?"checked":""}><span></span></label></div>
+    </div>
+    <div class="btns"><button class="act" data-sact="save-settings">Simpan setelan</button>
+      <span class="tiny">berlaku langsung, tanpa restart</span></div>
+    <div class="hint" style="margin-top:8px">Penerima sekarang: ${(st.audience||[]).map(a=>esc(a.replace("@s.whatsapp.net",""))).join(", ")||"—"}
+      — kontak yang nomornya disembunyikan WhatsApp tidak bisa lihat status.</div>
+  </div>
+
+  <div class="card tight fadein">
+    <div class="row"><h2 style="margin:0">Yang sudah diposting</h2><span class="grow"></span><span class="badge">${hist.length}</span></div>
+    ${hist.length? `<div style="margin-top:10px">${hist.map(h=>`
+      <div class="mrow" data-hist="${h.at}" style="grid-template-columns:1fr auto;gap:8px;align-items:center;margin-top:7px">
+        <div>
+          <span class="tiny">${new Date(h.at).toLocaleString("id-ID",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
+          ${h.color?`<span class="cdot" style="background:${esc(h.color)};display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 5px"></span>`:""}
+          <span style="font-size:12.5px">"${esc(h.text)}"</span>${h.media?' <span class="chip">📎</span>':""}
+        </div>
+        <button class="act" data-k="revoke" style="color:var(--bad)">Hapus dari WA</button>
+      </div>`).join("")}</div>` : '<div class="empty">Belum ada yang diposting.</div>'}
+  </div>`;
+}
+
+$("#tab-status").addEventListener("click",async (e)=>{
+  const tile=e.target.closest('[data-k="color"]');
+  if(tile){ $$('.mrow[data-item]').forEach(r=>{}); const row=tile.closest(".mrow");
+    row.querySelectorAll('[data-k="color"]').forEach(x=>x.classList.remove("sel")); tile.classList.add("sel"); return; }
+
+  const b=e.target.closest("[data-k],[data-sact]"); if(!b) return;
+  const sact=b.dataset.sact, k=b.dataset.k;
+  const row=b.closest("[data-item]"), id=row?.dataset.item;
+  const slug=CHAR_SLUG||DATA.activeSlug;
+  const val=(kk)=>row?.querySelector(`[data-k="${kk}"]`)?.value||"";
+  const chosen=()=>row?.querySelector('[data-k="color"].sel')?.dataset.v||"";
+
+  if(sact==="plan"){ toast("Menyusun cerita hari ini…");
+    const r=await api("/api/status",{slug,action:"plan"}); toast(r.ok?("Rencana baru: "+(r.status.items||[]).length+" status"):("Gagal: "+(r.error||""))); return refresh(true); }
+  if(sact==="copy"){ const r=await api("/api/status",{slug,action:"copy"}); toast(r.ok?"Sisa rencana dipakai ulang":("Gagal: "+(r.error||""))); return refresh(true); }
+  if(sact==="clear"){ if(!confirm("Kosongkan rencana hari ini? (yang sudah diposting tetap ada di bawah)")) return;
+    await api("/api/status",{slug,action:"clear"}); toast("Rencana dikosongkan"); return refresh(true); }
+  if(sact==="add"){ const r=await api("/api/status",{slug,action:"add",item:{at:"12:00",text:"status baru — ubah teks & jamnya"}});
+    toast(r.ok?"Ditambahkan":("Gagal: "+(r.error||""))); return refresh(true); }
+  if(sact==="save-settings"){
+    const values={};
+    $$('#tab-status [data-k^="STATUS_"], #tab-status [data-k="WA_STATUS"]').forEach(el=>{
+      values[el.dataset.k] = el.type==="checkbox" ? el.checked : el.value;
+    });
+    const r=await api("/api/status",{slug,action:"settings",values});
+    toast(r.ok?"Setelan disimpan (langsung berlaku)":("Gagal: "+(r.error||""))); return refresh(true); }
+
+  if(k==="save"){ const r=await api("/api/status",{slug,action:"update",item:{id,at:val("at"),text:val("text"),color:chosen()}});
+    toast(r.ok?"Disimpan":("Gagal: "+(r.error||""))); return refresh(true); }
+  if(k==="post"){ toast("Mengirim status…"); const r=await api("/api/status",{slug,action:"post",id,text:val("text"),color:chosen()});
+    toast(r.ok?"Status terkirim":("Gagal: "+(r.error||""))); return refresh(true); }
+  if(k==="del"){ const r=await api("/api/status",{slug,action:"remove",id}); toast(r.ok?"Dihapus dari rencana":("Gagal: "+(r.error||""))); return refresh(true); }
+  if(k==="nofile"){ const r=await api("/api/status",{slug,action:"update",item:{id,at:val("at"),text:val("text"),media:" "}});
+    toast("Fotonya dilepas"); return refresh(true); }
+  if(k==="revoke"){ if(!confirm("Hapus status ini dari WhatsApp juga?")) return;
+    const at=Number(b.closest("[data-hist]").dataset.hist);
+    const r=await api("/api/status",{slug,action:"revoke",at});
+    toast(r.ok?(r.deletedFromWhatsApp?"Dihapus dari WhatsApp":(r.note||"dihapus")):("Gagal: "+(r.error||""))); return refresh(true); }
+});
+
+$("#tab-status").addEventListener("change",async (e)=>{
+  const f=e.target.closest('[data-k="file"]'); if(!f || !f.files?.[0]) return;
+  const row=f.closest("[data-item]"); const id=row.dataset.item; const slug=CHAR_SLUG||DATA.activeSlug;
+  const file=f.files[0];
+  if(file.size>6*1024*1024) return toast("Fotonya kegedhean (maks 6MB)");
+  const ext=(file.name.split(".").pop()||"jpg").toLowerCase();
+  const data=await new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(String(fr.result).split(",")[1]); fr.readAsDataURL(file); });
+  toast("Mengunggah foto…");
+  const up=await api("/api/status",{slug,action:"upload",data,ext});
+  if(!up.ok) return toast("Gagal upload: "+(up.error||""));
+  const r=await api("/api/status",{slug,action:"update",item:{id,at:row.querySelector('[data-k="at"]').value,text:row.querySelector('[data-k="text"]').value,media:up.path}});
+  toast(r.ok?"Foto ditempel ke status ini":("Gagal: "+(r.error||"")));
+  refresh(true);
+});
+
 function renderAgent(){
   const root=$("#tab-agent");
   if(!AGENT_LOADED){
@@ -1515,6 +1660,7 @@ function renderAll(){
   renderHeader();
   if(tab==="contacts" && !dragging && !contactsDirty) renderContacts();
   if(tab==="chat") renderChat();
+  if(tab==="status") renderStatus();
   if(tab==="character") renderCharacter();
   if(tab==="agent") renderAgent();
   if(tab==="schedule") renderSchedule();

@@ -14,7 +14,22 @@ import { loadTraits, saveTraits, generateTraits } from "./traits.mjs";
 import { listEvents, recentEvents, clearEvents } from "./events.mjs";
 import { buildWeekDigest } from "./week.mjs";
 import { listChanges } from "./changes.mjs";
-import { loadPlan, ensurePlan, postStatus, statusAudience, dueStatus, markPosted, STATUS_COLORS } from "./status.mjs";
+import {
+  loadPlan,
+  ensurePlan,
+  postStatus,
+  statusAudience,
+  markPosted,
+  revokeStatus,
+  forgetHistory,
+  upsertItem,
+  removeItem,
+  clearPlan,
+  copyPlanForward,
+  saveMedia,
+  statusState,
+  STATUS_COLORS,
+} from "./status.mjs";
 import { RELATIONS, loadWorld, saveWorld, ensureWorld, worldFile } from "./world.mjs";
 import { resolveBlockJid } from "./stranger.mjs";
 import { generateSchedule, formatSchedule, parseSchedule, addContext, cleanContext } from "./schedule.mjs";
@@ -264,7 +279,7 @@ async function summary() {
     events: { recent: recentEvents(24).slice(-8), total: listEvents().length },
     week: buildWeekDigest(activeSlug),
     changes: listChanges().slice(-12).reverse(),
-    status: loadPlan(activeSlug),
+    status: { ...statusState(activeSlug), audienceCount: statusAudience().length },
     statusAudienceCount: statusAudience().length,
     statusColors: STATUS_COLORS,
     evals: { ...evalSummary(), running: isEvalRunning(), due: dueForEval(), everyDays: config.evalEveryDays },
@@ -566,27 +581,78 @@ export function startDashboard() {
         if (url.pathname === "/api/status") {
           const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
           const persona = loadPersona(slug);
-          if (body.action === "plan") {
-            const fresh = await ensurePlan(persona, null, null, { force: true });
-            return json(res, 200, { ok: true, status: fresh });
-          }
-          if (body.action === "post") {
+          const act = String(body.action || "state");
+          const sock = async () => {
             const { getSock } = await import("./whatsapp.mjs");
-            const sock = getSock();
-            if (!sock) return json(res, 400, { ok: false, error: "WhatsApp is not connected" });
-            const text = String(body.text || "").trim() || dueStatus(slug)?.text || "";
-            if (!text) return json(res, 400, { ok: false, error: "nothing to post" });
-            const ok = await postStatus(sock, text, {
-              audience: body.everyone ? null : statusAudience(),
-              color: body.color || "",
-              font: Number(body.font) || 1,
-            });
-            const plan = loadPlan(slug);
-            const due = dueStatus(slug);
-            if (ok && due && body.text === undefined) markPosted(slug, due);
-            return json(res, 200, { ok, posted: ok ? text : "", plan: loadPlan(slug) });
+            return getSock();
+          };
+
+          if (act === "plan") {
+            await ensurePlan(persona, null, null, { force: true });
+            return json(res, 200, { ok: true, status: statusState(slug) });
           }
-          return json(res, 200, { ok: true, status: loadPlan(slug), audience: statusAudience().length });
+          if (act === "update" || act === "add") {
+            const r = upsertItem(slug, body.item || body);
+            return json(res, r.ok ? 200 : 400, { ...r, status: statusState(slug) });
+          }
+          if (act === "remove") {
+            const r = removeItem(slug, body.id);
+            return json(res, r.ok ? 200 : 400, { ...r, status: statusState(slug) });
+          }
+          if (act === "clear") {
+            clearPlan(slug);
+            return json(res, 200, { ok: true, status: statusState(slug) });
+          }
+          if (act === "copy") {
+            const r = copyPlanForward(slug);
+            return json(res, r.ok ? 200 : 400, { ...r, status: statusState(slug) });
+          }
+          if (act === "upload") {
+            if (!config.statusMedia) return json(res, 400, { ok: false, error: "STATUS_MEDIA is off" });
+            const file = saveMedia(body.data, body.ext || "jpg");
+            if (!file) return json(res, 400, { ok: false, error: "could not read that file" });
+            return json(res, 200, { ok: true, path: file });
+          }
+          if (act === "revoke") {
+            const plan = loadPlan(slug);
+            const entry = (plan.history || []).find((h) => Number(h.at) === Number(body.at));
+            if (!entry) return json(res, 404, { ok: false, error: "that status is not in the history" });
+            const s2 = await sock();
+            if (!s2) return json(res, 400, { ok: false, error: "WhatsApp is not connected" });
+            const gone = entry.key ? await revokeStatus(s2, entry.key) : false;
+            forgetHistory(slug, body.at);
+            return json(res, 200, {
+              ok: true,
+              deletedFromWhatsApp: gone,
+              note: gone ? "deleted from WhatsApp too" : "removed from the list only — WhatsApp still shows it",
+              status: statusState(slug),
+            });
+          }
+          if (act === "settings") {
+            const v = body.values || {};
+            applyValues(v);
+            reloadConfig();
+            log("dashboard: status settings updated (applied live)");
+            return json(res, 200, { ok: true, status: statusState(slug) });
+          }
+          if (act === "post") {
+            const s2 = await sock();
+            if (!s2) return json(res, 400, { ok: false, error: "WhatsApp is not connected" });
+            const item = body.id ? (loadPlan(slug).items || []).find((i) => i.id === body.id) : null;
+            const text = String(body.text ?? item?.text ?? "").trim();
+            const media = String(body.media ?? item?.media ?? "");
+            if (!text && !media) return json(res, 400, { ok: false, error: "nothing to post" });
+            const key = await postStatus(s2, text, {
+              audience: body.everyone ? null : statusAudience(),
+              color: body.color || item?.color || "",
+              font: Number(body.font) || item?.font || 1,
+              media,
+            });
+            // posting a planned item by hand should tick it off the plan
+            if (key && item) markPosted(slug, item, key);
+            return json(res, 200, { ok: !!key, posted: key ? text : "", status: statusState(slug) });
+          }
+          return json(res, 200, { ok: true, status: statusState(slug) });
         }
 
         if (url.pathname === "/api/traits") {

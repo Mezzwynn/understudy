@@ -10,7 +10,7 @@ import { isPaused } from "./pause.mjs";
 import { dueForEval, isEvalRunning, runAndRecord } from "./evals.mjs";
 import { weekNotifyDue, markWeekNotified, weekText } from "./week.mjs";
 import { watchFiles } from "./changes.mjs";
-import { ensurePlan, dueStatus, markPosted, postStatus } from "./status.mjs";
+import { ensurePlan, dueStatus, markPosted, postStatus, inStatusWindow } from "./status.mjs";
 
 /**
  * proactive.mjs — she has her own life.
@@ -144,10 +144,11 @@ async function maybePostStatus(sock) {
     const slug = persona.slug || config.persona;
     const routine = loadRoutine(slug);
     await ensurePlan(persona, routine, null);
+    if (!inStatusWindow()) return;
     const due = dueStatus(slug);
     if (!due) return;
-    const ok = await postStatus(sock, due.text);
-    if (ok) markPosted(slug, due);
+    const key = await postStatus(sock, due.text, { color: due.color, font: due.font, media: due.media });
+    if (key) markPosted(slug, due, key);
   } catch (err) {
     log(`status tick failed: ${err.message}`);
   }

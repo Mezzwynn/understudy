@@ -449,20 +449,35 @@ changes the prompt (it once did not: `.env` said `WORLD=true` while the running 
 
 ## WhatsApp Status (her story)
 
-`WA_STATUS` gives her a story feed: 3-4 posts a day, planned as an arc from her routine and
-moments, so scrolling her status tells the story of that day rather than showing four unrelated
-lines.
+`WA_STATUS` gives her a story feed, and it has its own tab in the panel.
 
-- each item carries a time and goes out when that time comes (nothing to trigger, no model call
-  at post time)
-- if the model refuses to return JSON, the plan falls back to the moments of her own routine —
-  the feature cannot end up empty
+- she plans **one arc a day** (3-4 posts) from her routine and her moments, so scrolling
+  her status tells the story of that day instead of showing four unrelated lines
+- each post carries a time and goes out when that time comes — posting costs no model call
 - she can mention it in chat ("did u see my status"), the way people do
-- the dashboard has a card: today's arc, what has been posted, and buttons to replan, post the
-  next one, or post something written by hand
+- if the model refuses to answer with JSON, the arc falls back to the moments of her own
+  routine, so the day can never end up empty
+
+### The Status tab
+
+| | |
+|---|---|
+| **Today** | every post with an editable time, text, colour and photo; post one by hand, delete it, or add a new one |
+| **Settings** | on/off, posts per day, who may see them, the hours she may not post, the minimum gap between two posts, and whether photos are allowed |
+| **Posted** | what already went out, with a **Delete from WhatsApp** button — taking a status back is a normal thing to do |
+
+A text status with no colour set comes out as a plain black card, so a colour is always
+sent. The palette is WhatsApp's own twelve text-status colours; if the model picks a grey
+(the way it likes to for a monochrome character), the choice is snapped to the nearest
+standard colour instead of inventing one WhatsApp does not offer.
+
+Photos and short videos are supported (`STATUS_MEDIA`): attach one to a post in the tab and
+it goes out as an image status with the line as its caption.
 
 ⚠️ **A status is public to her contacts** — everyone she has talked to, including strangers.
-`STATUS_AUDIENCE=trusted` limits it to the people you trust.
+The tab shows exactly who can see it. Contacts whose number WhatsApp hides (anonymous LIDs)
+cannot be reached: a status whose recipient list carries no phone number at all is dropped
+by WhatsApp, which is what silently happened before this was fixed.
 
 ## Installable panel (PWA)
 
