@@ -920,8 +920,7 @@ function renderSchedule(){
 
 /* ═══════════════════════════════ settings ═══════════════════════════════ */
 // filled from /api/summary so the list stays in one place (scripts/_settings.mjs)
-let KNOB_FEATURES = [];
-const FEATURE_KEYS = KNOB_FEATURES;
+
 const GROUPS = [
   ["Reply style",["REACTION_CHANCE","QUOTE_CHANCE","SKIP_CHANCE","TYPO_CHANCE","BURST_CHANCE"]],
   ["Read & typing timing",["READ_MIN_MS","READ_MAX_MS","PRETYPE_MIN_MS","PRETYPE_MAX_MS","TYPING_PAUSE_CHANCE","DEBOUNCE_MS","DEBOUNCE_MAX_MS"]],
@@ -945,13 +944,20 @@ function knobField(k){
 function renderSettings(){
   if(SETTINGS_LOADED) return;
   const s=DATA.settings, root=$("#tab-settings");
-  if(DATA.featureKeys) KNOB_FEATURES=DATA.featureKeys;
   const seen=new Set();
   const groups=GROUPS.map(([title,keys])=>{
     const fields=keys.map(key=>{ const k=s.knobs.find(x=>x.key===key); if(!k) return ""; seen.add(key); return knobField(k); }).join("");
     return fields?`<div style="border-bottom:1px solid var(--line);padding:12px 0"><div class="kick" style="margin-bottom:9px">${esc(title)}</div><div class="grid">${fields}</div></div>`:"";
   }).join("");
   const rest=s.knobs.filter(k=>!seen.has(k.key)).map(knobField).join("");
+  // the list comes from the server; fall back to the well-known keys so the
+  // toggles still render if the payload is ever missing
+  const FEATURE_KEYS = DATA.featureKeys && DATA.featureKeys.length ? DATA.featureKeys : [
+    "WORLD","ROUTINE","ROUTINE_MOOD","PROACTIVE","SULKING","SOFT_MODE","COMMITMENTS",
+    "INSTRUCTION_FOLLOWUP","CROSS_CHAT","TASKS","STRANGER_GUARD","MEMORY_EMBEDDINGS",
+    "MILESTONES","PRESENCE","MARK_READ","MOOD_MEDIA","SAVE_USER_STICKERS","INJECTION_GUARD",
+    "NICK_ACCEPT_WARM","BACKUP",
+  ];
   const feats = s.knobs.filter(k=>FEATURE_KEYS.includes(k.key));
   root.innerHTML=`
     <div class="card hero">

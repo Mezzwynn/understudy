@@ -32,6 +32,21 @@ for (const m of html.matchAll(/\$\$?\(\s*"#([\w-]+)("\s*\+)?/g)) {
 }
 for (const m of html.matchAll(/getElementById\(\s*"([\w-]+)"/g)) refs.set(m[1], true);
 
+// A `const X = Y;` where Y is a `let` that gets reassigned later is a snapshot,
+// not a reference. That exact mistake left the Features card rendered but empty:
+// the key list was copied while it was still [] and never updated.
+let snapshots = 0;
+const lets = new Set();
+for (const m of html.matchAll(/\blet\s+([A-Za-z_$][\w$]*)/g)) lets.add(m[1]);
+for (const m of html.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*;/g)) {
+  const [, alias, source] = m;
+  if (!lets.has(source)) continue;
+  const reassigned = new RegExp(`(^|[^.\\w])${source}\\s*=(?!=)`).test(html.slice(html.indexOf(m[0]) + m[0].length));
+  if (!reassigned) continue;
+  snapshots++;
+  console.log(`  dashboard/index.html: const ${alias} = ${source} copies a value that changes later — use the source directly`);
+}
+
 let missing = 0;
 for (const id of refs.keys()) {
   if (defined.has(id)) continue;
@@ -39,4 +54,5 @@ for (const id of refs.keys()) {
   console.log(`  dashboard/index.html: #${id} is used by the script but does not exist in the markup`);
 }
 if (!missing) console.log("  ✓ every id the script uses exists");
-process.exit(missing ? 1 : 0);
+if (!snapshots) console.log("  ✓ no stale copies of mutable state");
+process.exit(missing + snapshots ? 1 : 0);
