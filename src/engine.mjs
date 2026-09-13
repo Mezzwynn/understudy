@@ -272,6 +272,25 @@ async function maybeSummarize(chat) {
   await consolidateMemory(chat);
 }
 
+/**
+ * Keep a small mood history for the dashboard sparkline: one sample every
+ * 30 minutes, at most two days' worth.
+ */
+function sampleMood(chat) {
+  const m = chat.mood;
+  if (!m) return;
+  chat.moodHistory ||= [];
+  const last = chat.moodHistory[chat.moodHistory.length - 1];
+  if (last && Date.now() - last.t < 30 * 60000) return;
+  chat.moodHistory.push({
+    t: Date.now(),
+    v: Number(m.valence.toFixed(2)),
+    e: Number(m.energy.toFixed(2)),
+    a: Number(m.affection.toFixed(2)),
+  });
+  if (chat.moodHistory.length > 96) chat.moodHistory = chat.moodHistory.slice(-96);
+}
+
 /** Change the mood — unless the dashboard locked it for this contact. */
 function bump(session, deltas) {
   if (isMoodLocked(session)) { session.mood = lockValue(session); return; }
@@ -400,6 +419,7 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
     if (Object.keys(nudge).length) bump(chat, nudge);
   }
 
+  sampleMood(chat);
   chat.history.push({ role: "user", content: incoming, ts: Date.now() });
   chat.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
   chat.stats.inbound = (chat.stats.inbound || 0) + 1;

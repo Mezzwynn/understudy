@@ -1,154 +1,232 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0b0c10" />
+<meta name="theme-color" content="#07080c" />
 <title>Understudy — Control Panel</title>
 <style>
+  /* ─────────────────────────────  design tokens  ───────────────────────────── */
   :root{
-    --bg:#0b0c10; --bg2:#0f1116; --card:#15171d; --card2:#1b1e26; --line:#262a34;
-    --tx:#e9ebf1; --dim:#8b93a4; --dim2:#5f6675;
-    --accent:#8b7bff; --accent2:#6f5cf0;
-    --ok:#3ddc97; --warn:#ffb454; --bad:#ff6b6b; --soft:#e3b6ff;
+    --bg:#07080c;
+    --bg-2:#0b0d13;
+    --panel:rgba(22,24,32,.72);
+    --panel-2:rgba(30,33,44,.6);
+    --line:rgba(255,255,255,.10);
+    --line-2:rgba(255,255,255,.17);
+    --tx:#eceef5;
+    --dim:#9aa3b8;
+    --dim-2:#8a93a6;
+    --accent:#8b7bff;
+    --accent-2:#6a56f0;
+    --accent-glow:rgba(139,123,255,.35);
+    --ok:#3ddc97;
+    --warn:#ffb454;
+    --bad:#ff6b7d;
+    --soft:#e3b6ff;
+    --r-lg:20px;
     --r:14px;
+    --r-sm:10px;
+    --shadow:0 18px 50px -22px rgba(0,0,0,.9);
+    --blur:blur(18px) saturate(140%);
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-  html,body{margin:0;background:var(--bg);color:var(--tx);
-    font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  body{padding-bottom:32px; background-image:radial-gradient(900px 420px at 50% -180px,#1a1633 0%,transparent 70%)}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1100px 600px at 50% -260px, rgba(106,86,240,.22), transparent 62%),
+      radial-gradient(700px 420px at 100% 10%, rgba(61,220,151,.07), transparent 60%),
+      linear-gradient(180deg,var(--bg),var(--bg-2) 40%,var(--bg));
+    background-attachment:fixed;
+    color:var(--tx);
+    font:15px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    padding-bottom:64px;
+    min-height:100vh;
+  }
   a{color:var(--accent)}
+  ::selection{background:var(--accent-glow)}
+  /* thin scrollbars */
+  *::-webkit-scrollbar{width:8px;height:8px}
+  *::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:8px}
 
-  /* ---------- header ---------- */
-  header{position:sticky;top:0;z-index:20;background:rgba(11,12,16,.86);
-    backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
-  .hwrap{max-width:940px;margin:0 auto;padding:12px 14px 0}
+  /* ─────────────────────────────  header  ───────────────────────────── */
+  header{position:sticky;top:0;z-index:40;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+    background:linear-gradient(180deg,rgba(7,8,12,.86),rgba(7,8,12,.62));border-bottom:1px solid var(--line)}
+  .hwrap{max-width:1080px;margin:0 auto;padding:14px 16px 0}
+  .brandrow{display:flex;align-items:center;gap:12px}
+  .avatar{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;font-size:22px;flex:none;
+    background:linear-gradient(150deg,rgba(139,123,255,.9),rgba(58,48,120,.9));box-shadow:0 10px 30px -12px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.18)}
+  .brandtxt{min-width:0}
+  h1{font-size:19px;margin:0;font-weight:650;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .subline{display:flex;align-items:center;gap:7px;margin-top:2px;flex-wrap:wrap}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--bad);position:relative;flex:none}
+  .pulse::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1px solid currentColor;opacity:0}
+  .pulse.on{background:var(--ok);color:var(--ok);animation:breathe 2.8s ease-in-out infinite}
+  .pulse.on::after{animation:ring 2.8s ease-out infinite}
+  @keyframes breathe{0%,100%{box-shadow:0 0 0 0 rgba(61,220,151,.5)}50%{box-shadow:0 0 14px 2px rgba(61,220,151,.25)}}
+  @keyframes ring{0%{opacity:.55;transform:scale(.7)}70%{opacity:0;transform:scale(1.9)}100%{opacity:0}}
+  .chip{font-size:11px;padding:3px 10px;border-radius:999px;border:1px solid var(--line-2);
+    background:var(--panel-2);color:var(--dim);white-space:nowrap;display:inline-flex;gap:5px;align-items:center}
+  .chip b{color:var(--tx);font-weight:600}
+  .chip.ok{color:#8ff0bb;border-color:rgba(61,220,151,.4);background:rgba(61,220,151,.08)}
+  .chip.warn{color:#f2cf9b;border-color:rgba(255,180,84,.4);background:rgba(255,180,84,.08)}
+  .chip.soft{color:var(--soft);border-color:rgba(227,182,255,.35);background:rgba(227,182,255,.08)}
+  .chip.accent{color:#cfc6ff;border-color:rgba(139,123,255,.45);background:rgba(139,123,255,.12)}
+
+  /* tabs */
+  nav{display:flex;gap:3px;margin:12px 0 0;overflow-x:auto;padding-bottom:11px;scrollbar-width:none;position:relative;
+    scroll-behavior:smooth;-webkit-overflow-scrolling:touch;
+    mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 26px),transparent 100%);
+    -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 26px),transparent 100%)}
+  nav::-webkit-scrollbar{display:none}
+  nav button{position:relative;background:transparent;color:var(--dim);border:1px solid transparent;
+    padding:8px 11px;border-radius:11px;font-size:12.5px;font-family:inherit;white-space:nowrap;cursor:pointer;transition:.18s;flex:none}
+  nav button:hover{color:var(--tx);background:rgba(255,255,255,.04)}
+  nav button.active{color:#fff;background:linear-gradient(180deg,rgba(139,123,255,.28),rgba(139,123,255,.14));
+    border-color:rgba(139,123,255,.45);box-shadow:0 8px 26px -14px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.12)}
+  nav button .dot{position:absolute;top:7px;right:9px;width:6px;height:6px;border-radius:50%;background:var(--warn)}
+
+  /* ─────────────────────────────  layout  ───────────────────────────── */
+  main{padding:16px;max-width:1080px;margin:0 auto}
+  section{animation:fade .35s cubic-bezier(.2,.8,.2,1)}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .card{position:relative;background:linear-gradient(180deg,var(--panel),rgba(14,16,22,.66));
+    border:1px solid var(--line-2);border-radius:var(--r-lg);padding:16px;margin-bottom:18px;
+    box-shadow:var(--shadow);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);overflow:hidden}
+  .card::before{content:"";position:absolute;inset:0 0 auto;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.09),transparent)}
+  .card.tight{padding:12px 14px}
+  @media (max-width:520px){ .card{padding:14px;border-radius:17px} .card.hero{padding:15px} }
+  .card.hero{padding:18px}
+  h2{font-size:11.5px;margin:0 0 12px;font-weight:650;letter-spacing:.9px;text-transform:uppercase;color:var(--dim)}
   .row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
   .grow{flex:1;min-width:0}
-  h1{font-size:17px;margin:0;font-weight:650;letter-spacing:-.2px;white-space:nowrap}
-  .dot{width:8px;height:8px;border-radius:50%;background:var(--bad);display:inline-block;
-    box-shadow:0 0 0 0 rgba(61,220,151,.5)}
-  .dot.on{background:var(--ok);animation:pulse 2.6s infinite}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(61,220,151,.45)}70%{box-shadow:0 0 0 8px rgba(61,220,151,0)}100%{box-shadow:0 0 0 0 rgba(61,220,151,0)}}
   .muted{color:var(--dim);font-size:12px}
-  .tiny{font-size:11px;color:var(--dim2)}
-  nav{display:flex;gap:6px;margin:11px 0 0;overflow-x:auto;scrollbar-width:none;padding-bottom:10px}
-  nav::-webkit-scrollbar{display:none}
-  nav button{background:transparent;color:var(--dim);border:1px solid var(--line);
-    padding:7px 13px;border-radius:999px;font-size:13px;white-space:nowrap;cursor:pointer;transition:.15s}
-  nav button.active{background:var(--accent);color:#fff;border-color:transparent;font-weight:550}
-  nav button:active{transform:scale(.96)}
-
-  /* ---------- layout ---------- */
-  main{padding:12px 14px 0;max-width:940px;margin:0 auto}
-  .card{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--line);
-    border-radius:var(--r);padding:14px;margin-bottom:12px}
-  .card.tight{padding:11px 12px}
-  .card h2{font-size:13px;margin:0 0 11px;font-weight:600;letter-spacing:.3px;
-    text-transform:uppercase;color:var(--dim)}
-  .badge{font-size:11px;padding:2px 9px;border-radius:999px;background:var(--card2);
-    color:var(--dim);border:1px solid var(--line);white-space:nowrap}
-  .badge.ok{color:#8ff0bb;border-color:#2b6647;background:#12241b}
-  .badge.warn{color:#f0cd93;border-color:#6d5227;background:#241c0f}
-  .badge.dry{color:var(--warn);border-color:#4a3a1c;background:#211a0e}
-  .badge.silent{color:var(--bad);border-color:#4a2222;background:#210f0f}
-  .badge.awaiting{color:#c8bcff;border-color:#3a3568;background:#191631}
-  .badge.soft{color:var(--soft);border-color:#553f66;background:#1d1424}
-
-  /* ---------- contact card ---------- */
-  .ccard{position:relative}
-  .avatar{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
-    font-weight:650;font-size:15px;color:#fff;background:linear-gradient(140deg,var(--accent2),#3a3568);flex:none}
-  .cname{font-size:15px;font-weight:600;margin:0;letter-spacing:-.2px;white-space:nowrap;
-    overflow:hidden;text-overflow:ellipsis;max-width:52vw}
-  .stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:9px}
-  .stat{font-size:11px;color:var(--dim)}
-  .stat b{color:var(--tx);font-weight:600}
-
-  /* ---------- mood ---------- */
-  .moodbox{margin-top:11px;border-top:1px solid var(--line);padding-top:11px}
-  .mhead{display:flex;align-items:center;gap:8px;margin-bottom:9px;flex-wrap:wrap}
-  .mlabel{font-size:13px;font-weight:600;color:#fff}
-  .bar{height:6px;background:var(--card2);border-radius:4px;overflow:hidden;position:relative}
-  .bar i{position:absolute;inset:0 auto 0 0;border-radius:4px;transition:width .45s cubic-bezier(.2,.8,.2,1)}
-  .mrow{display:grid;grid-template-columns:78px 1fr 40px;gap:9px;align-items:center;font-size:11px;margin-bottom:3px}
-  .mkey{color:var(--dim);white-space:nowrap}
-  .mval{text-align:right;font-variant-numeric:tabular-nums;color:var(--tx)}
-  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:26px;background:transparent;border:0;margin:0;padding:0}
-  input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:4px;background:var(--card2)}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;
-    background:var(--accent);border:3px solid #0b0c10;margin-top:-8px;box-shadow:0 0 0 1px var(--accent)}
-  input[type=range].v::-webkit-slider-thumb{background:var(--dim);box-shadow:0 0 0 1px var(--dim)}
-  .locked{display:flex;align-items:center;gap:7px;background:#1d1424;border:1px solid #553f66;
-    color:var(--soft);font-size:11px;padding:7px 10px;border-radius:9px;margin-bottom:9px}
-
-  /* ---------- controls ---------- */
-  button.act{background:var(--card2);color:var(--tx);border:1px solid var(--line);padding:8px 12px;
-    border-radius:9px;font-size:12px;cursor:pointer;transition:.15s;font-family:inherit}
-  button.act:active{transform:scale(.97)}
-  button.act:hover{border-color:#39404f}
-  button.act.primary{background:var(--accent);border-color:transparent;color:#fff;font-weight:550}
-  button.act.primary:hover{background:var(--accent2)}
-  button.act.ghost{background:transparent}
-  button.act.danger{color:var(--bad);border-color:#3d2222}
-  button.act[disabled]{opacity:.45;pointer-events:none}
-  .btns{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
-  input,select,textarea{background:var(--card2);color:var(--tx);border:1px solid var(--line);
-    border-radius:9px;padding:9px 10px;font-size:13px;width:100%;font-family:inherit}
-  input:focus,select:focus{outline:none;border-color:var(--accent)}
-  label{display:block;font-size:11px;color:var(--dim);margin-bottom:4px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:11px}
-  .hint{font-size:10px;color:var(--dim2);margin-top:3px}
-  details{border-top:1px solid var(--line);margin-top:11px;padding-top:9px}
-  details summary{cursor:pointer;font-size:12px;color:var(--dim);list-style:none;
-    display:flex;align-items:center;gap:6px}
-  details summary::-webkit-details-marker{display:none}
-  details summary::before{content:"›";transition:.2s;display:inline-block;font-size:15px;line-height:1}
-  details[open] summary::before{transform:rotate(90deg)}
-
-  /* ---------- tables / misc ---------- */
-  table{width:100%;border-collapse:collapse;font-size:12px}
-  td,th{text-align:left;padding:7px 4px;border-bottom:1px solid var(--line)}
-  th{color:var(--dim);font-weight:500;font-size:11px}
-  tr:last-child td{border-bottom:0}
-  pre{background:#0a0b0e;border:1px solid var(--line);border-radius:11px;padding:11px;
-    font-size:11px;max-height:56vh;overflow:auto;white-space:pre-wrap;word-break:break-word;
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.5}
-  .slots{display:flex;flex-wrap:wrap;gap:6px}
-  .slot{background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:12px}
-  .slot.next{border-color:var(--accent);color:#fff;background:#1d1a38;font-weight:600}
-  .slot.past{opacity:.35}
-  .prog{height:7px;border-radius:5px;background:var(--card2);overflow:hidden;margin-top:6px}
-  .prog i{display:block;height:100%;border-radius:5px;background:var(--accent);transition:width .4s}
-  .kwrap{border-bottom:1px solid var(--line);padding:9px 0}
-  .kwrap:last-child{border-bottom:0}
-  .kick{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.4px;margin:0 0 8px;font-weight:600}
-  .toast{position:fixed;left:50%;transform:translate(-50%,14px);bottom:18px;background:var(--accent);
-    color:#fff;padding:10px 17px;border-radius:999px;font-size:13px;opacity:0;transition:.25s;
-    pointer-events:none;z-index:50;max-width:88vw;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.5)}
-  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .tiny{font-size:11.5px;color:var(--dim-2)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:12px}
+  .stat{font-size:12px;color:var(--dim)}
+  .stat b{color:var(--tx);font-weight:600;font-variant-numeric:tabular-nums}
   .empty{color:var(--dim);font-size:13px;text-align:center;padding:26px 0}
-  .fadein{animation:fi .28s ease}
-  @keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+  .kick{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.7px;font-weight:650}
+
+  /* ─────────────────────────────  controls  ───────────────────────────── */
+  button.act{background:var(--panel-2);color:var(--tx);border:1px solid var(--line-2);padding:10px 14px;min-height:40px;
+    border-radius:11px;font-size:12.5px;font-family:inherit;cursor:pointer;transition:.16s}
+  button.act:hover{border-color:rgba(139,123,255,.5);background:rgba(139,123,255,.1);transform:translateY(-1px)}
+  button.act:active{transform:translateY(0) scale(.985)}
+  button.act.primary{background:linear-gradient(180deg,var(--accent),var(--accent-2));border-color:transparent;color:#fff;font-weight:600;
+    box-shadow:0 10px 26px -14px var(--accent-glow)}
+  button.act.primary:hover{filter:brightness(1.08)}
+  button.act.ghost{background:transparent}
+  button.act.danger{color:var(--bad);border-color:rgba(255,107,125,.35)}
+  button.act[disabled]{opacity:.4;pointer-events:none}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  input,select,textarea{background:rgba(9,10,15,.72);color:var(--tx);border:1px solid var(--line-2);
+    border-radius:11px;padding:10px 12px;font-size:13px;font-family:inherit;width:100%;transition:.16s}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:rgba(139,123,255,.65);box-shadow:0 0 0 3px rgba(139,123,255,.14)}
+  label{display:block;font-size:11.5px;color:var(--dim);margin-bottom:5px;letter-spacing:.2px}
+  .hint{font-size:11.5px;color:var(--dim-2);margin-top:5px;line-height:1.55}
+  details{border-top:1px solid var(--line);margin-top:12px;padding-top:11px}
+  details summary{cursor:pointer;font-size:12.5px;color:var(--dim);list-style:none;display:flex;align-items:center;gap:8px;transition:.16s}
+  details summary:hover{color:var(--tx)}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:"›";font-size:17px;line-height:1;transition:.2s;display:inline-block;color:var(--dim-2)}
+  details[open] summary::before{transform:rotate(90deg);color:var(--accent)}
+
+  /* ─────────────────────────────  person card  ───────────────────────────── */
+  .person{display:flex;gap:13px;align-items:flex-start}
+  .pavatar{width:54px;height:54px;border-radius:18px;flex:none;display:grid;place-items:center;font-size:20px;font-weight:700;
+    background:linear-gradient(155deg,rgba(139,123,255,.85),rgba(44,38,92,.9));
+    box-shadow:0 14px 34px -16px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.2)}
+  .pname{font-size:17px;font-weight:660;letter-spacing:-.3px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60vw}
+  .visuals{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;margin-top:14px}
+  .radar{filter:drop-shadow(0 8px 26px rgba(0,0,0,.5))}
+  .spark{width:100%;height:84px;display:block;margin-top:6px}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .legend span{font-size:11.5px;color:var(--dim-2);display:inline-flex;align-items:center;gap:5px}
+  .swatch{width:9px;height:9px;border-radius:3px;display:inline-block}
+  .moodline{display:flex;align-items:center;gap:9px;margin-top:13px}
+  .moodname{font-size:15px;font-weight:640}
+  .mbars{display:flex;flex-direction:column;gap:5px;margin-top:11px}
+  .mrow{display:grid;grid-template-columns:78px 1fr 44px;gap:9px;align-items:center;font-size:12px}
+  .mkey{color:var(--dim)}
+  .mval{text-align:right;font-variant-numeric:tabular-nums}
+  .track{height:7px;border-radius:5px;background:rgba(255,255,255,.07);overflow:hidden;position:relative}
+  .track i{position:absolute;inset:0 auto 0 0;border-radius:5px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+  input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;border:0;padding:0;height:26px;width:100%}
+  input[type=range]::-webkit-slider-runnable-track{height:7px;border-radius:5px;background:rgba(255,255,255,.09)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;margin-top:-8px;
+    background:linear-gradient(180deg,var(--accent),var(--accent-2));border:3px solid #0a0b10;box-shadow:0 0 0 1px rgba(139,123,255,.7),0 6px 16px -6px var(--accent-glow)}
+
+  /* conversation preview */
+  .conv{background:rgba(6,7,11,.5);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-top:13px}
+  .bub{max-width:88%;padding:9px 13px;border-radius:15px;font-size:13px;line-height:1.45;margin-bottom:7px;white-space:pre-wrap;word-break:break-word}
+  .bub.them{background:rgba(255,255,255,.06);border:1px solid var(--line);border-bottom-left-radius:5px}
+  .bub.her{background:linear-gradient(180deg,rgba(139,123,255,.24),rgba(139,123,255,.13));border:1px solid rgba(139,123,255,.3);
+    margin-left:auto;border-bottom-right-radius:5px}
+
+  /* ─────────────────────────────  timeline (schedule)  ───────────────────────────── */
+  .timeline{position:relative;height:66px;margin-top:6px}
+  .tl-track{position:absolute;inset:22px 0 auto;height:22px;border-radius:8px;background:rgba(255,255,255,.05);overflow:hidden;border:1px solid var(--line)}
+  .tl-zone{position:absolute;top:0;bottom:0;opacity:.5}
+  .tl-slot{position:absolute;top:14px;width:3px;height:38px;border-radius:3px;background:linear-gradient(180deg,var(--accent),transparent)}
+  .tl-now{position:absolute;top:8px;width:2px;height:50px;background:var(--ok);box-shadow:0 0 12px 2px rgba(61,220,151,.6)}
+  .tl-lbl{position:absolute;top:0;font-size:9.5px;color:var(--dim-2);transform:translateX(-50%)}
+  .tl-ticks{position:absolute;inset:auto 0 0;display:flex;justify-content:space-between;font-size:9px;color:var(--dim-2)}
+
+  /* ─────────────────────────────  rings (usage)  ───────────────────────────── */
+  .rings{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;justify-items:center}
+  .ring{text-align:center}
+  .ring .cap{font-size:11px;color:var(--dim);margin-top:6px}
+  .ring .big{font-size:16px;font-weight:650;font-variant-numeric:tabular-nums}
+
+  /* ─────────────────────────────  table / log / toast  ───────────────────────────── */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  td,th{text-align:left;padding:8px 5px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:550;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px}
+  tr:last-child td{border-bottom:0}
+  pre{background:rgba(4,5,8,.75);border:1px solid var(--line);border-radius:var(--r);padding:13px;font-size:11px;
+    max-height:58vh;overflow:auto;white-space:pre-wrap;word-break:break-word;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.55}
+  .slots{display:flex;flex-wrap:wrap;gap:6px}
+  .slot{background:var(--panel-2);border:1px solid var(--line-2);border-radius:9px;padding:6px 11px;font-size:12px}
+  .slot.next{border-color:rgba(139,123,255,.7);background:rgba(139,123,255,.14);color:#fff;font-weight:600}
+  .slot.past{opacity:.32}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);background:linear-gradient(180deg,var(--accent),var(--accent-2));
+    color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;opacity:0;transition:.26s cubic-bezier(.2,.8,.2,1);
+    pointer-events:none;z-index:60;max-width:90vw;text-align:center;box-shadow:0 18px 40px -18px rgba(0,0,0,.9)}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .castcard{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:var(--r);background:rgba(255,255,255,.02)}
+  .castav{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-size:13px;font-weight:700;flex:none;
+    background:linear-gradient(150deg,rgba(255,255,255,.16),rgba(255,255,255,.05))}
+  .typing span{display:inline-block;width:6px;height:6px;margin-right:3px;border-radius:50%;background:var(--dim);animation:blink 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.18s}
+  .typing span:nth-child(3){animation-delay:.36s}
+  @keyframes blink{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
 </style>
 </head>
 <body>
 <header>
   <div class="hwrap">
-    <div class="row">
-      <h1 id="pname">Understudy</h1>
-      <span class="badge" id="pstate">—</span>
-      <span class="grow"></span>
-      <span class="muted"><span class="dot" id="dot"></span> <span id="num">—</span></span>
-      <button class="act ghost" id="btn-refresh" title="Reload" style="padding:6px 10px">↻</button>
+    <div class="brandrow">
+      <div class="avatar" id="brand-av">🖤</div>
+      <div class="brandtxt grow">
+        <h1 id="pname">Understudy</h1>
+        <div class="subline">
+          <span class="pulse" id="dot"></span>
+          <span class="tiny" id="num">—</span>
+          <span class="chip" id="pstate">—</span>
+          <span class="chip" id="chip-up">—</span>
+          <span class="chip accent" id="chip-next">—</span>
+        </div>
+      </div>
+      <button class="act ghost" id="btn-refresh" title="Reload" style="padding:9px 12px">↻</button>
     </div>
-    <div class="tiny" id="sub" style="margin-top:5px">loading…</div>
     <nav id="tabs">
       <button data-t="contacts" class="active">Contacts</button>
       <button data-t="character">Character</button>
       <button data-t="agent">Agent</button>
-      <button data-t="settings">Settings</button>
       <button data-t="schedule">Schedule</button>
+      <button data-t="settings">Settings</button>
       <button data-t="quota">Usage</button>
       <button data-t="log">Log</button>
     </nav>
@@ -158,701 +236,586 @@
 <main>
   <section id="tab-contacts">
     <div class="card tight" id="ctools">
-      <input id="q" placeholder="Search contacts (name or number)…" autocomplete="off">
+      <input id="q" placeholder="Search contacts…" autocomplete="off">
       <div class="tiny" id="contacts-hint" style="margin-top:6px">auto-refresh pauses while you edit</div>
     </div>
     <div id="clist"></div>
   </section>
   <section id="tab-character" hidden></section>
   <section id="tab-agent" hidden></section>
-  <section id="tab-settings" hidden></section>
   <section id="tab-schedule" hidden></section>
+  <section id="tab-settings" hidden></section>
   <section id="tab-quota" hidden></section>
   <section id="tab-log" hidden></section>
 </main>
 <div class="toast" id="toast"></div>
 
 <script>
-/* ============================ helpers ============================ */
+/* ═══════════════════════════════ helpers ═══════════════════════════════ */
 const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MOODKEYS = ["valence","energy","arousal","affection","patience","playfulness"];
-const MOODMIN = { valence:-1 };
-let DATA=null, tab="contacts", SETTINGS_LOADED=false, CHAR_LOADED=false, CHAR_SLUG=null, charDirty=false;
-// the contacts list is rebuilt every few seconds; without these two guards that
-// wipes whatever you are typing and closes any card you opened
-let contactsDirty = false;
-const openCards = new Set();
-const draft = {};       // jid -> values being edited
-let dragging = false;
+const MOODCOLOR = { valence:"#7fe0b0", energy:"#8fb8ff", arousal:"#ff9e7a", affection:"#e0a6ff", patience:"#7fe6ef", playfulness:"#ffe08a" };
+let DATA=null, tab="contacts", SETTINGS_LOADED=false, CHAR_SLUG=null, charDirty=false;
+let contactsDirty=false, dragging=false, AGENT_LOG=[], AGENT_LOADED=false;
+const draft={}, openCards=new Set();
 
-function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show");
-  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2200); }
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2600); }
 async function api(path, body){
   const r = await fetch(path, body ? {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)} : {});
   return r.json().catch(()=>({}));
 }
 function ago(ts){
   if(!ts) return "—";
-  const m = Math.round((Date.now()-ts)/60000);
-  if(m<1) return "baru saja";
-  if(m<60) return m+" menit lalu";
-  const h=Math.round(m/60); if(h<24) return h+" jam lalu";
-  return Math.round(h/24)+" hari lalu";
+  const m=Math.round((Date.now()-ts)/60000);
+  if(m<1) return "just now";
+  if(m<60) return m+"m ago";
+  const h=Math.round(m/60); if(h<24) return h+"h ago";
+  return Math.round(h/24)+"d ago";
 }
-function pct(k,v){ return Math.max(0,Math.min(100, Math.round((k==="valence" ? (v+1)/2 : v)*100))); }
-function hue(k,v){
-  if(k==="valence") return v<0 ? "linear-gradient(90deg,#7a3b3b,#ff6b6b)" : "linear-gradient(90deg,#3b7a5a,#3ddc97)";
-  if(k==="affection") return "linear-gradient(90deg,#6a4a7a,#e3b6ff)";
-  if(k==="energy") return "linear-gradient(90deg,#4a4f6a,#8b9bff)";
-  if(k==="patience") return v<0.4 ? "linear-gradient(90deg,#7a5b3b,#ffb454)" : "linear-gradient(90deg,#3b6a7a,#54d6ff)";
-  if(k==="playfulness") return "linear-gradient(90deg,#7a6a3b,#ffe07a)";
-  return "linear-gradient(90deg,#5a4a6a,#b0a0d0)";
+const pctOf = (k,v) => Math.max(0,Math.min(100, Math.round((k==="valence"?(v+1)/2:v)*100)));
+function moodColor(k,v){
+  if(k==="valence") return v<0 ? "linear-gradient(90deg,#7a3b46,#ff6b7d)" : "linear-gradient(90deg,#2f7a5d,#3ddc97)";
+  return `linear-gradient(90deg,${MOODCOLOR[k]}55,${MOODCOLOR[k]})`;
 }
-function fmtMs(v){ const n=Number(v); if(!Number.isFinite(n)) return ""; return (n/1000).toFixed(n<1000?2:1)+"s"; }
+const fmtMs = (v) => { const n=Number(v); return Number.isFinite(n) ? (n/1000).toFixed(n<1000?2:1)+"s" : ""; };
 function hintFor(k,v){
-  const n = Number(v);
-  if(!Number.isFinite(n)) return k==="DEFAULT_NICK" ? "empty = she calls you by your name / \"you\"" : "";
+  const n=Number(v);
+  if(!Number.isFinite(n)) return k==="DEFAULT_NICK" ? "empty = she uses “you”" : "";
   if(/_MS$/.test(k)) return "≈ "+fmtMs(n);
-  if(/_CHANCE$/.test(k) || /^NICK_(AFFECTION|VALENCE|PATIENCE)_MIN$/.test(k)) return Math.round(n*100)+"%";
-  if(/_MIN$/.test(k) || /_AFTER$/.test(k)) return n+" menit";
+  if(/_CHANCE$/.test(k) || /^NICK_MOOD_MIN$/.test(k)) return Math.round(n*100)+"%";
+  if(/_MIN$/.test(k) || /_AFTER$/.test(k)) return n+" min";
   return "";
 }
 
-/* ============================ header ============================ */
-function renderHeader(){
-  const b = DATA.bot;
-  $("#pname").textContent = `${b.persona.emoji||""} ${b.persona.name}`.trim();
-  $("#dot").className = "dot" + (b.connected ? " on" : "");
-  $("#num").textContent = b.number || "belum tersambung";
-  $("#pstate").textContent = b.connected ? "online" : "terputus";
-  $("#pstate").className = "badge " + (b.connected ? "ok" : "warn");
-  const h=Math.floor(b.uptimeSec/3600), m=Math.floor(b.uptimeSec%3600/60);
-  $("#sub").innerHTML = `up ${h}h ${m}m · messages first: idle &gt;${b.idleMin}m, gap ${b.gapMin}m · quiet hours ${b.quiet[0]}:00–${b.quiet[1]}:00`;
+/* ═══════════════════════════════ svg visuals ═══════════════════════════════ */
+function radarSVG(mood, size=118){
+  const cx=size/2, cy=size/2, R=size/2-19, N=MOODKEYS.length;
+  const pt=(i,r)=>{ const a=(-Math.PI/2)+(i*2*Math.PI/N); return [cx+Math.cos(a)*r, cy+Math.sin(a)*r]; };
+  let rings="";
+  for(const f of [.25,.5,.75,1]){
+    const p=MOODKEYS.map((_,i)=>pt(i,R*f).join(",")).join(" ");
+    rings+=`<polygon points="${p}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="1"/>`;
+  }
+  let spokes="";
+  MOODKEYS.forEach((k,i)=>{
+    const [x,y]=pt(i,R);
+    spokes+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="rgba(255,255,255,.06)"/>`;
+  });
+  const vals=MOODKEYS.map((k,i)=>{ const v=mood?mood[k]:0; const n=k==="valence"?(v+1)/2:v; return pt(i,Math.max(.06,n)*R).join(","); }).join(" ");
+  return `<svg class="radar" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="mood radar">
+    <defs><radialGradient id="mg" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#8b7bff" stop-opacity=".55"/><stop offset="100%" stop-color="#8b7bff" stop-opacity=".14"/>
+    </radialGradient></defs>
+    ${rings}${spokes}
+    <polygon points="${vals}" fill="url(#mg)" stroke="#a99bff" stroke-width="1.6"/>
+    ${MOODKEYS.map((k,i)=>{ const v=mood?mood[k]:0; const n=k==="valence"?(v+1)/2:v; const [x,y]=pt(i,Math.max(.06,n)*R);
+      return `<circle cx="${x}" cy="${y}" r="2.6" fill="${MOODCOLOR[k]}"/>`; }).join("")}
+  </svg>`;
+}
+function sparkSVG(hist, key="v", color="#8b7bff", fallback=null){
+  let pts=(hist||[]).filter(h=>Number.isFinite(h[key]));
+  // no history yet: draw a flat line from the current value so the panel is not empty
+  if(pts.length<2 && fallback!==null && Number.isFinite(fallback)){
+    const now=Date.now();
+    pts=[{t:now-3600000,[key]:fallback},{t:now,[key]:fallback}];
+  }
+  if(pts.length<2) return `<svg class="spark" viewBox="0 0 300 76"><text x="150" y="42" font-size="11" fill="#8b93a8" text-anchor="middle">no history yet — it builds as she chats</text></svg>`;
+  const norm = key==="v" ? (x=>(x+1)/2) : (x=>x);
+  const W=300,H=76,pad=6;
+  const xs=(i)=>pad+(i*(W-pad*2))/(pts.length-1);
+  const ys=(x)=>H-pad-(norm(x)*(H-pad*2));
+  const path=pts.map((p,i)=>`${i?"L":"M"}${xs(i).toFixed(1)},${ys(p[key]).toFixed(1)}`).join(" ");
+  const area=`${path} L${xs(pts.length-1).toFixed(1)},${H-pad} L${pad},${H-pad} Z`;
+  const id="sg"+Math.random().toString(36).slice(2,7);
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${color}" stop-opacity=".42"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="${area}" fill="url(#${id})"/>
+    <path d="${path}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round"/>
+    <circle cx="${xs(pts.length-1)}" cy="${ys(pts[pts.length-1][key])}" r="3" fill="${color}"/>
+  </svg>`;
+}
+function ringSVG(value, max, label, cap, color="#8b7bff"){
+  const size=92, r=36, c=2*Math.PI*r, f=max>0?Math.max(0,Math.min(1,value/max)):0;
+  return `<div class="ring">
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="8"/>
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round"
+        stroke-dasharray="${(c*f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 ${size/2} ${size/2})"
+        style="filter:drop-shadow(0 0 8px ${color}66)"/>
+      <text x="${size/2}" y="${size/2-1}" text-anchor="middle" font-size="16" font-weight="650" fill="#eceef5">${label}</text>
+      <text x="${size/2}" y="${size/2+14}" text-anchor="middle" font-size="9" fill="#5b6376">${max>0?Math.round(f*100)+"%":"—"}</text>
+    </svg>
+    <div class="cap">${esc(cap)}</div>
+  </div>`;
+}
+function dayTimeline(info){
+  const sleep=[DATA.bot.quiet[0], DATA.bot.quiet[1]];
+  const inRange=(h,a,b)=> a<=b ? (h>=a&&h<b) : (h>=a||h<b);
+  const zones=[...Array(24).keys()].map(h=>{
+    const sleeping=inRange(h,sleep[0],sleep[1]);
+    let active=false;
+    for(const part of String(info.activeHours||"").split(",")){
+      const m=part.trim().match(/^(\d{1,2})-(\d{1,2})$/); if(!m) continue;
+      if(inRange(h, Number(m[1]), Number(m[2]))) active=true;
+    }
+    if(sleeping) return null;
+    return {h, color: active ? "rgba(139,123,255,.5)" : "rgba(255,255,255,.045)"};
+  }).filter(Boolean);
+  const pos=(h,m=0)=>((h*60+m)/1440)*100;
+  const slots=(info.slots||[]).map(s=>`<div class="tl-slot" style="left:${pos(s.hour, s.minute||0)}%"></div>`).join("");
+  const now=new Date(), nowPct=pos(now.getHours(), now.getMinutes());
+  return `<div class="timeline">
+    <div class="tl-lbl" style="left:${nowPct}%">now</div>
+    ${zones.map(z=>`<div class="tl-zone" style="left:${z.h*4.1666}%;width:4.1666%;background:${z.color}"></div>`).join("")}
+    <div class="tl-track">${zones.map(z=>`<div class="tl-zone" style="left:${(z.h/24)*100}%;width:${(1/24)*100}%;background:${z.color}"></div>`).join("")}</div>
+    ${slots}
+    <div class="tl-now" style="left:${nowPct}%"></div>
+    <div class="tl-ticks">${[0,6,12,18,24].map(h=>`<span>${String(h%24).padStart(2,"0")}</span>`).join("")}</div>
+  </div>`;
 }
 
-/* ============================ contacts ============================ */
+/* ═══════════════════════════════ header ═══════════════════════════════ */
+function renderHeader(){
+  const b=DATA.bot;
+  $("#brand-av").textContent = b.persona.emoji || "🖤";
+  $("#pname").textContent = `${b.persona.emoji||""} ${b.persona.name}`.trim();
+  $("#dot").className = "pulse" + (b.connected ? " on" : "");
+  $("#num").textContent = b.number ? "+"+b.number : "not connected";
+  $("#pstate").textContent = b.connected ? "online" : "disconnected";
+  $("#pstate").className = "chip " + (b.connected ? "ok" : "warn");
+  const h=Math.floor(b.uptimeSec/3600), m=Math.floor(b.uptimeSec%3600/60);
+  $("#chip-up").innerHTML = `uptime <b>${h}h ${m}m</b>`;
+  const next=(DATA.schedule||[]).find(s=>!s.passed && !s.quiet);
+  $("#chip-next").innerHTML = next ? `next message <b>${next.time}</b>` : `quiet hours <b>${b.quiet[0]}:00–${b.quiet[1]}:00</b>`;
+}
+
+/* ═══════════════════════════════ contacts ═══════════════════════════════ */
 function moodRead(c){
-  const rows = MOODKEYS.map(k=>{
-    const v = c.mood ? c.mood[k] : 0;
+  return `<div class="mbars">${MOODKEYS.map(k=>{
+    const v=c.mood?c.mood[k]:0;
     return `<div class="mrow"><span class="mkey">${k}</span>
-      <span class="bar"><i style="width:${pct(k,v)}%;background:${hue(k,v)}"></i></span>
+      <span class="track"><i style="width:${pctOf(k,v)}%;background:${moodColor(k,v)}"></i></span>
       <span class="mval">${Number(v).toFixed(2)}</span></div>`;
-  }).join("");
-  return `<div class="moodbox">
-    <div class="mhead">
-      <span class="mlabel">${esc(c.moodLabel||"—")}</span>
-      <span class="badge">auto</span>
-      <span class="grow"></span>
-      <span class="tiny">managed by the model from the chat</span>
-    </div>
-    ${rows}
-    <div class="btns">
-      <button class="act" data-act="mood-manual" data-jid="${esc(c.jid)}" >Manual</button>
-      <button class="act" data-act="mood-auto" data-jid="${esc(c.jid)}" >Auto (model)</button>
-    </div>
-  </div>`;
+  }).join("")}</div>`;
 }
 function moodEdit(c){
-  const d = draft[c.jid];
-  const vals = d ? d.values : c.mood;
-  const rows = MOODKEYS.map(k=>{
-    const v = vals ? vals[k] : 0.5;
-    const min = k==="valence" ? -1 : 0;
+  const d=draft[c.jid]; const vals=d?d.values:c.mood;
+  return `<div class="locked chip soft" style="display:flex;margin-bottom:9px">🔒 locked${c.moodLockedAt?` ${ago(c.moodLockedAt)}`:""} — changes on <b>Auto</b> only</div>
+  <div class="mbars">${MOODKEYS.map(k=>{
+    const v=vals?vals[k]:0.5, min=k==="valence"?-1:0;
     return `<div class="mrow"><span class="mkey">${k}</span>
-      <input type="range" class="mrange" data-k="${k}" data-jid="${esc(c.jid)}"
-        min="${min}" max="1" step="0.05" value="${v}">
+      <input type="range" class="mrange" data-k="${k}" data-jid="${esc(c.jid)}" min="${min}" max="1" step="0.05" value="${v}">
       <span class="mval" data-v="${k}">${Number(v).toFixed(2)}</span></div>`;
-  }).join("");
-  return `<div class="moodbox">
-    <div class="mhead">
-      <span class="mlabel">${esc(c.moodLabel||"—")}</span>
-      <span class="badge soft">manual</span>
-      <span class="grow"></span>
-    </div>
-    <div class="locked">🔒 <span>Mood locked${c.moodLockedAt?` ${ago(c.moodLockedAt)}`:""} — it will not change on its own until you press <b>Auto</b>.</span></div>
-    ${rows}
-    <div class="btns">
-      <button class="act primary" data-act="mood-save" data-jid="${esc(c.jid)}" >Save</button>
-      <button class="act" data-act="mood-baseline" data-jid="${esc(c.jid)}" >Reset to normal</button>
-      <button class="act" data-act="mood-auto" data-jid="${esc(c.jid)}" >Auto (model)</button>
-    </div>
+  }).join("")}</div>
+  <div class="btns">
+    <button class="act primary" data-act="mood-save" data-jid="${esc(c.jid)}">Save &amp; lock</button>
+    <button class="act" data-act="mood-baseline" data-jid="${esc(c.jid)}">Reset values</button>
+    <button class="act" data-act="mood-auto" data-jid="${esc(c.jid)}">Auto (model)</button>
   </div>`;
 }
-function routineBox(c){
-  // the routine is global (one day per character) — this is only a summary,
-  // panel lengkapnya ada di tab Karakter
-  if(!c.routineTheme) return "";
-  return `<div class="tiny" style="margin-top:8px">Hari ini: <b style="color:var(--tx)">${esc(c.routineTheme)}</b>${
-    c.routineNow?` · now: ${esc(c.routineNow.what)}`:""}</div>`;
-}
-function contactCard(c){
-  const badge = c.state==="dry"?"dry":c.state==="silent"?"silent":c.state==="awaiting"?"awaiting":"";
-  const initial = (c.name||c.number||"?").trim().charAt(0).toUpperCase();
-  const manual = c.moodMode === "manual";
-  const commit = (c.commitments&&c.commitments.length)
-    ? `<div class="tiny" style="margin-top:8px">Promise: ${c.commitments.map(x=>`“${esc(x.what)}” <span class="tiny">(${new Date(x.due).toLocaleString("id-ID",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})})</span>`).join(" · ")}</div>`
-    : "";
-  return `<div class="card ccard fadein" data-jid="${esc(c.jid)}">
-    <div class="row">
-      <span class="avatar">${esc(initial)}</span>
-      <div class="grow" style="min-width:120px">
+function personCard(c){
+  const initial=(c.name||c.number||"?").trim().charAt(0).toUpperCase();
+  const rel=(DATA.relations||[]).find(r=>r.id===c.relation);
+  const manual=c.moodMode==="manual";
+  const stateBadge = c.state!=="idle" ? `<span class="chip ${c.state==="dry"?"warn":c.state==="silent"?"":"warn"}">${esc(c.state)}${c.state==="dry"?` ${c.dryCount}`:""}</span>` : "";
+  const conv=(c.recent||[]).slice(-3).map(m=>`<div class="bub ${m.role==="user"?"them":"her"}">${esc(m.text)}</div>`).join("");
+  return `<div class="card hero fadein" data-jid="${esc(c.jid)}">
+    <div class="person">
+      <div class="pavatar">${esc(initial)}</div>
+      <div class="grow">
         <div class="row" style="gap:7px">
-          <h2 class="cname" style="margin:0">${esc(c.name||c.number)}</h2>
-          <span class="badge ${badge}">${c.state}${c.state==="dry"?` (${c.dryCount})`:""}</span>
-          ${c.softMinutes?`<span class="badge soft">soft ${c.softMinutes}m</span>`:""}
-          ${c.relation?`<span class="badge">${esc((DATA.relations||[]).find(r=>r.id===c.relation)?.label||c.relation)}</span>`:""}
+          <h3 class="pname">${esc(c.name||c.number)}</h3>
+          <span class="chip ${c.blocked?"":"ok"}">${c.blocked?"blocked":"trusted"}</span>
+          ${stateBadge}
+          ${c.softMinutes?`<span class="chip soft">soft ${c.softMinutes}m</span>`:""}
         </div>
-        <div class="tiny" style="margin-top:2px">${esc(c.number)}${c.nick?` · called “${esc(c.nick)}”`:""}</div>
+        <div class="tiny" style="margin-top:3px">${esc(String(c.number||"").startsWith("+")?c.number:"+"+c.number)}${c.nick?` · called “${esc(c.nick)}”`:""}${rel?` · ${esc(rel.label)}`:""}</div>
+        <div class="stat" style="margin-top:7px">in <b>${c.inbound}</b> · out <b>${c.outbound}</b> · last <b>${ago(c.lastInteraction)}</b></div>
+        <div class="btns" style="margin-top:9px">
+          <button class="act" data-act="proactive" data-jid="${esc(c.jid)}">Message now</button>
+          <button class="act" data-act="mood-manual" data-jid="${esc(c.jid)}" ${manual?"disabled":""}>Take control of mood</button>
+        </div>
       </div>
-      <span class="badge ${c.trusted?'ok':c.tier==='acquaintance'?'':'warn'}">${c.blocked?'blocked':c.tier}</span>
     </div>
-    <div class="stats">
-      <span class="stat">in <b>${c.inbound}</b></span>
-      <span class="stat">out <b>${c.outbound}</b></span>
-      <span class="stat">last <b>${ago(c.lastInteraction)}</b></span>
-      ${c.lastProactiveAt?`<span class="stat">started <b>${ago(c.lastProactiveAt)}</b></span>`:""}
+
+    <div class="visuals">
+      ${radarSVG(c.mood)}
+      <div style="width:100%">
+        ${manual ? `<div class="muted" style="font-size:12.5px">You are holding these values by hand. Use the sliders below, then <b>Save &amp; lock</b>.</div>`
+        : MOODKEYS.map(k=>{ const v=c.mood?c.mood[k]:0; return `<div class="mrow" style="grid-template-columns:78px 1fr 42px">
+          <span class="mkey">${k}</span><span class="track"><i style="width:${pctOf(k,v)}%;background:${moodColor(k,v)}"></i></span>
+          <span class="mval">${Number(v).toFixed(2)}</span></div>`; }).join("")}
+      </div>
     </div>
-    ${manual ? moodEdit(c) : moodRead(c)}
-    ${(c.tasks||[]).length?`<div class="tiny" style="margin-top:7px">📤 ${c.tasks.map(t=>`to <b>${esc(t.to)}</b>: ${esc(t.text.slice(0,50))} <span class="tiny">(${esc(t.status)})</span>`).join(" · ")}</div>`:""}
-    ${(c.crossNotes||[]).length?`<div class="tiny" style="margin-top:7px">🔗 ${c.crossNotes.map(n=>`<b>${esc(n.from)}</b>: ${esc(n.what.slice(0,90))}`).join(" · ")}</div>`:""}
-    ${(c.vouches||[]).length?`<div class="tiny" style="margin-top:4px;color:var(--warn)">⏳ waiting for ${c.vouches.map(v=>esc(v.with)).join(", ")} to answer</div>`:""}
-    ${c.blocked?`<div class="locked" style="background:#241414;border-color:#5c2a2a;color:#ffb1b1">⛔ ${c.blockConfirmed===false?"Ignored in the bot (WhatsApp refused — add the phone number)":"Blocked on WhatsApp"}${c.blockError?` — ${esc(c.blockError)}`:""}</div>`:c.strikes?`<div class="tiny" style="margin-top:6px;color:var(--warn)">suspicion score ${c.strikes}</div>`:""}
-    ${commit}
-    ${routineBox(c)}
+    <details style="margin-top:10px">
+      <summary>Mood history · ${(c.moodHistory||[]).length>1?Math.round(((c.moodHistory||[]).slice(-1)[0].t-(c.moodHistory||[])[0].t)/3600000)+"h":"starts now"}</summary>
+      ${sparkSVG(c.moodHistory||[], "v", "#8b7bff", c.mood?c.mood.valence:null)}
+    </details>
+
+    <div class="moodline">
+      <span class="moodname">${esc(c.moodLabel||"—")}</span>
+      <span class="chip">${manual?"manual":"auto"}</span>
+      <span class="grow"></span>
+      ${c.tier==="stranger"?`<span class="chip warn">stranger</span>`:c.tier==="acquaintance"?`<span class="chip">acquaintance</span>`:""}
+    </div>
+    ${manual?moodEdit(c):""}
+    ${manual?"":`<div class="btns"><button class="act" data-act="mood-auto" data-jid="${esc(c.jid)}">Auto (model)</button></div>`}
+
+    ${conv?`<div class="conv">${conv}</div>`:""}
+    ${c.routineTheme?`<div class="tiny" style="margin-top:9px">today: <b style="color:var(--tx)">${esc(c.routineTheme)}</b>${c.routineNow?` · now: ${esc(c.routineNow.what)}`:""}</div>`:""}
+    ${(c.tasks||[]).length?`<div class="tiny" style="margin-top:6px">📤 ${c.tasks.map(t=>`→ <b>${esc(t.to)}</b> ${esc(t.text.slice(0,40))} <span class="tiny">(${esc(t.status)})</span>`).join(" · ")}</div>`:""}
+    ${(c.crossNotes||[]).length?`<div class="tiny" style="margin-top:6px">🔗 ${c.crossNotes.map(n=>`${esc(n.from)}: ${esc(n.what.slice(0,70))}`).join(" · ")}</div>`:""}
+    ${(c.vouches||[]).length?`<div class="tiny" style="margin-top:4px;color:var(--warn)">⏳ waiting for ${c.vouches.map(v=>esc(v.with)).join(", ")}</div>`:""}
+    ${c.blocked?`<div class="chip ${c.blockConfirmed===false?"warn":"ok"}" style="margin-top:9px;display:inline-flex">⛔ ${c.blockConfirmed===false?"ignored in the bot (WhatsApp refused)":"blocked on WhatsApp"}</div>`:`${c.strikes?`<div class="tiny" style="margin-top:6px;color:var(--warn)">suspicion ${c.strikes}</div>`:""}`}
+
     <details ${openCards.has(c.jid)?"open":""}>
       <summary>Contact settings</summary>
-      <div class="grid" style="margin-top:10px">
-        <div><label>Name you go by for her</label>
-          <input class="f-nick" data-jid="${esc(c.jid)}" value="${esc(c.nick)}" placeholder="mis. sayang"></div>
-        <div><label>Character (slug, optional)</label>
-          <input class="f-persona" data-jid="${esc(c.jid)}" value="${esc(c.persona)}" placeholder="(default)"></div>
-        <div><label>Who they are to her</label>
-          <select class="f-relation" data-jid="${esc(c.jid)}">
-            ${(DATA.relations||[]).map(r=>`<option value="${esc(r.id)}" ${r.id===(c.relation||"")?"selected":""}>${esc(r.label)}</option>`).join("")}
-          </select></div>
-        <div><label>Phone number (if known)</label>
-          <input class="f-phone" data-jid="${esc(c.jid)}" value="${esc(c.phone||"")}" placeholder="+62… — needed to block a hidden LID"></div>
-        <div><label>Relationship note (optional)</label>
-          <input class="f-relation-note" data-jid="${esc(c.jid)}" value="${esc(c.relationNote||"")}" placeholder="e.g. we met at work"></div>
+      <div class="grid" style="margin-top:12px">
+        <div><label>Name you go by for her</label><input class="f-nick" data-jid="${esc(c.jid)}" value="${esc(c.nick)}" placeholder="e.g. honey"></div>
+        <div><label>Character (optional)</label><input class="f-persona" data-jid="${esc(c.jid)}" value="${esc(c.persona)}" placeholder="(default)"></div>
+        <div><label>Who they are to her</label><select class="f-relation" data-jid="${esc(c.jid)}">
+          ${(DATA.relations||[]).map(r=>`<option value="${esc(r.id)}" ${r.id===(c.relation||"")?"selected":""}>${esc(r.label)}</option>`).join("")}
+        </select></div>
+        <div><label>Phone number (if known)</label><input class="f-phone" data-jid="${esc(c.jid)}" value="${esc(c.phone||"")}" placeholder="+62… — needed to block a hidden LID"></div>
+        <div><label>Relationship note</label><input class="f-relation-note" data-jid="${esc(c.jid)}" value="${esc(c.relationNote||"")}" placeholder="e.g. we met at work"></div>
       </div>
       <div class="btns">
-        <button class="act primary" data-act="save" data-jid="${esc(c.jid)}" >Save</button>
-        <button class="act" data-act="trust" data-jid="${esc(c.jid)}" data-v="${c.trusted?0:1}">${c.trusted?'Revoke trusted':'Mark as trusted'}</button>
-        <button class="act" data-act="proactive" data-jid="${esc(c.jid)}" >Message them now</button>
-        <button class="act" data-act="block" data-jid="${esc(c.jid)}" data-v="${c.blocked?0:1}" ${c.trusted?'disabled':''}>${c.blocked?'Unblock':'Block number'}</button>
-        <button class="act danger" data-act="reset" data-jid="${esc(c.jid)}" >Reset context</button>
+        <button class="act primary" data-act="save" data-jid="${esc(c.jid)}">Save</button>
+        <button class="act" data-act="trust" data-jid="${esc(c.jid)}" data-v="${c.trusted?0:1}">${c.trusted?"Revoke trusted":"Mark as trusted"}</button>
+        <button class="act" data-act="block" data-jid="${esc(c.jid)}" data-v="${c.blocked?0:1}" ${c.trusted?"disabled":""}>${c.blocked?"Unblock":"Block number"}</button>
+        <button class="act" data-act="proactive" data-jid="${esc(c.jid)}">Message them now</button>
+        <button class="act danger" data-act="reset" data-jid="${esc(c.jid)}">Reset context</button>
       </div>
     </details>
   </div>`;
 }
 function renderContacts(){
-  const root = $("#clist");
-  const q = ($("#q").value||"").trim().toLowerCase();
-  const list = DATA.contacts.filter(c => !q || (c.name||"").toLowerCase().includes(q) || (c.number||"").includes(q));
-  root.innerHTML = list.length ? list.map(contactCard).join("")
+  const q=($("#q").value||"").trim().toLowerCase();
+  const list=DATA.contacts.filter(c=>!q||(c.name||"").toLowerCase().includes(q)||(c.number||"").includes(q));
+  $("#clist").innerHTML = list.length ? list.map(personCard).join("")
     : `<div class="card"><div class="empty">${DATA.contacts.length?"No matches.":"No contacts yet."}</div></div>`;
 }
 
-/* ============================ character ============================ */
+/* ═══════════════════════════════ character ═══════════════════════════════ */
 const CHAR_FIELDS = [
-  ["name", "Name", "e.g. Fiona"],
-  ["emoji", "Emoji", "🖤"],
-  ["vibe", "Vibe (one line)", "Cold on the surface, caring but refuses to show it"],
-  ["language", "Language", "English-dominant, casual, with a little Indonesian"],
-  ["deflection", "Line she uses when accused of being an AI", "hm. whatever."],
-  ["active_hours", "Active hours", "11-14,17-19,21-2"],
-  ["work_hours", "Work hours", "13-21"],
-  ["chat_schedule", "Message-first schedule", "11,16,20,23"],
-  ["voice", "Voice (Gemini TTS)", "Kore"],
-  ["voice_eleven", "ElevenLabs voice ID", ""],
-  ["voice_tags", "Signature audio tags", "[sighs] [pause] [dryly]"],
-  ["voice_style", "Voice style", ""],
-  ["appearance", "Appearance (for photos)", ""],
+  ["name","Name","e.g. Fiona"],["emoji","Emoji","🖤"],
+  ["vibe","Vibe (one line)","Cold on the surface, caring underneath"],
+  ["language","Language","English-dominant with a little Indonesian"],
+  ["deflection","Line when accused of being an AI","hm. whatever."],
+  ["active_hours","Active hours","11-14,17-19,21-2"],["work_hours","Work hours","13-21"],
+  ["chat_schedule","Message-first schedule","11,16,20,23"],
+  ["voice","Voice (Gemini TTS)","Kore"],["voice_eleven","ElevenLabs voice ID",""],
+  ["voice_tags","Signature audio tags","[sighs] [pause] [dryly]"],["voice_style","Voice style",""],
+  ["appearance","Appearance (for photos)",""],
 ];
+const CAST_FIELDS = [["name","Name","e.g. Sari"],["relation","Who they are","older sister"],["vibe","What they are like","loud, nosy, kind"],["notes","Detail","calls her Fio to annoy her"]];
 const KINDICON = { fun:"😄", sweet:"🥰", proud:"😤", annoyed:"😒", sad:"😢", scared:"😨", tired:"😮‍💨", awkward:"😬" };
 
 async function renderCharacter(force){
-  const root = $("#tab-character");
-  // do not redraw while the user is typing — it would wipe their input
+  const root=$("#tab-character");
   if(charDirty && !force && root.innerHTML.trim()) return;
-  let card = DATA.personaCard;
+  let card=DATA.personaCard;
   if(!card || force){
-    const slug = CHAR_SLUG || DATA.bot.persona.slug;
-    card = await api("/api/persona/card?slug="+encodeURIComponent(slug));
-    if(!card.ok){ root.innerHTML = `<div class="card"><div class="empty">Gagal muat kartu characters.</div></div>`; return; }
-    DATA.personaCard = card; CHAR_SLUG = slug;
+    const slug=CHAR_SLUG||DATA.bot.persona.slug;
+    card=await api("/api/persona/card?slug="+encodeURIComponent(slug));
+    if(!card.ok){ root.innerHTML=`<div class="card"><div class="empty">Could not load the character card.</div></div>`; return; }
+    DATA.personaCard=card; CHAR_SLUG=slug;
   }
-  const fm = card.frontmatter || {};
+  const fm=card.frontmatter||{};
+  const w=DATA.world||{};
   root.innerHTML = `
-    <div class="card">
-      <div class="row"><h2 style="margin:0">Character</h2><span class="grow"></span>
-        <select id="char-picker" style="max-width:150px">
-          ${DATA.personas.map(p=>`<option value="${esc(p.slug)}" ${p.slug===CHAR_SLUG?"selected":""}>${esc((p.emoji||"")+" "+p.name)}</option>`).join("")}
-        </select>
+    <div class="card hero">
+      <div class="person">
+        <div class="pavatar">${esc(fm.emoji||"🎭")}</div>
+        <div class="grow">
+          <h3 class="pname">${esc(fm.name||CHAR_SLUG)}</h3>
+          <div class="tiny" style="margin-top:3px">${esc(fm.vibe||"")}</div>
+          <div class="row" style="margin-top:9px">
+            <select id="char-picker" style="max-width:170px">
+              ${DATA.personas.map(p=>`<option value="${esc(p.slug)}" ${p.slug===CHAR_SLUG?"selected":""}>${esc((p.emoji||"")+" "+p.name)}</option>`).join("")}
+            </select>
+            <span class="grow"></span>
+            <span class="tiny">${card.body.length} chars · voice ${(DATA.personaVoice||0)}</span>
+          </div>
+        </div>
       </div>
-      <div class="btns" style="margin-top:11px">
+      <div class="btns">
+        <button class="act primary" id="btn-char-save">Save character</button>
         <button class="act" id="btn-char-export">Export .json</button>
         <button class="act" id="btn-char-import">Import .json</button>
-        <button class="act" id="btn-char-share">Share in chat</button>
-        <span class="grow"></span>
         <button class="act danger" id="btn-char-delete">Delete</button>
         <input type="file" id="char-file" accept=".json,application/json" hidden>
       </div>
-      <div class="grid" style="margin-top:12px">
-        ${CHAR_FIELDS.map(([k,label,ph])=>`<div><label>${esc(label)}<span class="tiny"> · ${k}</span></label>
-          <input class="cf" data-k="${k}" value="${esc(fm[k]||"")}" placeholder="${esc(ph)}"></div>`).join("")}
-      </div>
-      <div class="hint" style="margin-top:8px">Active hours = when she may appear online. Schedule = when she may message first (hour only = random minute each day).</div>
+      <div class="tiny" id="char-hint" style="margin-top:9px"></div>
     </div>
 
     <div class="card">
-      <h2>Personality (character card)</h2>
-      <textarea id="char-body" rows="18" style="font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.6">${esc(card.body||"")}</textarea>
-      <div class="hint" style="margin-top:6px">This is what makes her feel alive: vocabulary, texting habits, example lines, what she hides. The more specific, the better.</div>
-      <div class="btns">
-        <button class="act primary" id="btn-char-save" >Save character</button>
-        <span class="grow"></span>
-        <span class="muted" id="char-hint"></span>
-      </div>
+      <h2>Identity</h2>
+      <div class="grid">${CHAR_FIELDS.map(([k,label,ph])=>`<div><label>${esc(label)}<span class="tiny"> · ${k}</span></label>
+        <input class="cf" data-k="${k}" value="${esc(fm[k]||"")}" placeholder="${esc(ph)}"></div>`).join("")}</div>
+      <div class="hint" style="margin-top:8px">Active hours = when she may appear online. Schedule = when she may message first (hour only = a random minute each day).</div>
     </div>
 
-    ${contextPanel(DATA.world)}
-    ${worldPanel(DATA.world)}
-    ${routinePanel(DATA.routine)}
-  `;
-  $("#char-picker").onchange = (e)=>{
-    if(charDirty && !confirm("You have unsaved changes. Switch character?")){ e.target.value = CHAR_SLUG; return; }
-    charDirty = false; CHAR_SLUG = e.target.value; DATA.personaCard=null; renderCharacter(true);
+    <div class="card">
+      <h2>Personality card</h2>
+      <textarea id="char-body" rows="16" style="font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.65">${esc(card.body||"")}</textarea>
+      <div class="hint" style="margin-top:6px">This is what makes her feel alive: vocabulary, texting habits, example lines, what she hides. The more specific the better.</div>
+    </div>
+
+    ${contextPanel(w)}
+    ${worldPanel(w)}
+    ${routinePanel(DATA.routine)}`;
+
+  $("#char-picker").onchange=(e)=>{
+    if(charDirty && !confirm("You have unsaved changes. Switch character?")){ e.target.value=CHAR_SLUG; return; }
+    charDirty=false; CHAR_SLUG=e.target.value; DATA.personaCard=null; renderCharacter(true);
   };
-  $("#btn-char-save").onclick = ()=>saveCharacter();
-  $("#btn-char-export").onclick = ()=>{ window.location = "/api/persona/export?slug="+encodeURIComponent(CHAR_SLUG); };
-  $("#btn-char-import").onclick = ()=>$("#char-file").click();
-  $("#btn-char-share").onclick = async ()=>{
-    const r = await api("/api/admin",{ message:`Export the character ${CHAR_SLUG} as a shareable file and tell me what is in it` });
-    toast((r.say||"").slice(0,160));
-    drawAgent && null;
-  };
-  $("#char-file").onchange = async (e)=>{
-    const f = e.target.files[0]; if(!f) return;
-    const text = await f.text();
-    const applySettings = confirm("Also apply the behaviour settings inside this file?");
-    const r = await api("/api/persona/import",{ bundle:text, applySettings });
-    if(!r.ok){ toast("Import failed: "+(r.error||"")); return; }
-    toast("Imported as \""+r.slug+"\""+(r.renamed?" (name was taken)":"")+(r.settingsApplied?" · "+r.settingsApplied+" settings applied":""));
-    CHAR_SLUG = r.slug; DATA.personaCard = null; charDirty=false;
-    await refresh(true);
-  };
-  $("#btn-char-delete").onclick = async ()=>{
-    if(!confirm(`Delete "${CHAR_SLUG}"? It is moved to personas/.trash/ so you can restore it later.`)) return;
-    const r = await api("/api/persona/delete",{ slug: CHAR_SLUG });
+  $("#btn-char-save").onclick=async ()=>{
+    const frontmatter={}; $$(".cf").forEach(i=>{ frontmatter[i.dataset.k]=i.value.trim(); });
+    const r=await api("/api/persona/save",{ slug:CHAR_SLUG, frontmatter, body:$("#char-body").value });
     if(!r.ok){ toast("Failed: "+(r.error||"")); return; }
-    toast("Deleted"+ (r.switchedTo? " · now using "+r.switchedTo : ""));
-    CHAR_SLUG = r.switchedTo || (DATA.personas[0]&&DATA.personas[0].slug) || null;
-    DATA.personaCard = null; await refresh(true);
-  };
-  $("#btn-ctx-add").onclick = async ()=>{
-    const text = $("#ctx-text").value.trim();
-    if(!text) return;
-    const r = await api("/api/context",{ slug: CHAR_SLUG, text, until: $("#ctx-until").value });
-    toast(r.ok ? "Note added" : "Failed");
+    charDirty=false; toast("Character saved — applied immediately");
     await refresh(true);
+    const h=$("#char-hint"); if(h) h.textContent="✓ saved · used from the next reply";
   };
-  $("#tab-character").onclick = async (e)=>{
-    const b = e.target.closest("[data-ctx-remove]");
-    if(!b) return;
-    const list = (DATA.world && DATA.world.context) || [];
-    const item = list[Number(b.dataset.ctxRemove)];
+  $("#btn-char-export").onclick=()=>{ window.location="/api/persona/export?slug="+encodeURIComponent(CHAR_SLUG); };
+  $("#btn-char-import").onclick=()=>$("#char-file").click();
+  $("#char-file").onchange=async (e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const text=await f.text();
+    const applySettings=confirm("Also apply the behaviour settings inside this file?");
+    const r=await api("/api/persona/import",{ bundle:text, applySettings });
+    if(!r.ok){ toast("Import failed: "+(r.error||"")); return; }
+    toast(`Imported as "${r.slug}"${r.renamed?" (name was taken)":""}`);
+    CHAR_SLUG=r.slug; DATA.personaCard=null; charDirty=false; await refresh(true);
+  };
+  $("#btn-char-delete").onclick=async ()=>{
+    if(!confirm(`Delete "${CHAR_SLUG}"? It moves to personas/.trash/ so you can restore it.`)) return;
+    const r=await api("/api/persona/delete",{ slug:CHAR_SLUG });
+    if(!r.ok){ toast("Failed: "+(r.error||"")); return; }
+    toast("Deleted"+(r.switchedTo?" · now using "+r.switchedTo:""));
+    CHAR_SLUG=r.switchedTo||(DATA.personas[0]&&DATA.personas[0].slug)||null;
+    DATA.personaCard=null; await refresh(true);
+  };
+  $("#btn-ctx-add").onclick=async ()=>{
+    const text=$("#ctx-text").value.trim(); if(!text) return;
+    await api("/api/context",{ slug:CHAR_SLUG, text, until:$("#ctx-until").value });
+    toast("Note added"); await refresh(true);
+  };
+  $("#tab-character").onclick=async (e)=>{
+    const b=e.target.closest("[data-ctx-remove]"); if(!b) return;
+    const list=(DATA.world&&DATA.world.context)||[]; const item=list[Number(b.dataset.ctxRemove)];
     if(!item) return;
-    await api("/api/context",{ slug: CHAR_SLUG, action:"remove", text: item.text });
-    toast("Note removed");
-    await refresh(true);
+    await api("/api/context",{ slug:CHAR_SLUG, action:"remove", text:item.text });
+    toast("Note removed"); await refresh(true);
   };
-  $("#btn-world-save").onclick = async ()=>{
-    const w = collectWorld();
-    await api("/api/world",{ slug: CHAR_SLUG, backstory: w.backstory, cast: w.cast });
-    toast("World saved");
-    await refresh(true);
+  $("#btn-world-save").onclick=async ()=>{
+    const cast=$$("#world-cast .world-row").map(row=>{ const o={}; $$(".world-field",row).forEach(i=>{ o[i.dataset.k]=i.value.trim(); }); return o; }).filter(c=>c.name);
+    await api("/api/world",{ slug:CHAR_SLUG, backstory:$("#world-backstory").value.trim(), cast });
+    toast("World saved"); await refresh(true);
   };
-  $("#btn-world-gen").onclick = async ()=>{
+  $("#btn-world-gen").onclick=async ()=>{
     if(!confirm("Generate a new backstory and cast? The current one is replaced.")) return;
     toast("Building her world…");
-    const r = await api("/api/world/gen",{ slug: CHAR_SLUG });
-    toast(r.ok ? "World generated" : ("Failed: "+(r.error||"")));
-    DATA.personaCard = null;
-    await refresh(true);
+    const r=await api("/api/world/gen",{ slug:CHAR_SLUG });
+    toast(r.ok?"World generated":("Failed: "+(r.error||"")));
+    DATA.personaCard=null; await refresh(true);
   };
-  $("#btn-world-add").onclick = ()=>{
-    const box = $("#world-cast");
-    if($(".empty", box)) box.innerHTML = "";
-    const i = $$("#world-cast .world-row").length;
-    box.insertAdjacentHTML("beforeend", `<div class="world-row" data-i="${i}" style="border:1px solid var(--line);border-radius:10px;padding:9px;margin-bottom:8px">
+  $("#btn-world-add").onclick=()=>{
+    const box=$("#world-cast"); if($(".empty",box)) box.innerHTML="";
+    const i=$$("#world-cast .world-row").length;
+    box.insertAdjacentHTML("beforeend",`<div class="world-row" style="border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:9px">
       <div class="row"><span class="tiny">#${i+1}</span><span class="grow"></span>
-        <button class="act" data-world-remove="${i}" style="padding:3px 9px">Remove</button></div>
-      <div class="grid" style="margin-top:6px">
-        ${CAST_FIELDS.map(([k,label,ph])=>`<div><label>${esc(label)}</label>
-          <input class="world-field" data-k="${k}" value="" placeholder="${esc(ph)}"></div>`).join("")}
-      </div></div>`);
+        <button class="act" data-world-remove="${i}" style="padding:3px 10px">Remove</button></div>
+      <div class="grid" style="margin-top:7px">${CAST_FIELDS.map(([k,label,ph])=>`<div><label>${esc(label)}</label>
+        <input class="world-field" data-k="${k}" value="" placeholder="${esc(ph)}"></div>`).join("")}</div></div>`);
   };
-  $("#world-cast").onclick = (e)=>{
-    const b = e.target.closest("[data-world-remove]");
-    if(!b) return;
-    b.closest(".world-row")?.remove();
-  };
-  const rb = $("#btn-routine-new");
-  if(rb) rb.onclick = async ()=>{
-    if(charDirty && !confirm("You have unsaved card changes. Generate a new routine anyway? (unsaved edits may be lost)")) return;
+  $("#world-cast").onclick=(e)=>{ const b=e.target.closest("[data-world-remove]"); if(b) b.closest(".world-row")?.remove(); };
+  const rb=$("#btn-routine-new");
+  if(rb) rb.onclick=async ()=>{
+    if(charDirty && !confirm("You have unsaved card changes. Generate a new routine anyway?")) return;
     toast("Generating a new day…");
-    const r = await api("/api/routine/new",{ slug: CHAR_SLUG });
+    const r=await api("/api/routine/new",{ slug:CHAR_SLUG });
     toast(r.ok ? ("New routine: "+r.routine.theme) : ("Failed: "+(r.error||"")));
     await refresh(true);
   };
 }
 
 function contextPanel(w){
-  const list = (w && w.context) || [];
+  const list=(w&&w.context)||[];
   return `<div class="card">
-    <div class="row"><h2 style="margin:0">Extra context</h2><span class="grow"></span><span class="tiny">additive only</span></div>
-    <div class="hint" style="margin-top:6px">Anything you want her to keep in mind: "she is moving house this month", "it is rainy season here". These are <b>added on top</b> of the card, mood and rules — they never replace them.</div>
-    <div style="margin-top:10px">
-      ${list.map((c,i)=>`<div class="mrow" style="grid-template-columns:1fr 90px 30px;gap:8px;align-items:center;margin-bottom:6px">
-        <span style="font-size:12px">${esc(c.text)}</span>
-        <span class="tiny">${c.until?esc(c.until):"no expiry"}</span>
-        <button class="act" data-ctx-remove="${i}" style="padding:2px 8px">✕</button>
-      </div>`).join("") || '<div class="empty">Nothing extra right now.</div>'}
-    </div>
-    <div class="grid" style="margin-top:10px">
+    <div class="row"><h2 style="margin:0">Extra context</h2><span class="grow"></span><span class="chip">additive only</span></div>
+    <div class="hint" style="margin-top:7px">Anything she should keep in mind: “she is moving house this month”, “it is rainy season”. Added <b>on top</b> of the card, mood and rules — never replacing them.</div>
+    <div style="margin-top:11px">${list.map((c,i)=>`<div class="mrow" style="grid-template-columns:1fr 86px 34px;gap:8px;margin-bottom:7px">
+      <span style="font-size:12.5px">${esc(c.text)}</span><span class="tiny">${c.until?esc(c.until):"no expiry"}</span>
+      <button class="act" data-ctx-remove="${i}" style="padding:3px 9px">✕</button></div>`).join("") || '<div class="empty">Nothing extra right now.</div>'}</div>
+    <div class="grid" style="margin-top:11px">
       <div><label>New note</label><input id="ctx-text" placeholder="e.g. she is moving house this month"></div>
       <div><label>Expires (optional)</label><input id="ctx-until" type="date"></div>
     </div>
     <div class="btns"><button class="act primary" id="btn-ctx-add">Add note</button></div>
   </div>`;
 }
-
-const CAST_FIELDS = [["name","Name","e.g. Sari"],["relation","Who they are","older sister"],["vibe","What they are like","loud, nosy, kind"],["notes","Detail that keeps them consistent","calls her Fio to annoy her"]];
 function worldPanel(w){
-  const cast = (w && w.cast) || [];
-  const rows = cast.map((c,i)=>`
-    <div class="world-row" data-i="${i}" style="border:1px solid var(--line);border-radius:10px;padding:9px;margin-bottom:8px">
-      <div class="row"><span class="tiny">#${i+1}</span><span class="grow"></span>
-        <button class="act" data-world-remove="${i}" style="padding:3px 9px">Remove</button></div>
-      <div class="grid" style="margin-top:6px">
-        ${CAST_FIELDS.map(([k,label,ph])=>`<div><label>${esc(label)}</label>
-          <input class="world-field" data-k="${k}" value="${esc(c[k]||"")}" placeholder="${esc(ph)}"></div>`).join("")}
-      </div>
-    </div>`).join("");
+  const cast=(w&&w.cast)||[];
   return `<div class="card">
     <div class="row"><h2 style="margin:0">Backstory &amp; the people around her</h2><span class="grow"></span>
-      <button class="act" id="btn-world-gen">Generate</button>
-    </div>
-    <div class="hint" style="margin-top:6px">Her history and the people she actually deals with (family, companion, coworkers). Canon characters get theirs from the source material; original characters get one invented from the card. Shared in the export file.</div>
-    <div style="margin-top:11px">
-      <label>Backstory</label>
-      <textarea id="world-backstory" rows="7">${esc((w&&w.backstory)||"")}</textarea>
-    </div>
-    <div class="row" style="margin-top:12px"><b style="font-size:12px">Cast (${cast.length})</b><span class="grow"></span>
+      <button class="act" id="btn-world-gen">Generate</button></div>
+    <div class="hint" style="margin-top:7px">Canon characters get theirs from the source material; original ones get one invented from the card. Shared in the export file.</div>
+    <div style="margin-top:12px"><label>Backstory</label><textarea id="world-backstory" rows="7">${esc((w&&w.backstory)||"")}</textarea></div>
+    <div class="row" style="margin-top:13px"><span class="kick">cast (${cast.length})</span><span class="grow"></span>
       <button class="act" id="btn-world-add">Add person</button></div>
-    <div id="world-cast" style="margin-top:8px">${rows || '<div class="empty">Nobody yet. Generate or add someone.</div>'}</div>
-    <div class="btns">
-      <button class="act primary" id="btn-world-save">Save world</button>
-      <span class="muted" id="world-hint"></span>
+    <div id="world-cast" style="margin-top:10px">
+      ${cast.map((c,i)=>`<div class="world-row" style="border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:9px">
+        <div class="row"><span class="castav">${esc((c.name||"?").charAt(0).toUpperCase())}</span>
+          <b style="font-size:13px">${esc(c.name)}</b><span class="tiny">${esc(c.relation||"")}</span>
+          <span class="grow"></span><button class="act" data-world-remove="${i}" style="padding:3px 10px">Remove</button></div>
+        <div class="grid" style="margin-top:7px">${CAST_FIELDS.map(([k,label,ph])=>`<div><label>${esc(label)}</label>
+          <input class="world-field" data-k="${k}" value="${esc(c[k]||"")}" placeholder="${esc(ph)}"></div>`).join("")}</div>
+      </div>`).join("") || '<div class="empty">Nobody yet. Generate or add someone.</div>'}
     </div>
+    <div class="btns"><button class="act primary" id="btn-world-save">Save world</button></div>
   </div>`;
 }
-
-function collectWorld(){
-  const cast = $$("#world-cast .world-row").map(row=>{
-    const o = {};
-    $$(".world-field", row).forEach(i=>{ o[i.dataset.k] = i.value.trim(); });
-    return o;
-  }).filter(c=>c.name);
-  return { backstory: $("#world-backstory").value.trim(), cast };
-}
-
 function routinePanel(r){
-  if(!r) return `<div class="card"><h2>Today's routine</h2><div class="empty">Nothing yet. Generate a routine.</div>
+  if(!r) return `<div class="card"><h2>Today's routine</h2><div class="empty">Nothing yet.</div>
     <div class="btns"><button class="act primary" id="btn-routine-new">Generate today's routine</button></div></div>`;
   return `<div class="card">
     <div class="row"><h2 style="margin:0">Today's routine</h2><span class="grow"></span>
-      <span class="badge">${esc(r.weekday||"")} ${esc(r.date||"")}</span>
-      <button class="act" id="btn-routine-new" >Regenerate</button>
-    </div>
-    <div class="locked" style="background:#131a24;border-color:#2b3a52;color:#a9c6e8;margin-top:11px">
-      🕐 now: <b>${esc(r.now?r.now.what:"(free)")}</b>${r.now&&r.now.place?` · ${esc(r.now.place)}`:""}
-    </div>
-    <div class="muted" style="margin-bottom:10px">Theme: ${esc(r.theme||"—")}${r.next?` · next: ${esc(r.next.what)}`:""}</div>
-    ${(r.moments||[]).map(m=>`<div class="mrow" style="grid-template-columns:44px 20px 1fr">
+      <span class="chip">${esc(r.weekday||"")} ${esc(r.date||"")}</span>
+      <button class="act" id="btn-routine-new">Regenerate</button></div>
+    <div class="chip accent" style="display:flex;margin-top:12px">🕐 now: <b>${esc(r.now?r.now.what:"(free)")}</b>${r.now&&r.now.place?` · ${esc(r.now.place)}`:""}</div>
+    <div class="muted" style="margin:10px 0">Theme: ${esc(r.theme||"—")}${r.next?` · next: ${esc(r.next.what)}`:""}</div>
+    ${(r.moments||[]).map(m=>`<div class="mrow" style="grid-template-columns:44px 22px 1fr">
       <span class="tiny">${esc(m.at)}</span><span>${KINDICON[m.kind]||"•"}</span>
-      <span style="font-size:11px;color:${m.lived?"var(--tx)":"var(--dim2)"}">${esc(m.what)}${m.lived?"":" <span class='tiny'>(pending)</span>"}</span></div>`).join("")}
-    <details style="margin-top:9px"><summary>Full schedule (${(r.blocks||[]).length} blok)</summary>
-      <div style="margin-top:8px">${(r.blocks||[]).map(b=>`<div class="mrow" style="grid-template-columns:96px 1fr">
-        <span class="tiny">${esc(b.start)}–${esc(b.end)}</span><span style="font-size:11px">${esc(b.what)}${b.place?` <span class="tiny">· ${esc(b.place)}</span>`:""}</span></div>`).join("")}</div></details>
-    ${(r.highlights||[]).length?`<details style="margin-top:6px"><summary>Saved highlights (${r.highlights.length})</summary>
-      <div style="margin-top:8px">${r.highlights.map(h=>`<div class="mrow" style="grid-template-columns:20px 1fr"><span>${KINDICON[h.kind]||"•"}</span><span style="font-size:11px">${esc(h.what)}</span></div>`).join("")}</div></details>`:""}
-    ${(r.history||[]).length?`<div class="tiny" style="margin-top:8px">Previous days: ${r.history.map(h=>esc((h.date||"")+" "+h.theme)).join(" · ")}</div>`:""}
+      <span style="font-size:12px;color:${m.lived?"var(--tx)":"var(--dim-2)"}">${esc(m.what)}${m.lived?"":" <span class='tiny'>(pending)</span>"}</span></div>`).join("")}
+    <details style="margin-top:10px"><summary>Full schedule (${(r.blocks||[]).length} blocks)</summary>
+      <div style="margin-top:9px">${(r.blocks||[]).map(b=>`<div class="mrow" style="grid-template-columns:92px 1fr">
+        <span class="tiny">${esc(b.start)}–${esc(b.end)}</span><span style="font-size:12px">${esc(b.what)}${b.place?` <span class="tiny">· ${esc(b.place)}</span>`:""}</span></div>`).join("")}</div></details>
+    ${(r.highlights||[]).length?`<details><summary>Saved highlights (${r.highlights.length})</summary>
+      <div style="margin-top:9px">${r.highlights.map(h=>`<div class="mrow" style="grid-template-columns:22px 1fr"><span>${KINDICON[h.kind]||"•"}</span>
+        <span style="font-size:12px">${esc(h.what)}</span></div>`).join("")}</div></details>`:""}
   </div>`;
 }
 
-async function saveCharacter(){
-  const frontmatter = {};
-  $$(".cf").forEach(i=>{ frontmatter[i.dataset.k] = i.value.trim(); });
-  const body = $("#char-body").value;
-  const r = await api("/api/persona/save",{ slug: CHAR_SLUG, frontmatter, body });
-  if(!r.ok){ toast("gagal: "+(r.error||"")); return; }
-  charDirty = false;
-  toast("Character saved — applied immediately, no restart needed");
-  await refresh(true);
-  const h=$("#char-hint");
-  if(h) h.textContent = "✓ saved · used from the next reply on";
-}
-
-/* ============================== agent ============================== */
-let AGENT_LOG = [];
-let AGENT_LOADED = false;
+/* ═══════════════════════════════ agent ═══════════════════════════════ */
 const AGENT_IDEAS = [
   "Make her reply less often, she answers too much right now",
   "Inject a routine for today: gym in the morning, client meeting at noon, a walk in the afternoon, cooking at night",
   "She gets cold too fast, make her a bit more patient",
   "Add to her personality: she loves strong black coffee",
-  "Change her active hours to 10-14,17-20,22-2",
+  "Move her schedule later in the evening",
   "Make today's routine more interesting",
-  "She is exhausted today, set her mood accordingly",
+  "Add a note that she is moving house this month",
 ];
-
 function renderAgent(){
-  const root = $("#tab-agent");
+  const root=$("#tab-agent");
   if(!AGENT_LOADED){
-    root.innerHTML = `
+    root.innerHTML=`
       <div class="card tight">
-        <div class="row"><b style="font-size:12px">Configuration agent (OOC)</b><span class="grow"></span>
-          <span class="badge warn">cannot touch the core system</span></div>
-        <div class="tiny" style="margin-top:5px">It can change: behaviour settings · personality card · routine · schedule · active hours · active character · per-contact nickname.
+        <div class="row"><b style="font-size:12.5px">Configuration agent (OOC)</b><span class="grow"></span>
+          <span class="chip warn">cannot touch the core system</span></div>
+        <div class="hint" style="margin-top:6px">It can change: behaviour settings · personality card · backstory &amp; cast · routine · schedule · relationships · active character.
         It <b>cannot</b>: edit code or files, delete data, change API keys, ALLOW or TRUSTED lists.</div>
       </div>
       <div class="card tight"><div class="slots" id="agent-ideas">
         ${AGENT_IDEAS.map(i=>`<span class="slot" data-idea="${esc(i)}" style="cursor:pointer;font-size:11px">${esc(i)}</span>`).join("")}
       </div></div>
       <div id="agent-log"></div>
-      <div class="card tight" style="position:sticky;bottom:8px">
+      <div class="card tight" style="position:sticky;bottom:10px">
         <div class="row"><input id="agent-in" placeholder="What should I change?" autocomplete="off">
           <button class="act primary" id="agent-send">Send</button></div>
       </div>`;
-    $("#agent-send").onclick = sendAgent;
-    $("#agent-in").onkeydown = (e)=>{ if(e.key==="Enter") sendAgent(); };
-    $("#agent-ideas").onclick = (e)=>{
-      const i = e.target.closest("[data-idea]"); if(!i) return;
-      $("#agent-in").value = i.dataset.idea; sendAgent();
-    };
-    AGENT_LOADED = true;
+    $("#agent-send").onclick=sendAgent;
+    $("#agent-in").onkeydown=(e)=>{ if(e.key==="Enter") sendAgent(); };
+    $("#agent-ideas").onclick=(e)=>{ const i=e.target.closest("[data-idea]"); if(!i) return; $("#agent-in").value=i.dataset.idea; sendAgent(); };
+    AGENT_LOADED=true;
   }
   drawAgent();
 }
-
 function drawAgent(){
-  const log = $("#agent-log");
-  if(!log) return;
-  if(!AGENT_LOG.length){
-    log.innerHTML = `<div class="card"><div class="empty">No messages yet.<br>Pick one of the examples above, or type your own.</div></div>`;
-    return;
-  }
-  log.innerHTML = AGENT_LOG.map(m=>{
-    if(m.role==="me") return `<div class="card" style="margin-left:auto;max-width:88%;background:#241d3d;border-color:#4a3f7a">
-        <div class="tiny">you</div><div>${esc(m.text)}</div></div>`;
-    const chips = [
-      ...(m.applied||[]).map(a=>`<span class="badge ok">✓ ${esc(a.describe)}</span>`),
-      ...(m.refused||[]).map(r=>`<span class="badge silent">✗ ${esc(r.reason)}</span>`),
-    ].join(" ");
-    return `<div class="card" style="max-width:92%">
-        <div class="tiny">agent</div>
-        <div>${esc(m.say||"")}</div>
-        ${chips?`<div class="row" style="margin-top:8px">${chips}</div>`:""}
-        ${m.degraded?`<div class="tiny" style="margin-top:6px;color:var(--warn)">the model answered in prose — nothing was changed</div>`:""}
-        ${m.tookSec?`<div class="tiny" style="margin-top:5px">took ${m.tookSec}s</div>`:""}
-      </div>`;
+  const log=$("#agent-log"); if(!log) return;
+  if(!AGENT_LOG.length){ log.innerHTML=`<div class="card"><div class="empty">No conversation yet.<br>Pick an example above, or type your own.</div></div>`; return; }
+  log.innerHTML=AGENT_LOG.map(m=>{
+    if(m.role==="me") return `<div class="card tight" style="margin-left:auto;max-width:90%;background:linear-gradient(180deg,rgba(139,123,255,.24),rgba(139,123,255,.12));border-color:rgba(139,123,255,.35)">
+      <div class="tiny">you</div><div>${esc(m.text)}</div></div>`;
+    const chips=[...(m.applied||[]).map(a=>`<span class="chip ok">✓ ${esc(a.describe)}</span>`),
+                 ...(m.refused||[]).map(r=>`<span class="chip" style="color:var(--bad)">✗ ${esc(r.reason)}</span>`)].join(" ");
+    return `<div class="card tight" style="max-width:94%">
+      <div class="tiny">agent${m.tookSec?` · ${m.tookSec}s`:""}</div>
+      <div style="${m.pending?"color:var(--dim)":""}">${m.pending?`<span class="typing"><span></span><span></span><span></span></span> ${esc(m.say)}`:esc(m.say||"")}</div>
+      ${chips?`<div class="row" style="margin-top:9px">${chips}</div>`:""}
+      ${m.degraded?`<div class="tiny" style="margin-top:6px;color:var(--warn)">the model answered in prose — nothing was changed</div>`:""}
+    </div>`;
   }).join("");
-  log.lastElementChild?.scrollIntoView({behavior:"smooth", block:"nearest"});
+  log.lastElementChild?.scrollIntoView({behavior:"smooth",block:"nearest"});
 }
-
 async function sendAgent(){
-  const inp = $("#agent-in");
-  const text = (inp.value||"").trim();
-  if(!text) return;
-  inp.value = "";
-  AGENT_LOG.push({ role:"me", text });
-  const slot = AGENT_LOG.length;
-  AGENT_LOG.push({ role:"agent", say:"thinking…", pending:true, startedAt:Date.now() });
+  const inp=$("#agent-in"); const text=(inp.value||"").trim(); if(!text) return;
+  inp.value="";
+  AGENT_LOG.push({role:"me",text});
+  const slot=AGENT_LOG.length;
+  AGENT_LOG.push({role:"agent",say:"thinking",pending:true,startedAt:Date.now()});
   drawAgent();
-
-  const history = AGENT_LOG.slice(0,-1).slice(-6).map(m=>({role:m.role, text:m.text||m.say}));
-
-  // start the job, then poll: a long model call must never look like a timeout
+  const history=AGENT_LOG.slice(0,-1).slice(-6).map(m=>({role:m.role,text:m.text||m.say}));
   let started;
-  try {
-    started = await fetch("/api/admin",{
-      method:"POST", headers:{"content-type":"application/json"},
-      body: JSON.stringify({ message:text, history }),
-    }).then(r=>r.json());
-  } catch (err){
-    AGENT_LOG[slot] = { role:"agent", say:"Could not reach the dashboard: "+err.message };
-    drawAgent(); return;
-  }
-  if(!started || !started.jobId){
-    AGENT_LOG[slot] = { role:"agent", say: started && started.error ? "Failed: "+started.error : "The agent did not start." };
-    drawAgent(); return;
-  }
-
-  const t0 = Date.now();
-  const tick = setInterval(()=>{
-    const el = Math.round((Date.now()-t0)/1000);
-    AGENT_LOG[slot] = { role:"agent", say:`thinking… ${el}s`, pending:true, startedAt:t0 };
-    drawAgent();
-  }, 1000);
-
-  let r = null;
-  const deadline = Date.now() + 5*60*1000;
-  while(Date.now() < deadline){
+  try{
+    started=await fetch("/api/admin",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({message:text,history})}).then(r=>r.json());
+  }catch(err){ AGENT_LOG[slot]={role:"agent",say:"Could not reach the dashboard: "+err.message}; drawAgent(); return; }
+  if(!started||!started.jobId){ AGENT_LOG[slot]={role:"agent",say:started&&started.error?("Failed: "+started.error):"The agent did not start."}; drawAgent(); return; }
+  const t0=Date.now();
+  const tick=setInterval(()=>{ AGENT_LOG[slot]={role:"agent",say:`thinking… ${Math.round((Date.now()-t0)/1000)}s`,pending:true,startedAt:t0}; drawAgent(); },1000);
+  let r=null; const deadline=Date.now()+5*60*1000;
+  while(Date.now()<deadline){
     await new Promise(res=>setTimeout(res,1200));
-    try {
-      r = await api("/api/admin/job?id="+encodeURIComponent(started.jobId));
-    } catch { continue; }
-    if(r && r.status && r.status !== "running") break;
-    r = null;
+    try{ r=await api("/api/admin/job?id="+encodeURIComponent(started.jobId)); }catch{ continue; }
+    if(r&&r.status&&r.status!=="running") break;
+    r=null;
   }
   clearInterval(tick);
-
-  if(!r){
-    AGENT_LOG[slot] = { role:"agent", say:"Still running after five minutes. The model may be stuck — try again, or check the Log tab." };
-    drawAgent(); return;
-  }
-  const secs = Math.round((r.elapsedMs||0)/1000);
-  AGENT_LOG[slot] = {
-    role:"agent",
-    say: r.status === "error" ? "Failed: "+r.error : (r.say || "(empty reply)"),
-    applied: r.applied, refused: r.refused, tookSec: secs, degraded: r.degraded,
-  };
+  if(!r){ AGENT_LOG[slot]={role:"agent",say:"Still running after five minutes. Try again, or check the Log tab."}; drawAgent(); return; }
+  AGENT_LOG[slot]={role:"agent",say:r.status==="error"?("Failed: "+r.error):(r.say||"(empty reply)"),applied:r.applied,refused:r.refused,degraded:r.degraded,tookSec:Math.round((r.elapsedMs||0)/1000)};
   drawAgent();
-  if((r.applied||[]).length){
-    SETTINGS_LOADED = false; DATA.personaCard = null; charDirty = false;
-    const back = tab; await refresh(true); tab = back;
-  }
+  if((r.applied||[]).length){ SETTINGS_LOADED=false; DATA.personaCard=null; charDirty=false; const back=tab; await refresh(true); tab=back; }
 }
 
-/* ============================ settings ============================ */
-const GROUPS = [
-  ["Gaya bales", ["REACTION_CHANCE","QUOTE_CHANCE","SKIP_CHANCE","TYPO_CHANCE","BURST_CHANCE","LONG_DELAY_CHANCE"]],
-  ["Timing baca & ngetik", ["READ_MIN_MS","READ_MAX_MS","PRETYPE_MIN_MS","PRETYPE_MAX_MS","TYPING_PAUSE_CHANCE","DEBOUNCE_MS","DEBOUNCE_MAX_MS"]],
-  ["Voice note", ["VOICE_CHANCE","VOICE_MIRROR_CHANCE","TEXT_THEN_VOICE_CHANCE","VOICE_SPLIT_CHANCE"]],
-  ["Foto & stiker", ["PHOTO_CHANCE","STICKER_CHANCE","STICKER_ONLY_CHANCE"]],
-  ["Panggilan sayang", ["DEFAULT_NICK","NICK_CHANCE","NICK_AFFECTION_MIN","NICK_VALENCE_MIN","NICK_PATIENCE_MIN"]],
-  ["Ngambek & diam", ["NUDGE_AFTER_MIN","DRY_AFTER_MIN","DRY_SILENT_AFTER"]],
-  ["Chat duluan", ["PROACTIVE_IDLE_MIN","PROACTIVE_GAP_MIN"]],
-  ["Lain-lain", ["USER_WORK_HOURS"]],
-];
-function knobField(k){
-  const v = k.value ?? "";
-  return `<div class="kfield" data-key="${esc(k.key)}" data-search="${esc((k.label+" "+k.key).toLowerCase())}">
-    <label>${esc(k.label)}<span class="tiny"> · ${esc(k.key)}</span></label>
-    <input data-k="${esc(k.key)}" class="knob" value="${esc(v)}">
-    <div class="hint" data-h="${esc(k.key)}">${hintFor(k.key,v)}</div>
-  </div>`;
-}
-function renderSettings(){
-  if(SETTINGS_LOADED) return;
-  const s = DATA.settings, root = $("#tab-settings");
-  const seen = new Set();
-  const groups = GROUPS.map(([title, keys])=>{
-    const fields = keys.map(key=>{
-      const k = s.knobs.find(x=>x.key===key); if(!k) return ""; seen.add(key); return knobField(k);
-    }).join("");
-    return fields ? `<div class="kwrap"><div class="kick">${esc(title)}</div><div class="grid">${fields}</div></div>` : "";
-  }).join("");
-  const rest = s.knobs.filter(k=>!seen.has(k.key)).map(knobField).join("");
-
-  root.innerHTML = `
-    <div class="card">
-      <h2>Character</h2>
-      <div class="grid">
-        <div><label>Active character</label>
-          <select id="set-persona">${DATA.personas.map(p=>`<option value="${esc(p.slug)}" ${p.slug===DATA.bot.persona.slug?"selected":""}>${esc((p.emoji||"")+" "+p.name)}</option>`).join("")}</select></div>
-        <div><label>Active hours</label><input id="set-hours" value="${esc(s.activeHours)}" placeholder="11-14,17-19,21-2"></div>
-        <div><label>Message-first schedule</label><input id="set-sched" value="${esc(s.chatSchedule)}" placeholder="11,12,13,17,18,19"></div>
+/* ═══════════════════════════════ schedule ═══════════════════════════════ */
+function nextSlot(){ return (DATA.schedule||[]).find(s=>!s.passed && !s.quiet); }
+function renderSchedule(){
+  const root=$("#tab-schedule");
+  const info=DATA.scheduleInfo||{slots:[],spec:"",activeHours:"",workHours:""};
+  const slots=info.slots||[];
+  root.innerHTML=`
+    <div class="card hero">
+      <h2>Her 24 hours</h2>
+      ${dayTimeline(info)}
+      <div class="legend" style="margin-top:10px">
+        <span><i class="swatch" style="background:rgba(139,123,255,.6)"></i>awake window</span>
+        <span><i class="swatch" style="background:rgba(255,255,255,.12)"></i>free time</span>
+        <span><i class="swatch" style="background:#8b7bff"></i>may message first</span>
+        <span><i class="swatch" style="background:#3ddc97"></i>now</span>
+        <span><i class="swatch" style="background:rgba(0,0,0,.45)"></i>quiet ${DATA.bot.quiet[0]}:00–${DATA.bot.quiet[1]}:00</span>
       </div>
-      <div class="hint" style="margin-top:8px">Schedule format: <b>hour only</b> = random minute each day (11,12,13) · <b>hour:minute</b> = fixed minute (12:30).</div>
     </div>
     <div class="card">
-      <div class="row"><h2 style="margin:0">Behaviour</h2><span class="grow"></span>
-        <input id="knob-q" placeholder="search settings…" style="max-width:190px"></div>
-      <div style="margin-top:12px" id="knobbox">
-        ${groups}${rest?`<div class="kwrap"><div class="kick">Other</div><div class="grid">${rest}</div></div>`:""}
-      </div>
-      <div class="btns" style="margin-top:14px">
-        <button class="act primary" id="btn-save-settings" >Save (applies immediately)</button>
-        <button class="act" id="btn-auto" >Auto (let the model decide)</button>
-        <span class="grow"></span>
-        <button class="act danger" id="btn-restart" >Restart bot</button>
-      </div>
-      <div class="muted" id="save-hint" style="margin-top:9px"></div>
-    </div>`;
-  $("#btn-save-settings").onclick = () => saveSettings();
-  $("#btn-auto").onclick = async () => {
-    toast("The model is deciding…");
-    const r = await api("/api/auto",{apply:true});
-    if(r.ok){ toast("Automatic settings applied"); SETTINGS_LOADED=false; await refresh(true); }
-    else toast("Failed: "+(r.error||"?"));
-  };
-  $("#btn-restart").onclick = async () => { await api("/api/restart",{}); toast("Restarting…"); };
-  $("#knob-q").oninput = (e)=>{
-    const q = e.target.value.trim().toLowerCase();
-    $$(".kfield").forEach(f=>{ f.style.display = (!q || f.dataset.search.includes(q)) ? "" : "none"; });
-    $$(".kwrap").forEach(w=>{ w.style.display = $$(".kfield",w).some(f=>f.style.display!=="none") ? "" : "none"; });
-  };
-  SETTINGS_LOADED = true;
-}
-async function saveSettings(){
-  const values = {};
-  $$(".knob").forEach(i=>{
-    const v=i.value.trim();
-    values[i.dataset.k] = (v==="" || isNaN(Number(v))) ? v : Number(v);
-  });
-  const activeHours = $("#set-hours").value.trim();
-  const chatSchedule = $("#set-sched").value.trim();
-  const slug = $("#set-persona").value;
-  if(slug !== DATA.bot.persona.slug) await api("/api/persona",{slug});
-  await api("/api/settings",{values, activeHours, chatSchedule});
-  SETTINGS_LOADED = false;
-  toast("Saved — applied immediately, no restart needed");
-  await refresh(true);
-  const hint = $("#save-hint");
-  if(hint) hint.innerHTML = "✓ written to <b>.env</b> and picked up by the running bot.";
-}
-
-/* ============================ schedule ============================ */
-function renderSchedule(){
-  const root = $("#tab-schedule");
-  const info = DATA.scheduleInfo || { slots: [], spec: "", activeHours: "", workHours: "" };
-  const slots = info.slots || [];
-  const rows = slots.map((sl,i)=>`
-    <div class="slot-row" data-i="${i}" style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-      <input class="slot-hour" type="number" min="0" max="23" value="${sl.hour}" style="width:70px" placeholder="hh">
-      <span class="muted">:</span>
-      <input class="slot-min" type="number" min="0" max="59" value="${sl.minute===null?"":sl.minute}" style="width:70px" placeholder="auto">
-      <span class="tiny">${sl.minute===null?"random minute each day":"fixed minute"}</span>
-      <span class="grow"></span>
-      <button class="act" data-slot-remove="${i}" style="padding:4px 10px">Remove</button>
-    </div>`).join("");
-
-  root.innerHTML = `
-    <div class="card">
       <div class="row"><h2 style="margin:0">Message-first schedule</h2><span class="grow"></span>
-        <button class="act" id="btn-sched-gen">Auto-generate</button>
+        <button class="act" id="btn-sched-gen">Auto-generate</button></div>
+      <div class="hint" style="margin-top:7px"><b>Hour only</b> = a random minute inside that hour (different every day). <b>hour:minute</b> = that exact minute. Add or remove freely.</div>
+      <div id="slot-list" style="margin-top:13px">
+        ${slots.map((sl,i)=>`<div class="slot-row" style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
+          <input class="slot-hour" type="number" min="0" max="23" value="${sl.hour}" style="width:72px" placeholder="hh">
+          <span class="muted">:</span>
+          <input class="slot-min" type="number" min="0" max="59" value="${sl.minute===null?"":sl.minute}" style="width:72px" placeholder="auto">
+          <span class="tiny">${sl.minute===null?"random minute daily":"fixed"}</span><span class="grow"></span>
+          <button class="act" data-slot-remove="${i}" style="padding:4px 11px">Remove</button></div>`).join("") || '<div class="empty">No slots — she never messages first.</div>'}
       </div>
-      <div class="hint" style="margin-top:6px">When she is allowed to start a chat. <b>Hour only</b> = a random minute inside that hour (different every day). <b>hour:minute</b> = that exact time. Add or remove as many as you like.</div>
-      <div id="slot-list" style="margin-top:12px">${rows || '<div class="empty">No slots. She never messages first.</div>'}</div>
       <div class="btns">
         <button class="act" id="btn-slot-add">Add slot</button>
         <button class="act primary" id="btn-sched-save">Save schedule</button>
-        <span class="muted" id="sched-hint"></span>
       </div>
     </div>
     <div class="card">
@@ -861,225 +824,253 @@ function renderSchedule(){
         <div><label>Active hours (online window)</label><input id="sched-active" value="${esc(info.activeHours||"")}" placeholder="11-14,17-19,21-2"></div>
         <div><label>Work hours</label><input id="sched-work" value="${esc(info.workHours||"")}" placeholder="13-21"></div>
       </div>
-      <div class="hint" style="margin-top:6px">Active hours decide when she appears online. Work hours stop her asking "what are you doing" during your job.</div>
+      <div class="hint" style="margin-top:7px">Active hours decide when she appears online. Work hours stop her asking “what are you doing” during your job.</div>
     </div>
     <div class="card">
       <h2>Today</h2>
       <div class="slots">${DATA.schedule.map(s=>`<span class="slot ${s.passed?"past":""} ${nextSlot()&&s.time===nextSlot().time?"next":""}">${s.time}${s.quiet?" (quiet)":""}</span>`).join("") || '<span class="muted">(not set)</span>'}</div>
-      <div class="muted" style="margin-top:11px">Next: <b style="color:#fff">${nextSlot()?nextSlot().time:"—"}</b></div>
+      <div class="stat" style="margin-top:12px">Next: <b>${nextSlot()?nextSlot().time:"—"}</b></div>
       <div class="grid" style="margin-top:12px">
-        <div class="stat">she waits for <b>${DATA.bot.idleMin} min</b> of silence before starting a chat</div>
+        <div class="stat">she waits <b>${DATA.bot.idleMin} min</b> of silence before starting a chat</div>
         <div class="stat">gap between her own messages <b>${DATA.bot.gapMin} min</b></div>
-        <div class="stat">quiet hours <b>${DATA.bot.quiet[0]}:00–${DATA.bot.quiet[1]}:00</b></div>
       </div>
     </div>`;
-
-  const collect = ()=>$$("#slot-list .slot-row").map(r=>({
-    hour: Number($(".slot-hour",r).value),
-    minute: $(".slot-min",r).value === "" ? null : Number($(".slot-min",r).value),
-  }));
-
-  $("#btn-slot-add").onclick = ()=>{
-    const box = $("#slot-list");
-    if($(".empty", box)) box.innerHTML = "";
-    const i = $$("#slot-list .slot-row").length;
-    box.insertAdjacentHTML("beforeend", `<div class="slot-row" data-i="${i}" style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-      <input class="slot-hour" type="number" min="0" max="23" value="" style="width:70px" placeholder="hh">
+  const collect=()=>$$("#slot-list .slot-row").map(r=>({hour:Number($(".slot-hour",r).value),minute:$(".slot-min",r).value===""?null:Number($(".slot-min",r).value)}));
+  $("#btn-slot-add").onclick=()=>{
+    const box=$("#slot-list"); if($(".empty",box)) box.innerHTML="";
+    const i=$$("#slot-list .slot-row").length;
+    box.insertAdjacentHTML("beforeend",`<div class="slot-row" style="display:flex;gap:7px;align-items:center;margin-bottom:7px">
+      <input class="slot-hour" type="number" min="0" max="23" value="" style="width:72px" placeholder="hh">
       <span class="muted">:</span>
-      <input class="slot-min" type="number" min="0" max="59" value="" style="width:70px" placeholder="auto">
-      <span class="tiny">random minute each day</span>
-      <span class="grow"></span>
-      <button class="act" data-slot-remove="${i}" style="padding:4px 10px">Remove</button>
-    </div>`);
+      <input class="slot-min" type="number" min="0" max="59" value="" style="width:72px" placeholder="auto">
+      <span class="tiny">random minute daily</span><span class="grow"></span>
+      <button class="act" data-slot-remove="${i}" style="padding:4px 11px">Remove</button></div>`);
   };
-  $("#slot-list").onclick = (e)=>{
-    const b = e.target.closest("[data-slot-remove]");
-    if(!b) return;
-    b.closest(".slot-row")?.remove();
-  };
-  $("#btn-sched-save").onclick = async ()=>{
-    const r = await api("/api/schedule",{ slug: CHAR_SLUG, slots: collect(), activeHours: $("#sched-active").value.trim(), workHours: $("#sched-work").value.trim() });
-    toast(r.ok ? ("Schedule saved — "+r.count+" slots") : ("Failed: "+(r.error||"")));
+  $("#slot-list").onclick=(e)=>{ const b=e.target.closest("[data-slot-remove]"); if(b) b.closest(".slot-row")?.remove(); };
+  $("#btn-sched-save").onclick=async ()=>{
+    const r=await api("/api/schedule",{ slug:CHAR_SLUG||DATA.bot.persona.slug, slots:collect(), activeHours:$("#sched-active").value.trim(), workHours:$("#sched-work").value.trim() });
+    toast(r.ok?("Schedule saved — "+r.count+" slots"):("Failed: "+(r.error||"")));
     if(r.ok) await refresh(true);
   };
-  $("#btn-sched-gen").onclick = async ()=>{
-    const n = $$("#slot-list .slot-row").length || 5;
+  $("#btn-sched-gen").onclick=async ()=>{
+    const n=$$("#slot-list .slot-row").length||5;
     toast("Asking the model for a schedule that fits her…");
-    const r = await api("/api/schedule/gen",{ slug: CHAR_SLUG, apply:true, count:n });
-    toast(r.ok ? ("Generated: "+r.spec+(r.why?" — "+r.why:"")) : ("Failed: "+(r.error||"")));
-    if(r.ok) await refresh(true);
+    const r=await api("/api/schedule/gen",{ slug:CHAR_SLUG||DATA.bot.persona.slug, apply:true, count:n });
+    toast(r.ok?("Generated: "+r.spec+(r.why?" — "+r.why:"")):("Failed: "+(r.error||"")));
+    if(r.ok){ DATA.personaCard=null; await refresh(true); }
   };
 }
-function nextSlot(){ return (DATA.schedule||[]).find(s=>!s.passed && !s.quiet); }
 
-/* ============================ quota ============================ */
-function renderQuota(){
-  const root=$("#tab-quota"), q=DATA.quota;
-  const rows = Object.entries(q.usage||{}).map(([k,v])=>
-    `<tr><td>${esc(k)}</td><td>${v.calls}</td><td>${v.in}</td><td>${v.out}</td></tr>`).join("");
-  const el = q.eleven ? q.eleven.left : null;
-  const elMax = q.eleven && q.eleven.limit ? q.eleven.limit : null;
-  root.innerHTML = `<div class="card">
-      <h2>Usage</h2>
-      <div class="grid">
-        <div><div class="stat">Photos today</div><div style="font-size:19px;font-weight:650;color:#fff">${q.photos}<span class="tiny"> / ${q.photoMax}</span></div>
-          <div class="prog"><i style="width:${Math.min(100,Math.round(q.photos/Math.max(1,q.photoMax)*100))}%"></i></div></div>
-        <div><div class="stat">Voice notes (characters)</div><div style="font-size:19px;font-weight:650;color:#fff">${q.ttsChars}${q.ttsMax?`<span class="tiny"> / ${q.ttsMax}</span>`:""}</div>
-          <div class="prog"><i style="width:${q.ttsMax?Math.min(100,Math.round(q.ttsChars/q.ttsMax*100)):0}%"></i></div></div>
-        ${el!==null?`<div><div class="stat">ElevenLabs remaining</div><div style="font-size:19px;font-weight:650;color:#fff">${el}<span class="tiny"> characters</span></div>
-          ${elMax?`<div class="prog"><i style="width:${Math.min(100,Math.round(el/elMax*100))}%"></i></div>`:""}
-          ${q.eleven.reset?`<div class="hint">resets ${esc(q.eleven.reset)}</div>`:""}</div>`:""}
-      </div>
+/* ═══════════════════════════════ settings ═══════════════════════════════ */
+const GROUPS = [
+  ["Reply style",["REACTION_CHANCE","QUOTE_CHANCE","SKIP_CHANCE","TYPO_CHANCE","BURST_CHANCE"]],
+  ["Read & typing timing",["READ_MIN_MS","READ_MAX_MS","PRETYPE_MIN_MS","PRETYPE_MAX_MS","TYPING_PAUSE_CHANCE","DEBOUNCE_MS","DEBOUNCE_MAX_MS"]],
+  ["Voice notes",["VOICE_CHANCE","VOICE_MIRROR_CHANCE","TEXT_THEN_VOICE_CHANCE","VOICE_SPLIT_CHANCE"]],
+  ["Photos & stickers",["PHOTO_CHANCE","STICKER_CHANCE","STICKER_ONLY_CHANCE"]],
+  ["Pet name",["DEFAULT_NICK","NICK_CHANCE","NICK_MOOD_MIN"]],
+  ["Sulking",["NUDGE_AFTER_MIN","DRY_AFTER_MIN","DRY_SILENT_AFTER"]],
+  ["Follow-ups",["CHECKUP_CHANCE","CHECKUP_COOLDOWN_MIN","MAX_PENDING_CHECKUPS"]],
+  ["Messaging first",["PROACTIVE_IDLE_MIN","PROACTIVE_GAP_MIN"]],
+  ["Strangers",["STRANGER_GUARD","STRANGER_WARN_SCORE","STRANGER_BLOCK_SCORE","STRANGER_FLOOD_PER_MIN","STRANGER_PROMOTE_AFTER"]],
+  ["Errands",["TASKS","TASK_DAILY_MAX"]],
+  ["Routine & world",["ROUTINE","ROUTINE_MOOD","ROUTINE_KEEP_DAYS","ROUTINE_HIGHLIGHT_MIN","ROUTINE_HIGHLIGHT_MAX","WORLD"]],
+  ["Other",["USER_WORK_HOURS"]],
+];
+function knobField(k){
+  return `<div class="kfield" data-key="${esc(k.key)}" data-search="${esc((k.label+" "+k.key).toLowerCase())}">
+    <label>${esc(k.label)}<span class="tiny"> · ${esc(k.key)}</span></label>
+    <input data-k="${esc(k.key)}" class="knob" value="${esc(k.value??"")}">
+    <div class="hint" data-h="${esc(k.key)}">${hintFor(k.key,k.value)}</div></div>`;
+}
+function renderSettings(){
+  if(SETTINGS_LOADED) return;
+  const s=DATA.settings, root=$("#tab-settings");
+  const seen=new Set();
+  const groups=GROUPS.map(([title,keys])=>{
+    const fields=keys.map(key=>{ const k=s.knobs.find(x=>x.key===key); if(!k) return ""; seen.add(key); return knobField(k); }).join("");
+    return fields?`<div style="border-bottom:1px solid var(--line);padding:12px 0"><div class="kick" style="margin-bottom:9px">${esc(title)}</div><div class="grid">${fields}</div></div>`:"";
+  }).join("");
+  const rest=s.knobs.filter(k=>!seen.has(k.key)).map(knobField).join("");
+  root.innerHTML=`
+    <div class="card">
+      <h2>Search</h2>
+      <input id="knob-q" placeholder="filter settings…">
     </div>
     <div class="card">
-      <h2>Tokens ${q.usageDay?`· ${q.usageDay}`:""}</h2>
+      <div id="knobbox">${groups}${rest?`<div style="padding:12px 0"><div class="kick" style="margin-bottom:9px">Other</div><div class="grid">${rest}</div></div>`:""}</div>
+      <div class="btns" style="margin-top:14px">
+        <button class="act primary" id="btn-save-settings">Save (applies immediately)</button>
+        <button class="act" id="btn-auto">Auto (let the model decide)</button>
+        <span class="grow"></span>
+        <button class="act danger" id="btn-restart">Restart bot</button>
+      </div>
+      <div class="muted" id="save-hint" style="margin-top:9px"></div>
+    </div>`;
+  $("#btn-save-settings").onclick=()=>saveSettings();
+  $("#btn-auto").onclick=async ()=>{
+    toast("The model is deciding…");
+    const r=await api("/api/auto",{apply:true});
+    if(r.ok){ toast("Automatic settings applied"); SETTINGS_LOADED=false; await refresh(true); } else toast("Failed: "+(r.error||"?"));
+  };
+  $("#btn-restart").onclick=async ()=>{ await api("/api/restart",{}); toast("Restarting…"); };
+  $("#knob-q").oninput=(e)=>{
+    const q=e.target.value.trim().toLowerCase();
+    $$(".kfield").forEach(f=>{ f.style.display=(!q||f.dataset.search.includes(q))?"":"none"; });
+  };
+  SETTINGS_LOADED=true;
+}
+async function saveSettings(){
+  const values={};
+  $$(".knob").forEach(i=>{ const v=i.value.trim(); values[i.dataset.k]=(v===""||isNaN(Number(v)))?v:Number(v); });
+  await api("/api/settings",{values});
+  SETTINGS_LOADED=false;
+  toast("Saved — applied immediately, no restart needed");
+  await refresh(true);
+  const h=$("#save-hint"); if(h) h.innerHTML="✓ written to <b>.env</b> and picked up by the running bot.";
+}
+
+/* ═══════════════════════════════ usage ═══════════════════════════════ */
+function renderQuota(){
+  const q=DATA.quota, root=$("#tab-quota");
+  const rows=Object.entries(q.usage||{}).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v.calls}</td><td>${v.in}</td><td>${v.out}</td></tr>`).join("");
+  root.innerHTML=`
+    <div class="card">
+      <h2>Quota</h2>
+      <div class="rings">
+        ${ringSVG(q.photos,q.photoMax,q.photos+" / "+q.photoMax,"photos today","#8fb8ff")}
+        ${ringSVG(q.ttsChars,q.ttsMax||0,q.ttsChars+"","voice characters","#3ddc97")}
+        ${q.eleven?ringSVG(q.eleven.left,q.eleven.limit||0,String(q.eleven.left),"ElevenLabs left","#e0a6ff"):""}
+      </div>
+      ${q.eleven&&q.eleven.reset?`<div class="tiny" style="text-align:center;margin-top:10px">ElevenLabs resets ${esc(q.eleven.reset)}</div>`:""}
+    </div>
+    <div class="card">
+      <h2>Tokens ${q.usageDay?`· ${esc(q.usageDay)}`:""}</h2>
       <table><tr><th>provider</th><th>calls</th><th>in</th><th>out</th></tr>${rows||'<tr><td colspan=4 class="muted">none yet</td></tr>'}</table>
     </div>`;
 }
 
-/* ============================ log ============================ */
+/* ═══════════════════════════════ log ═══════════════════════════════ */
 function renderLog(){
   const root=$("#tab-log");
-  if(!$("#log-pre",root)) root.innerHTML = `<div class="card tight">
-      <input id="log-q" placeholder="filter log…" autocomplete="off">
-      <pre id="log-pre" style="margin-top:9px"></pre></div>`;
-  const q = ($("#log-q").value||"").trim().toLowerCase();
-  const pre = $("#log-pre");
-  const atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 24;
-  const lines = (DATA.log||[]).filter(l=>!q || l.toLowerCase().includes(q));
-  pre.innerHTML = lines.map(l=>{
-    let cls = "";
-    if(/error|failed|gagal|ERR/.test(l)) cls="#ff8a8a";
-    else if(/→|sent|terkirim/.test(l)) cls="#9fd8ff";
-    else if(/←|received|masuk/.test(l)) cls="#b8f0c8";
-    else if(/soft|melunak|thaw|ngambek|dry|silent/.test(l)) cls="#e3b6ff";
-    return `<span style="color:${cls||"#c9ced9"}">${esc(l)}</span>`;
+  if(!$("#log-pre",root)) root.innerHTML=`<div class="card tight">
+    <input id="log-q" placeholder="filter log…" autocomplete="off"><pre id="log-pre" style="margin-top:10px"></pre></div>`;
+  const q=($("#log-q").value||"").trim().toLowerCase();
+  const pre=$("#log-pre");
+  const atBottom=pre.scrollTop+pre.clientHeight>=pre.scrollHeight-24;
+  pre.innerHTML=(DATA.log||[]).filter(l=>!q||l.toLowerCase().includes(q)).map(l=>{
+    let c="#c3c9d8";
+    if(/error|failed|✗/i.test(l)) c="#ff8a9a";
+    else if(/→|sent|blocked/i.test(l)) c="#9fd8ff";
+    else if(/←|received|stranger/i.test(l)) c="#b8f0c8";
+    else if(/soft|thaw|dry|silent|moment/i.test(l)) c="#e3b6ff";
+    return `<span style="color:${c}">${esc(l)}</span>`;
   }).join("\n");
-  if(atBottom) pre.scrollTop = pre.scrollHeight;
+  if(atBottom) pre.scrollTop=pre.scrollHeight;
 }
 
-/* ============================ render ============================ */
+/* ═══════════════════════════════ render ═══════════════════════════════ */
 function renderAll(){
   renderHeader();
   if(tab==="contacts" && !dragging && !contactsDirty) renderContacts();
   if(tab==="character") renderCharacter();
   if(tab==="agent") renderAgent();
-  if(tab==="settings") renderSettings();
   if(tab==="schedule") renderSchedule();
+  if(tab==="settings") renderSettings();
   if(tab==="quota") renderQuota();
   if(tab==="log") renderLog();
 }
-async function refresh(forceSettings){
-  DATA = await api("/api/summary");
-  if(forceSettings) { SETTINGS_LOADED = false; DATA.personaCard = null; }
+async function refresh(force){
+  DATA=await api("/api/summary");
+  if(force){ SETTINGS_LOADED=false; DATA.personaCard=null; charDirty=false; }
   renderAll();
 }
 
-/* ============================ events ============================ */
-document.addEventListener("input", (e)=>{
-  const t = e.target;
-  if(t.closest && t.closest("#tab-contacts")){
-    contactsDirty = true;
-    const h = $("#contacts-hint");
-    if(h) h.innerHTML = '<span style="color:var(--warn)">● unsaved changes — press Save on that contact</span>';
+/* ═══════════════════════════════ events ═══════════════════════════════ */
+document.addEventListener("input",(e)=>{
+  const t=e.target;
+  if(t.closest&&t.closest("#tab-contacts")){
+    contactsDirty=true;
+    const h=$("#contacts-hint"); if(h) h.innerHTML='<span style="color:var(--warn)">● unsaved changes — press Save on that contact</span>';
   }
-  if(t.closest && t.closest("#tab-character")){
-    charDirty = true;
-    const h = $("#char-hint");
-    if(h) h.innerHTML = '<span style="color:var(--warn)">● unsaved changes</span>';
+  if(t.closest&&t.closest("#tab-character")){
+    charDirty=true;
+    const h=$("#char-hint"); if(h) h.innerHTML='<span style="color:var(--warn)">● unsaved changes</span>';
   }
   if(t.classList?.contains("mrange")){
-    dragging = true;
-    const jid = t.dataset.jid;
-    draft[jid] = draft[jid] || { values:{} };
-    draft[jid].values[t.dataset.k] = Number(t.value);
-    const out = t.closest(".mrow").querySelector(".mval");
-    if(out) out.textContent = Number(t.value).toFixed(2);
+    dragging=true;
+    const jid=t.dataset.jid;
+    draft[jid]=draft[jid]||{values:{}};
+    draft[jid].values[t.dataset.k]=Number(t.value);
+    const out=t.closest(".mrow").querySelector(".mval"); if(out) out.textContent=Number(t.value).toFixed(2);
   }
-  if(t.classList?.contains("knob")){
-    const h = $(`[data-h="${t.dataset.k}"]`);
-    if(h) h.textContent = hintFor(t.dataset.k, t.value);
-  }
-  if(t.id === "q") renderContacts();
-  if(t.id === "log-q") renderLog();
+  if(t.classList?.contains("knob")){ const h=$(`[data-h="${t.dataset.k}"]`); if(h) h.textContent=hintFor(t.dataset.k,t.value); }
+  if(t.id==="q") renderContacts();
+  if(t.id==="log-q") renderLog();
 });
-document.addEventListener("pointerup", ()=>{ dragging = false; });
-document.addEventListener("pointercancel", ()=>{ dragging = false; });
+document.addEventListener("pointerup",()=>{ dragging=false; });
+document.addEventListener("pointercancel",()=>{ dragging=false; });
+document.addEventListener("toggle",(e)=>{
+  const d=e.target.closest&&e.target.closest("#tab-contacts details"); if(!d) return;
+  const jid=d.closest(".card")?.dataset.jid; if(!jid) return;
+  if(d.open) openCards.add(jid); else openCards.delete(jid);
+},true);
 
-document.addEventListener("toggle", (e)=>{
-  const d = e.target.closest && e.target.closest("#tab-contacts details");
-  if(!d) return;
-  const jid = d.closest(".ccard")?.dataset.jid;
-  if(!jid) return;
-  if(d.open) openCards.add(jid);
-  else openCards.delete(jid);
-}, true);
-
-document.addEventListener("click", async (e)=>{
-  const b = e.target.closest("[data-act]");
-  if(!b) return;
-  const jid = b.dataset.jid, act = b.dataset.act;
-
+document.addEventListener("click",async (e)=>{
+  const b=e.target.closest("[data-act]"); if(!b) return;
+  const jid=b.dataset.jid, act=b.dataset.act;
   if(act==="mood-manual"){
-    const c = DATA.contacts.find(x=>x.jid===jid);
-    draft[jid] = { values: { ...(c.mood||{}) } };
-    await api("/api/mood",{ jid, mood: c.mood, lock: true });
-    toast("Manual mode — mood locked");
-    SETTINGS_LOADED = false; await refresh(true);
+    const c=DATA.contacts.find(x=>x.jid===jid);
+    draft[jid]={values:{...(c.mood||{})}};
+    await api("/api/mood",{ jid, mood:c.mood, lock:true });
+    toast("Manual mode — mood locked"); await refresh(true);
   }
   if(act==="mood-save"){
-    const values = draft[jid]?.values || {};
-    const r = await api("/api/mood",{ jid, mood: values, lock: true });
-    delete draft[jid];
-    toast("Mood saved and locked → "+(r.label||""));
-    await refresh(true);
+    const values=draft[jid]?.values||{};
+    const r=await api("/api/mood",{ jid, mood:values, lock:true });
+    delete draft[jid]; toast("Mood saved and locked → "+(r.label||"")); await refresh(true);
   }
   if(act==="mood-baseline"){
-    const c = DATA.contacts.find(x=>x.jid===jid);
-    draft[jid] = { values: { ...(c.baseline||c.mood||{}) } };
-    renderContacts();
-    toast("angka diresets ke normal — pencet Simpan buat mengunci");
+    const c=DATA.contacts.find(x=>x.jid===jid);
+    draft[jid]={values:{...(c.baseline||c.mood||{})}}; renderContacts();
+    toast("Values reset to normal — press Save to lock them");
   }
   if(act==="mood-auto"){
     toast("Assessing mood…");
-    const r = await api("/api/mood/auto",{ jid, apply:true });
+    const r=await api("/api/mood/auto",{ jid, apply:true });
     delete draft[jid];
-    toast(r.ok ? ("auto → "+(r.label||"")+(r.suggested?.reason?" · "+r.suggested.reason:"")) : ("gagal: "+(r.error||"")));
-    await refresh(true);
-  }
-  if(act==="block"){
-    contactsDirty = false;
-    const want = b.dataset.v === "1";
-    if(want && !confirm("Block this number on WhatsApp? They will no longer be able to message this account.")) return;
-    const r = await api("/api/block",{ jid, block: want });
-    if(!r.ok) toast("Failed: "+(r.error||""));
-    else if(want && r.onWhatsApp === false) toast("Ignored in the bot only — WhatsApp needs the real number. Fill in \"Phone number\" and try again.");
-    else toast(want?"Blocked on WhatsApp":"Unblocked on WhatsApp");
+    toast(r.ok?("Auto → "+(r.label||"")+(r.suggested?.reason?" · "+r.suggested.reason:"")):("Failed: "+(r.error||"")));
     await refresh(true);
   }
   if(act==="trust"){
-    contactsDirty = false;
-    const want = b.dataset.v === "1";
-    if(!want && !confirm("Cabut kepercayaan? Dia bakal dingin lagi, panggilan sayang & mood-nya diresets ke mode asing.")) return;
-    await api("/api/trust",{ jid, trusted: want });
-    toast(want ? "Trusted (full mode)" : "Stranger mode");
+    contactsDirty=false;
+    const want=b.dataset.v==="1";
+    if(!want && !confirm("Revoke trust? She becomes cold again, and the pet name and mood reset to stranger mode.")) return;
+    await api("/api/trust",{ jid, trusted:want });
+    toast(want?"Trusted (full mode)":"Stranger mode"); await refresh(true);
+  }
+  if(act==="block"){
+    contactsDirty=false;
+    const want=b.dataset.v==="1";
+    if(want && !confirm("Block this number on WhatsApp? They can no longer message this account.")) return;
+    const r=await api("/api/block",{ jid, block:want });
+    if(!r.ok) toast("Failed: "+(r.error||""));
+    else if(want && r.onWhatsApp===false) toast('Ignored in the bot only — WhatsApp needs the real number. Fill in "Phone number" and retry.');
+    else toast(want?"Blocked on WhatsApp":"Unblocked on WhatsApp");
     await refresh(true);
   }
   if(act==="save"){
-    contactsDirty = false;
-    const card = b.closest(".card");
-    await api("/api/contact",{ jid, field:"nick", value: $(".f-nick",card).value });
-    await api("/api/contact",{ jid, field:"persona", value: $(".f-persona",card).value });
-    await api("/api/contact",{ jid, field:"phone", value: $(".f-phone",card).value });
-    await api("/api/contact",{ jid, field:"relation", value: $(".f-relation",card).value, note: $(".f-relation-note",card).value });
-    await api("/api/contact",{ jid, field:"relationNote", value: $(".f-relation-note",card).value });
-    toast("Saved"); contactsDirty = false; await refresh(true);
+    contactsDirty=false;
+    const card=b.closest(".card");
+    await api("/api/contact",{ jid, field:"nick", value:$(".f-nick",card).value });
+    await api("/api/contact",{ jid, field:"persona", value:$(".f-persona",card).value });
+    await api("/api/contact",{ jid, field:"phone", value:$(".f-phone",card).value });
+    await api("/api/contact",{ jid, field:"relation", value:$(".f-relation",card).value, note:$(".f-relation-note",card).value });
+    toast("Saved"); await refresh(true);
   }
   if(act==="proactive"){
     toast("Composing…");
-    const r = await api("/api/proactive",{jid});
-    toast(r.ok ? ("Sent: "+r.text) : ("Skipped: "+(r.reason||"")));
-    refresh();
+    const r=await api("/api/proactive",{jid});
+    toast(r.ok?("Sent: "+r.text):("Skipped: "+(r.reason||""))); refresh();
   }
   if(act==="reset"){
     if(!confirm("Reset this conversation? History and mood are cleared.")) return;
@@ -1088,28 +1079,27 @@ document.addEventListener("click", async (e)=>{
 });
 
 $$("#tabs button").forEach(b=>{
-  b.onclick = () => {
+  b.onclick=()=>{
+    if(charDirty&&tab==="character"&&b.dataset.t!=="character"&&!confirm("You have unsaved card changes. Leave this tab?")) return;
+    if(contactsDirty&&tab==="contacts"&&b.dataset.t!=="contacts"&&!confirm("You have unsaved contact changes. Leave this tab?")) return;
     $$("#tabs button").forEach(x=>x.classList.remove("active"));
-    b.classList.add("active");
-    if(charDirty && tab==="character" && b.dataset.t!=="character" && !confirm("You have unsaved card changes. Leave this tab?")) return;
-    if(contactsDirty && tab==="contacts" && b.dataset.t!=="contacts" && !confirm("You have unsaved contact changes. Leave this tab?")) return;
-    tab = b.dataset.t;
+    b.classList.add("active"); tab=b.dataset.t;
     $$("main > section").forEach(s=>s.hidden=true);
     $("#tab-"+tab).hidden=false;
+    b.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
     renderAll();
   };
 });
-$("#btn-refresh").onclick = ()=>refresh(true);
+$("#btn-refresh").onclick=()=>refresh(true);
 
 refresh();
-// never auto-refresh a tab that is being edited — this used to wipe
-// whatever was being typed, every five seconds
 setInterval(()=>{
   if(document.hidden) return;
   if(["settings","character","agent"].includes(tab)) return;
-  if(tab==="contacts" && (contactsDirty || dragging)) return;
+  if(tab==="contacts" && (contactsDirty||dragging)) return;
   refresh();
-}, 8000);
+},8000);
+setInterval(()=>{ if(tab==="contacts"&&!contactsDirty&&!dragging&&DATA) renderContacts(); }, 30000);
 </script>
 </body>
 </html>

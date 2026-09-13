@@ -190,6 +190,28 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## Dashboard
+
+`rp dash` → http://127.0.0.1:8787, a single-file dark UI (no CDN, works offline).
+
+- **Contacts** — per contact: avatar, tier badge, live stats, a mood **radar**, the six
+  dimensions as bars, a collapsible valence history, the last few messages rendered as
+  chat bubbles, where her day is right now, pending errands and cross-chat notes. Mood has
+  two modes: **Auto** (the tracker decides) and **Manual** (sliders that LOCK her mood until
+  you press Auto). Editing never fights the auto-refresh.
+- **Character** — identity fields, the full personality card, backstory & cast, extra
+  context notes, today's routine, and export/import/delete.
+- **Agent** — the OOC setup assistant (see above).
+- **Schedule** — a 24-hour timeline (awake window, quiet hours, the slots she may message
+  first, a marker for now) plus the editor and auto-generate.
+- **Settings** — every behaviour knob, grouped and searchable, with unit hints.
+- **Usage** — rings for photos, voice characters and ElevenLabs remaining, plus per-provider
+  token usage. **Log** — colour-coded, filterable.
+
+Saving applies immediately: `reloadConfig()` re-reads `.env` into the running process and the
+persona card is read from disk on every reply, so there is no restart step. The only restart
+button is in Settings.
+
 ## Schedule and extra context
 
 **Message-first schedule** (per character). The Schedule tab is an editor now: add or remove
