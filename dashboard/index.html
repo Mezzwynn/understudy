@@ -64,11 +64,9 @@
     background:linear-gradient(180deg,var(--header-bg),var(--header-bg2));border-bottom:1px solid var(--line)}
   .hwrap{max-width:1080px;margin:0 auto;padding:14px 16px 0}
   .brandrow{display:flex;align-items:center;gap:12px}
-  .logobox{position:relative;flex:none;width:50px;height:50px;border-radius:16px;overflow:hidden;
-    border:1px solid var(--line-2);box-shadow:0 12px 30px -14px var(--accent-glow),inset 0 1px 0 rgba(255,255,255,.08);
-    background:linear-gradient(150deg,var(--panel-2),var(--card-2));display:block}
+  .logobox{position:relative;flex:none;width:52px;height:52px;border-radius:17px;overflow:hidden;display:block;
+    box-shadow:0 12px 28px -16px rgba(0,0,0,.75)}
   .logobox img{width:100%;height:100%;object-fit:cover;display:block}
-  .logobox::after{content:"";position:absolute;inset:0;border-radius:16px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
   .namerow{display:flex;align-items:center;gap:8px;min-width:0}
   .ver{font-size:10.5px;font-weight:600;letter-spacing:.4px;color:var(--accent);
     border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent);
@@ -430,7 +428,6 @@ function dayTimeline(info){
 /* ═══════════════════════════════ header ═══════════════════════════════ */
 function renderHeader(){
   const b=DATA.bot;
-  $("#brand-av").textContent = b.persona.emoji || "🖤";
   $("#pname").textContent = `${b.persona.emoji||""} ${b.persona.name}`.trim();
   $("#chip-ver").textContent = "v" + (DATA.version || "0.0.0");
   $("#dot").className = "pulse" + (b.connected ? " on" : "");

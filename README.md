@@ -362,6 +362,8 @@ lists, or delete anything — that is enforced in code by an allowlist, not by t
 ```bash
 rp test            # everything below
 rp lint            # identifiers that are called but never imported/defined
+                   #   (also checks that every element id the dashboard script
+                   #    uses still exists in the markup)
 rp smoke           # the whole reply path with a fake socket, no model calls
 rp smoke --live    # same, with the real model (costs a few calls)
 rp turing          # humanness eval against an independent judge
