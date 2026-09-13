@@ -65,6 +65,66 @@ keeps filling the same library.
 Openverse answers 500/504 from this network and each failed call costs a minute, so it is
 **opt-in** (`--openverse`); Wikimedia alone carries the library for now.
 
+
+---
+
+## Appendix: Atlas Cloud, tested (14 Sep, key supplied by Hik)
+
+Hik's key works. It is worth having, because the same models cost **half to a seventeenth** of what
+OpenRouter charges, and it answers in 8-18 seconds instead of 13-30.
+
+| Model | Price per image | Note |
+|---|---|---|
+| `openai/gpt-image-1-mini/text-to-image` | **$0.004** | cheapest by far, quality untested |
+| `z-image/turbo` | $0.005 | fast and cheap |
+| `black-forest-labs/flux-dev-lora` | $0.015 | accepts a **LoRA slot** |
+| `black-forest-labs/flux-kontext-dev` | $0.025 | editing with a reference |
+| `bytedance/seedream-v4.7/text-to-image` | $0.03 | |
+| `black-forest-labs/flux-2-pro/text-to-image` | $0.03 | |
+| `google/nano-banana/text-to-image` | $0.038 | the one tested end to end |
+| `google/nano-banana-2/edit` | $0.08 | takes reference images |
+| *(OpenRouter, for comparison)* | $0.067 / $0.139 | |
+
+Shape of the API (taken from the official n8n node, then confirmed against the live service):
+
+```
+POST /api/v1/model/generateImage   { model, prompt, ...params }   -> { data: { id } }
+GET  /api/v1/model/prediction/{id}                                -> { data: { status, outputs } }
+GET  /api/v1/models                                                -> 491 models, 134 of them image
+Authorization: Bearer <key>
+```
+
+- model ids carry a **task suffix** — `google/nano-banana/text-to-image`, `.../edit`,
+  `.../reference-to-image`. Sending a bare name like `google/gemini-3.1-flash-image` fails with a
+  confusing *"failed to evaluate price: expression compile failed"* — the catalogue prices the
+  full id, not the family.
+- each model publishes an OpenAPI **schema** (`static.atlascloud.ai/model/schema/...json`) that
+  lists its parameters, so the request shape is discoverable rather than guessed.
+- outputs land on a public URL, which is convenient: that URL can be fed straight back in as the
+  reference image for the next call.
+- **134 image models, 63 families**, including `edit` and `reference-to-image` variants *and*
+  LoRA slots (`flux-dev-lora`, `flux-kontext-dev-lora`, `z-image/turbo-lora`). No training endpoint
+  was found, so their LoRA models take an existing LoRA rather than making one.
+
+### And identity still does not hold
+
+Two more tests, both with the reference photo passed directly to an editing model:
+
+| Attempt | Identity score |
+|---|---|
+| Written identity description + reference + pro model (OpenRouter) | 4/10 |
+| `google/nano-banana-2/edit` given the reference photo (Atlas Cloud) | 4/10 |
+| **Memory test**: remember her face, then pick her out of three candidates | **failed** — the judge said none of the three was her |
+
+The judge's own note on the edit result: *"a generic avatar wearing the person's features rather
+than a true representation"*. So this is not one bad model; it is what prompt-driven editing does
+to a face.
+
+**Conclusion, and it decides the feature:** a new photo of her face is not something to generate on
+a whim, however cheap the image is. Faces come from a **curated, fixed library** — and if new ones
+are ever truly needed, they come from a trained model, on a service that trains them.
+
+
 ---
 
 ## 2. The plan: a library, not a generator
