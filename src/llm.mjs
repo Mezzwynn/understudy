@@ -76,7 +76,33 @@ async function callProvider(p, { messages, temperature, maxTokens, json }) {
     }
     trackUsage(p.label, data);
     const msg = data.choices?.[0]?.message;
-    const content = (msg?.content ?? "").trim();
+    let content = (msg?.content ?? "").trim();
+
+    // Some models (GLM especially, and Gemini with thinking turned on) spend the
+    // whole max_tokens budget on reasoning and return EMPTY content with
+    // finish_reason "length". Retrying the same provider with more room is much
+    // cheaper than falling through to another model.
+    if (!content && data.choices?.[0]?.finish_reason === "length") {
+      const bigger = Math.min(Math.max(maxTokens * 2, maxTokens + 400), 8000);
+      log(`llm ${p.label}: empty content after hitting max_tokens (${maxTokens}) — retrying with ${bigger}`);
+      const res3 = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${p.apiKey}` },
+        body: JSON.stringify({ ...body, max_tokens: bigger }),
+        signal: ctrl.signal,
+      });
+      const text3 = await res3.text();
+      if (res3.ok) {
+        try {
+          const data3 = JSON.parse(text3);
+          trackUsage(p.label, data3);
+          content = (data3.choices?.[0]?.message?.content ?? "").trim();
+        } catch {
+          /* stay empty and let the caller fall through to the next provider */
+        }
+      }
+    }
+
     if (!content) throw new Error(`${p.label}: empty content`);
     return content;
   } finally {
