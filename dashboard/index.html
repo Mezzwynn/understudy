@@ -25,9 +25,9 @@
     --conv:rgba(6,7,11,.5); --bub-them:rgba(255,255,255,.06); --code-bg:rgba(4,5,8,.75);
   }
   /* ── Mono: her own palette. Graphite, one cold accent, no candy. */
-  body.t-mono{
-    --bg:#0a0a0b; --bg-2:#0f1011;
-    --panel:rgba(24,25,27,.78); --panel-2:rgba(34,35,38,.6);
+  html.t-mono, body.t-mono{
+    --bg:#08080a; --bg-2:#121214;
+    --panel:rgba(28,29,31,.86); --panel-2:rgba(40,41,44,.7);
     --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14);
     --tx:#f2f2f3; --dim:#9b9c9f; --dim-2:#7c7d80;
     --accent:#e8e8ea; --accent-2:#b9babe; --accent-glow:rgba(255,255,255,.18);
@@ -39,9 +39,9 @@
     --conv:rgba(10,10,11,.6); --bub-them:rgba(255,255,255,.06); --code-bg:rgba(8,8,9,.8);
   }
   /* ── Aurora: cold teal + rose, softer contrast */
-  body.t-aurora{
-    --bg:#05090b; --bg-2:#08121a;
-    --panel:rgba(16,30,36,.72); --panel-2:rgba(24,44,52,.6);
+  html.t-aurora, body.t-aurora{
+    --bg:#03100f; --bg-2:#062420;
+    --panel:rgba(10,40,42,.78); --panel-2:rgba(16,58,58,.68);
     --line:rgba(140,255,230,.14); --line-2:rgba(140,255,230,.24);
     --tx:#eaf7f5; --dim:#93b3b0; --dim-2:#7b9b98;
     --accent:#3ddcc0; --accent-2:#22b39c; --accent-glow:rgba(61,220,192,.35);
@@ -53,8 +53,8 @@
     --conv:rgba(5,12,15,.55); --bub-them:rgba(140,255,230,.07); --code-bg:rgba(3,8,10,.8);
   }
   /* ── Paper: light theme, for daytime reading */
-  body.t-paper{
-    --bg:#f4f5f7; --bg-2:#e9ebef;
+  html.t-paper, body.t-paper{
+    --bg:#f6f7fa; --bg-2:#e6e9f0;
     --panel:rgba(255,255,255,.92); --panel-2:rgba(240,241,245,.9);
     --line:rgba(15,20,30,.10); --line-2:rgba(15,20,30,.18);
     --tx:#14161c; --dim:#5b6272; --dim-2:#787f8f;
@@ -67,13 +67,13 @@
     --ghost:rgba(15,20,30,.045); --track:rgba(15,20,30,.1);
     --conv:rgba(15,20,30,.035); --bub-them:rgba(15,20,30,.05); --code-bg:rgba(15,20,30,.05);
   }
-  body.t-paper{ background:radial-gradient(900px 500px at 50% -200px, rgba(91,75,214,.12), transparent 60%), linear-gradient(180deg,var(--bg),var(--bg-2)) }
+  html.t-paper, body.t-paper{ background:radial-gradient(900px 500px at 50% -200px, rgba(91,75,214,.12), transparent 60%), linear-gradient(180deg,var(--bg),var(--bg-2)) }
   /* ── density ── */
-  body.dense{ --pad:12px; --gap:11px; --fs:14px }
-  body.dense .card{padding:12px}
-  body.dense .card.hero{padding:13px}
-  body.dense .hint{display:none}
-  body.dense .legend{display:none}
+  html.dense, body.dense{ --pad:12px; --gap:11px; --fs:14px }
+  html.dense .card, body.dense .card{padding:12px}
+  html.dense .card.hero, body.dense .card.hero{padding:13px}
+  html.dense .hint, body.dense .hint{display:none}
+  html.dense .legend, body.dense .legend{display:none}
 
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0}
@@ -326,6 +326,14 @@
 
 <script>
 /* ═══════════════════════════════ helpers ═══════════════════════════════ */
+// localStorage can throw (private mode / blocked site data). Never let that stop
+// a theme switch — fall back to memory.
+const memStore = {};
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch { return memStore[k] ?? null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch { memStore[k] = String(v); } },
+  del(k){ try { localStorage.removeItem(k); } catch { delete memStore[k]; } },
+};
 const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -985,6 +993,7 @@ function renderSettings(){
       </div>
       <div class="kick" style="margin:14px 0 8px">density</div>
       <div class="row"><button class="act" id="density-toggle">Comfortable / compact</button></div>
+      <div class="chip" id="look-status" style="display:inline-flex;margin-top:12px">—</div>
       <div class="hint" style="margin-top:10px">The accent also colours avatars, tabs, bubbles and buttons. Text on top flips between black and white automatically so it stays readable.</div>
     </div>
     <div class="card">
@@ -1002,11 +1011,11 @@ function renderSettings(){
       <div class="muted" id="save-hint" style="margin-top:9px"></div>
     </div>`;
   $("#btn-save-settings").onclick=()=>saveSettings();
-  $("#theme-row").onclick=(e)=>{ const b=e.target.closest("[data-set-theme]"); if(!b) return; localStorage.setItem("us-theme", b.dataset.setTheme); applyLook(); toast("Theme: "+b.textContent.trim()); };
-  $("#accent-row").onclick=(e)=>{ const b=e.target.closest("[data-accent]"); if(!b) return; setAccent(b.dataset.accent); localStorage.setItem("us-accent", b.dataset.accent); toast("Accent "+b.dataset.accent); };
-  const ac=$("#accent-custom"); if(ac) ac.oninput=(e)=>{ setAccent(e.target.value); localStorage.setItem("us-accent", e.target.value); };
-  const ar=$("#accent-reset"); if(ar) ar.onclick=()=>{ localStorage.removeItem("us-accent"); applyLook(); SETTINGS_LOADED=false; refresh(true); toast("Accent reset"); };
-  const dt=$("#density-toggle"); if(dt) dt.onclick=()=>{ localStorage.setItem("us-dense", localStorage.getItem("us-dense")==="1"?"0":"1"); applyLook(); toast("Density changed"); };
+  $("#theme-row").onclick=(e)=>{ const b=e.target.closest("[data-set-theme]"); if(!b) return; store.set("us-theme", b.dataset.setTheme); applyLook(); toast("Theme: "+b.textContent.trim()); };
+  $("#accent-row").onclick=(e)=>{ const b=e.target.closest("[data-accent]"); if(!b) return; setAccent(b.dataset.accent); store.set("us-accent", b.dataset.accent); toast("Accent "+b.dataset.accent); };
+  const ac=$("#accent-custom"); if(ac) ac.oninput=(e)=>{ setAccent(e.target.value); store.set("us-accent", e.target.value); };
+  const ar=$("#accent-reset"); if(ar) ar.onclick=()=>{ store.del("us-accent"); applyLook(); SETTINGS_LOADED=false; refresh(true); toast("Accent reset"); };
+  const dt=$("#density-toggle"); if(dt) dt.onclick=()=>{ store.set("us-dense", store.get("us-dense")==="1"?"0":"1"); applyLook(); toast("Density changed"); };
   $("#btn-auto").onclick=async ()=>{
     toast("The model is deciding…");
     const r=await api("/api/auto",{apply:true});
@@ -1216,20 +1225,32 @@ function setAccent(hex){
   const custom=$("#accent-custom"); if(custom && custom.value.toLowerCase()!==String(hex).toLowerCase()) custom.value = hex.length===7?hex:"#8b7bff";
 }
 function applyLook(){
-  // ?theme=t-mono&dense=1 also works, so a look can be shared as a link
+  // ?theme=t-mono&accent=%23ff6b9d&dense=1 also works, so a look can be shared as a link
   const params = new URLSearchParams(location.search);
-  if(params.has("theme")) localStorage.setItem("us-theme", params.get("theme") || "");
-  if(params.has("dense")) localStorage.setItem("us-dense", params.get("dense") === "1" ? "1" : "0");
-  if(params.has("accent")) localStorage.setItem("us-accent", params.get("accent"));
-  const theme = localStorage.getItem("us-theme") || "";
-  const dense = localStorage.getItem("us-dense") === "1";
-  const accent = localStorage.getItem("us-accent") || "";
-  document.body.classList.remove("t-mono","t-aurora","t-paper");
-  if(theme) document.body.classList.add(theme);
-  document.body.classList.toggle("dense", dense);
+  if(params.has("theme")) store.set("us-theme", params.get("theme") || "");
+  if(params.has("dense")) store.set("us-dense", params.get("dense") === "1" ? "1" : "0");
+  if(params.has("accent")) store.set("us-accent", params.get("accent"));
+  const theme = store.get("us-theme") || "";
+  const dense = store.get("us-dense") === "1";
+  const accent = store.get("us-accent") || "";
+  for (const el of [document.documentElement, document.body]) {
+    el.classList.remove("t-mono","t-aurora","t-paper");
+    if(theme) el.classList.add(theme);
+    el.classList.toggle("dense", dense);
+  }
+  $$("#theme-row [data-set-theme]").forEach(b=>{
+    const on = (b.dataset.setTheme || "") === theme;
+    b.classList.toggle("primary", on);
+  });
   $$("#themebar .tdot[data-theme]").forEach(b=>b.classList.toggle("sel", b.dataset.theme===theme));
   const d=$("#btn-dense"); if(d) d.classList.toggle("sel", dense);
   const t=$("#theme-name"); if(t) t.textContent = (theme || "violet").replace("t-","");
+  const ls = $("#look-status");
+  if(ls){
+    let storageOk = true;
+    try { localStorage.setItem("us-probe","1"); localStorage.removeItem("us-probe"); } catch { storageOk = false; }
+    ls.textContent = `active: ${(theme || "violet").replace("t-","")} · ${dense ? "compact" : "comfortable"} · accent ${accent || "theme"} · storage ${storageOk ? "ok" : "memory only"}`;
+  }
   document.body.style.removeProperty("--accent");
   if(accent){
     document.body.style.setProperty("--accent", accent);
@@ -1241,8 +1262,8 @@ function applyLook(){
 }
 document.addEventListener("click",(e)=>{
   const dot=e.target.closest("#themebar .tdot[data-theme]");
-  if(dot){ localStorage.setItem("us-theme", dot.dataset.theme); applyLook(); toast(dot.title || "Theme"); }
-  if(e.target.closest("#btn-dense")){ localStorage.setItem("us-dense", localStorage.getItem("us-dense")==="1"?"0":"1"); applyLook(); }
+  if(dot){ store.set("us-theme", dot.dataset.theme); applyLook(); toast("Theme: "+(dot.title || "Violet")); }
+  if(e.target.closest("#btn-dense")){ store.set("us-dense", store.get("us-dense")==="1"?"0":"1"); applyLook(); toast(store.get("us-dense")==="1"?"Compact":"Comfortable"); }
 });
 applyLook();
 
