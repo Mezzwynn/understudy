@@ -38,6 +38,48 @@ No text, no watermark.`,
   },
 };
 
+Object.assign(SCENES, {
+  "pagi-kerja": {
+    aspect: "4:3",
+    prompt: `A casual phone photo taken by a 20-year-old in Denpasar, Bali in the morning: an iced coffee in a
+plastic cup, a phone and a closed laptop on a small wooden desk, a hair tie and a pair of earphones beside them.
+Photographed from slightly above at an angle, no people and no hands in frame. Soft morning daylight through a
+window, slightly crooked framing, mild sensor noise, not tidy. A normal snapshot sent to a friend.
+No text, no watermark.`,
+  },
+  "warung-malam": {
+    aspect: "4:3",
+    prompt: `A casual phone photo taken at night at a small outdoor warung in Denpasar, Bali: a plastic plate of
+nasi campur, a glass of iced tea, a paper napkin, a motorbike parked in the blurred background under a yellow
+street light. No people and no hands in frame. Photographed from the seat across the table, handheld, grainy in
+low light, harsh single bulb above the table, slightly crooked framing. A normal snapshot sent to a friend.
+No text, no watermark.`,
+  },
+  momo: {
+    aspect: "4:3",
+    prompt: `A casual phone photo taken by a 20-year-old in Denpasar: a grey and white street cat lying on a
+closed laptop on a wooden desk, one paw hanging off the edge, a half-full glass of iced tea beside it.
+Photographed from slightly above, handheld, indoor daylight from the left, mild noise, slightly crooked framing,
+not composed. A normal snapshot of a pet sent to a friend. No people, no hands, no text, no watermark.`,
+  },
+  "selfie-siang": {
+    aspect: "3:4",
+    prompt: `A candid front-camera selfie taken by a slim 20-year-old Indonesian woman in Denpasar, Bali in the
+afternoon. Shoulder-length straight black hair, oversized plain t-shirt, no makeup, visible skin texture, a small
+mole on her cheek, flat unimpressed expression, no smile. Indoor daylight from a window on the left, a plain
+lived-in room behind her, mildly noisy phone sensor, slightly crooked framing, unposed. A real phone snapshot
+sent to a friend, not a produced photo. No text, no watermark.`,
+  },
+  "selfie-malam": {
+    aspect: "3:4",
+    prompt: `A candid phone selfie taken at night outside a Denpasar cafe by a slim 20-year-old Indonesian woman.
+Shoulder-length straight black hair, black oversized shirt, no makeup, tired but relaxed expression, half a smile
+at most. Lit by a single warm street light and the phone screen glow, dark noisy background with a blurred
+motorbike and a lit shop sign, grainy low-light sensor, slightly crooked framing, unposed. A real night snapshot
+sent to a friend, not a produced photo. No text, no watermark.`,
+  },
+});
+
 const args = process.argv.slice(2);
 const arg = (n, d) => {
   const i = args.indexOf(`--${n}`);
@@ -92,8 +134,8 @@ async function schemaFor(model) {
   };
 }
 
-async function generate(model, meta) {
-  const body = { model, prompt: scene.prompt };
+async function generate(model, meta, promptText = null) {
+  const body = { model, prompt: promptText || scene.prompt };
   for (const key of meta.required) {
     if (key === "model" || key === "prompt") continue;
     if (key === "images") body.images = [];
@@ -143,7 +185,7 @@ async function judge(file, model) {
             { type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } },
             {
               type: "text",
-              text: `This is meant to be a casual photo a 20-year-old woman in Denpasar, Bali sent on WhatsApp: a normal phone snapshot, not a produced image. Answer with JSON only:
+              text: `This is meant to be a casual photo a 20-year-old woman in Denpasar, Bali sent on WhatsApp: a normal phone snapshot, not a produced image.${process.env.IDENTITY_REF ? "\nAlso: photo 1 is her approved face. Photo 2 is the candidate. Are they the same person? Answer the identity question in the JSON as well." : ""} Answer with JSON only:
 {"score":0-10,"what":"what is actually in the photo, one line","real":"does it read as a real phone photo, one line","tells":["exact thing that gives it away", "..."]}
 Score 10 only if nothing in the frame would make anyone doubt it. Be blunt; a produced, clean, professional or shiny image is a low score even if it is pretty.`,
             },

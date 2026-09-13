@@ -154,6 +154,41 @@ expensive end, and the price difference ($0.07 against $0.03) is irrelevant for 
 The rating page stays, with its wording fixed: it now asks for **bagus / lumayan / kurang** and an
 optional "kelihatan aneh" tick, because that is the question actually being answered.
 
+
+---
+
+## The five scenarios, tested (14 Sep, late)
+
+Two models (his picks: nano-banana-pro and seedream-v5.0-pro), five scenes, one prompt each, and the
+same judge. Two of the five put her face in the frame, and those were checked against the real avatar
+he uploaded — so identity drift is measured, not assumed.
+
+| scene | nano-banana-pro | seedream-v5.0-pro |
+|---|---|---|
+| morning desk (coffee, laptop) | **9/10** | **9/10** |
+| warung at night | **9/10** | 5/10 |
+| the cat on the laptop | **10/10** | 9/10 |
+| afternoon selfie | 2/10 — *identity: no* | 3/10 — *identity: no* |
+| night selfie | 3/10 — *identity: no* | 2/10 — *identity: no* |
+
+And the decisive one: `google/nano-banana-2/edit` given **her real avatar** as a reference —
+afternoon 4/10 (*"the facial proportions, philtrum length and eye shape differ significantly"*),
+night 5/10 (*"identity is consistent, but the heavy digital manipulation makes it obvious this is a
+stylised edit"*). It also showed that the reference can be sent as a base64 data URL, so no public
+hosting is needed for a reference.
+
+**So the answer to "can she send photos" is two different answers.**
+
+1. **Places and things: yes, now.** 9-10/10 across both models, and the pictures are of a warung, a
+   desk, a cat — things with no identity to get wrong. This is what most photos in a real chat are.
+2. **Her face: no — not generated.** Every route tried fails: description, reference photo, editing
+   model with the real photo. The face she sends has to be **a real photo of her that already exists**.
+   The library is not a compromise here, it is the only honest option: the avatar, plus whatever else
+   he uploads, sent in rotation the way people actually reuse photos.
+
+If new photos of her face are ever needed, they need a model trained on her (a LoRA) — a paid job on
+a service that does training, and it needs 15-20 approved photos to start from.
+
 ---
 
 ## 2. The plan: a library, not a generator
