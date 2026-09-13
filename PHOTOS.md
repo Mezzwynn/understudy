@@ -133,7 +133,47 @@ photo feature that cannot pass that test does not get switched on.
 
 ---
 
-## 4. What I need from Hik before writing code
+## 4. Hik's decisions (14 Sep)
+
+| Question | Answer |
+|---|---|
+| Whose face | Synthetic only. Candidates generated, Hik picks the one that is her. |
+| Photos for Olivia | **Yes, she should get photos** — switchable per contact in the dashboard. |
+| Place photos | **Take them from online sources** (real photos), but they must match **Fio's place and her routine** — Denpasar, not "somewhere in Bali". |
+| Budget | Build the library on the **free Gemini quota**; pay only if waiting is worse than $0.067 an image. |
+
+### Where the places come from (verified, keyless)
+
+- **Wikimedia Commons** (`commons.wikimedia.org/w/api.php`) and **Openverse** (`api.openverse.org`)
+  both answer without an API key, and both return real photographs with machine-readable licence
+  data. Searches run during planning: *Warung Sang Dewi Denpasar* (5120×3308, CC BY-SA 4.0),
+  *Warung Kenangan* (CC BY 3.0), *Dapoer Chandra Cafe Buleleng* (CC BY 2.0).
+- **Licence rule**: prefer **CC0 / public domain** (no attribution needed); accept CC BY / CC BY-SA
+  but record author + licence + source in `data/photos/places/CREDITS.txt` so the credit exists
+  somewhere real. Never use a photo whose terms are unclear.
+- **Search quality is the actual work.** "Denpasar street night" returned **aeroplanes at the
+  airport**; "Bali cafe" returned a restaurant **in Nairobi**. So the pipeline is: specific
+  queries (warung, pasar, gang kecil, kafe, angkot, pedagang kaki lima, pantai Sanur, Jalan
+  Raya) → drop the obvious (aircraft, maps, diagrams, monuments) → **a vision pass** that rejects
+  aerial shots, brochure landscapes, focus on a stranger's face, and anything that is not a place
+  a 20-year-old could be standing in → then humanise.
+- **Real photos still need the humanising pass**: a Wikimedia photo is often a sharp, wide,
+  professionally framed landscape with GPS in the EXIF — the opposite of a phone snapshot. Crop to
+  phone framing, resize, re-encode (which also strips the GPS), and prefer the ones that already
+  look off-hand over the beautiful ones.
+
+### Gemini, for the record
+
+The image models on the Gemini key are real (`gemini-2.5-flash-image`, `gemini-3.1-flash-image`,
+`gemini-3-pro-image`) but every call answers **429 with a `RetryInfo` of 11-45 seconds** even after
+waiting: the free tier allows very few image requests, so it is effectively a queue, not a budget.
+That is why the earlier numbers came from OpenRouter (flash **$0.067**, pro **$0.139**). For a
+once-built library, free-and-slow is the right trade: generate a few at a time, back off on 429,
+and pay nothing. OpenRouter stays as the fast path when a specific photo is wanted now.
+
+---
+
+## 5. What I need from Hik before writing code
 
 1. **Whose face?** I will only build this with a **synthetic** face. Using a real person's photos
    (scraped from anywhere) is impersonating a specific human being, and face search makes her
@@ -143,21 +183,23 @@ photo feature that cannot pass that test does not get switched on.
    what makes it a person to her. One photo changes the relationship more than a thousand
    messages. That is your call, not mine, but the dashboard will let you turn photos off
    **per contact** so the choice stays local.
-3. **The camera session.** Two photos from the phone's camera already exist from my earlier test
-   (`/sdcard/DCIM/Camera`, 13 Sep 19:37) — I will delete them if you want. For the texture
-   library I need a small set of real photos, and I will ask before each thing leaves the device.
+3. **The camera session.** *(Corrected: the two photos in `/sdcard/DCIM/Camera` from 19:37 are
+   Hik's own, not from my test — the camera call produced a 0-byte file and the pictures are his.
+   Nothing is deleted.)* For the texture library I still need a small set of real photos, and I
+   will ask before each thing leaves the device.
 4. **Budget.** The library is a one-time spend: roughly **$1.50-3** for 20-40 images with retries.
    Runtime cost after that is **$0** per photo. The LoRA path (Layer 3) is a separate decision.
 
 ---
 
-## 5. Order of work
+## 6. Order of work
 
 | # | Step | Cost | Why first |
 |---|---|---|---|
-| 1 | Profile picture: generate, pick, set | ~$0.20 | One image, no consistency problem, biggest visible gain |
-| 2 | The judge + the blind test harness | $0 | Without it, nobody can say whether this works |
-| 3 | Texture library (real photos + a few generated) | ~$0.50 + a shooting session | Covers most real photo use, zero identity risk |
+| 1 | **Place library** (real photos, licence-tracked, matched to her routine) | $0 | Approved tonight, needs no model, and the Status tab can use it *immediately* |
+| 2 | Profile picture: generate, pick, set | $0 (slow) | One image, no consistency problem, biggest visible gain — behind a small queue |
+| 3 | The judge + the blind test harness | $0 | Without it, nobody can say whether this works |
+| 3b | Texture library (real photos + a few generated) | ~$0.50 + a shooting session | Covers most real photo use, zero identity risk |
 | 4 | In-chat sending rules (triggers, frequency, dressing) | $0 | The behaviour is where photos look human or not |
 | 5 | Face library: a curation session in the dashboard | ~$1-2 | Faces are the minority of real photos, and the risky part |
 | 6 | LoRA | $2-10 once | Only if new photos of her are actually missed |
@@ -167,7 +209,7 @@ know the answer, and `rp test` green before anything is claimed.
 
 ---
 
-## 6. What this will not fix
+## 7. What this will not fix
 
 - **A watermark exists.** Google images carry SynthID, an imperceptible mark that survives
   cropping and compression. WhatsApp does not scan or label photos and no ordinary person runs a
