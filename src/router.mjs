@@ -21,6 +21,7 @@ import {
   WARN_LINES,
 } from "./stranger.mjs";
 import { detectMention, addCrossNote, addVouch, resolveNotes } from "./links.mjs";
+import { traitsForChat, topicReaction } from "./traits.mjs";
 import { runTask, notifyTaskReply } from "./tasks.mjs";
 import { ensureToday, tickMoments, momentDeltas, saveRoutine, loadRoutine } from "./routine.mjs";
 import {
@@ -646,10 +647,14 @@ async function respond(sock, jid, p) {
   }
 
   let replyText;
+  const reaction = topicReaction(traitsForChat(chat), incoming);
+  if (reaction.hot.length) log(`hot topic (${reaction.hot.join(", ")}) → she will be livelier`);
   try {
     replyText = await generateReply(chat, incoming, persona, {
       displayName: p.pushName,
       sleepy,
+      hotTopic: reaction.hot,
+      boredTopic: reaction.bored,
       voice: wantVoice,
       startedIt,
       thawed,

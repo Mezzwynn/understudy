@@ -9,9 +9,10 @@ import { openNotes, openVouches } from "./links.mjs";
 import { relationPromptBlock, worldForChat, worldPromptBlock } from "./world.mjs";
 import { contextBlock } from "./schedule.mjs";
 import { pausePromptBlock } from "./pause.mjs";
-import { traitsForChat, humorPromptBlock, interestPromptBlock } from "./traits.mjs";
+import { traitsForChat, humorPromptBlock, interestPromptBlock, topicReaction, touchedBoundaries } from "./traits.mjs";
 import { lifePromptBlock } from "./events.mjs";
 import { sleepPromptBlock, morningNote } from "./sleep.mjs";
+import { weekPromptBlock } from "./week.mjs";
 import { tasksBlock } from "./tasks.mjs";
 
 const ENGINE_FILE = path.join(PROMPT_DIR, "engine.md");
@@ -135,7 +136,7 @@ function factsWithAge(mem) {
   );
 }
 
-export function buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled, worried, sleepy } = {}) {
+export function buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled, worried, sleepy, hotTopic = [], boredTopic = [] } = {}) {
   // always have a mood object, even for a chat that was never used
   const mood = normalize(chat.mood || newMood(baselineFor(chat)));
   chat.mood = mood;
@@ -303,6 +304,7 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     pausePromptBlock(),
     sleepy ? sleepPromptBlock() : morningNote(chat),
     lifePromptBlock(chat),
+    weekPromptBlock(chat.persona || config.persona),
     (() => {
       const asked = (chat.asked || []).filter((a) => Date.now() - a.at < 7 * 24 * 3600 * 1000).slice(-6);
       if (!asked.length) return "";
@@ -316,6 +318,28 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
       config.humor ? humorPromptBlock(tr) : "",
       config.interest ? interestPromptBlock(tr) : "",
     ].join("\n"); })(),
+    (() => {
+      const tr = traitsForChat(chat);
+      const react = topicReaction(tr, chat.lastIncoming || "");
+      const hot = [...new Set([...(hotTopic || []), ...react.hot])];
+      const bored = [...new Set([...(boredTopic || []), ...react.bored])];
+      const touched = touchedBoundaries(chat, chat.lastIncoming || "");
+      const lines = [];
+      if (hot.length) {
+        lines.push("## Dia lagi nyentuh topik yang kamu SUKA");
+        lines.push(`Topiknya: ${hot.join(", ")}. Kamu boleh lebih hidup di balasannya — lebih panjang dikit, lebih banyak reaksi, boleh nyeletuk atau nanya lanjutan. Jangan lebay, tetap kamu.`);
+      }
+      if (bored.length) {
+        lines.push("## Ini topik yang bikin kamu bosen");
+        lines.push(`Topiknya: ${bored.join(", ")}. Jawab pendek dan datar. Jangan pura-pura tertarik, tapi juga jangan kasar — cukup irit.`);
+      }
+      if (touched.length) {
+        lines.push("## Dia barusan nyentuh hal sensitif buat kamu");
+        lines.push(`Yang kesentuh: ${touched.join(" / ")}.`);
+        lines.push("Reaksimu wajar tapi jelas nggak nyaman: jadi lebih pendek, dingin, atau ganti topik. JANGAN jelasin kenapa, jangan ceramah.");
+      }
+      return lines.join("\n");
+    })(),
     config.crossChat ? crossBlock : "",
     config.crossChat ? vouchBlock : "",
     trusted ? tasksBlock(chat) : "",

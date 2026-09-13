@@ -54,6 +54,12 @@ Rules:
 - LANGUAGE: "theme", "what" and "place" must follow the LANGUAGE line in the user message exactly. Keep every string SHORT, max ~12 words.
 - Nothing sexual, nothing illegal, nothing about the people she chats with (this is HER day, they are not in it).`;
 
+/** Is it already partway through the day? (used to ask for a partial plan) */
+function isTodayMid() {
+  const h = new Date().getHours();
+  return h >= 11;
+}
+
 function todayKey(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -105,9 +111,33 @@ export function routineForChat(chat) {
 
 /* ------------------------------- shape -------------------------------- */
 
+/**
+ * Two blocks cannot run at the same time. The model occasionally produces an
+ * overlap (22:30-23:30 then 23:00-00:30), so the earlier block is trimmed back
+ * and dropped if nothing is left of it.
+ */
+function dropOverlaps(list) {
+  const out = [];
+  for (const b of list) {
+    const start = toMin(b.start);
+    const end = toMin(b.end);
+    if (start === null || end === null) continue;
+    const prev = out[out.length - 1];
+    if (prev) {
+      const prevEnd = toMin(prev.end);
+      if (prevEnd !== null && start < prevEnd) {
+        if (start <= toMin(prev.start)) continue; // fully inside the previous one
+        prev.end = b.start; // trim the earlier block
+      }
+    }
+    out.push(b);
+  }
+  return out;
+}
+
 function sanitize(raw) {
   if (!raw || typeof raw !== "object") return null;
-  const blocks = (Array.isArray(raw.blocks) ? raw.blocks : [])
+  const blocks = dropOverlaps((Array.isArray(raw.blocks) ? raw.blocks : [])
     .map((b) => ({
       start: String(b?.start || "").trim(),
       end: String(b?.end || "").trim(),
@@ -116,7 +146,7 @@ function sanitize(raw) {
     }))
     .filter((b) => toMin(b.start) !== null && toMin(b.end) !== null && b.what)
     .sort((a, b) => toMin(a.start) - toMin(b.start))
-    .slice(0, 12);
+    .slice(0, 12));
   const moments = (Array.isArray(raw.moments) ? raw.moments : [])
     .map((m) => ({
       at: String(m?.at || "").trim(),
@@ -160,12 +190,15 @@ export async function ensureToday(persona, { force = false, mood = null } = {}) 
     .filter(Boolean)
     .join("\n");
 
+  const nowClock = `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`;
+  const partial = isTodayMid() ? `- It is already ${nowClock} for her. Plan ONLY the rest of the day, from ${nowClock} until she sleeps. Do not plan anything before that.` : "";
   const user = [
     `CHARACTER CARD:\n${String(persona?.card || "").slice(0, 2600)}`,
     `LANGUAGE: ${languageDirective(persona?.language) || "match the character card"} (card: "${persona?.language || "-"}")`,
     `TODAY: ${weekdayName()} ${key}`,
     persona?.work_hours ? `HER WORK HOURS: ${persona.work_hours}` : "",
     persona?.active_hours ? `HER WAKING HOURS: ${persona.active_hours}` : "",
+    partial,
     mood ? `HER MOOD RIGHT NOW: ${JSON.stringify(mood)}` : "",
     recent,
   ]
@@ -202,13 +235,49 @@ export async function ensureToday(persona, { force = false, mood = null } = {}) 
     return current || null;
   }
 
+  // Regenerating mid-day must NOT wipe what already happened: keep the blocks that
+  // are already over and the moments that already fired, and only replace the rest.
+  const isToday = current && current.date === key;
+  const nowM = nowMin();
+  const keepBlocks = isToday
+    ? (current.blocks || []).filter((b) => {
+        const end = toMin(b.end);
+        return end !== null && end <= nowM;
+      })
+    : [];
+  const keepMoments = isToday ? (current.moments || []).filter((m) => m.firedAt) : [];
+
+  const freshBlocks = clean.blocks.filter((b) => {
+    const end = toMin(b.end);
+    return end === null || end > nowM;
+  });
+  const freshMoments = clean.moments.filter((m) => {
+    const at = toMin(m.at);
+    return at === null || at >= nowM;
+  });
+
+  const mergedBlocks = [...keepBlocks, ...freshBlocks]
+    .sort((a, b) => (toMin(a.start) ?? 0) - (toMin(b.start) ?? 0))
+    .slice(0, 14);
+  const mergedMoments = [...keepMoments, ...freshMoments]
+    .sort((a, b) => (toMin(a.at) ?? 0) - (toMin(b.at) ?? 0))
+    .slice(-8);
+
+  if (isToday && keepBlocks.length + keepMoments.length) {
+    log(
+      `routine ${slug}: kept ${keepBlocks.length} finished blocks and ${keepMoments.length} lived moments, regenerated the rest of the day`,
+    );
+  }
+
   const history2 = current && current.date !== key ? [...(current.history || []), strip(current)] : current?.history || [];
   const routine = {
     slug,
     date: key,
     weekday: weekdayName(),
-    createdAt: Date.now(),
-    ...clean,
+    createdAt: isToday && current?.createdAt ? current.createdAt : Date.now(),
+    theme: isToday && clean.theme ? clean.theme : clean.theme,
+    blocks: mergedBlocks.length ? mergedBlocks : clean.blocks,
+    moments: mergedMoments.length ? mergedMoments : clean.moments,
     history: history2,
     highlights: current?.highlights || [],
   };

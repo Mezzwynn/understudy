@@ -65,6 +65,7 @@ export const FEATURES = [
   { key: "NICK_ACCEPT_WARM", label: "Accepts pet names when warm", kind: "bool", def: 1, hint: "off: she refuses them even when close" },
   { key: "BUDGET_GUARD", label: "Daily model-call limit (safety valve)", kind: "bool", def: 1, hint: "stops and notifies when the day's calls are spent, so a loop cannot drain a prepaid balance" },
   { key: "LLM_DAILY_CALLS_MAX", label: "Calls allowed per day (all providers)", kind: "int", def: 400 },
+  { key: "WEEK_DIGEST", label: "Weekly recap of her life", kind: "bool", def: 1, hint: "a card in the dashboard, a Sunday notification, and she can mention her week" },
   { key: "SLEEP_MODE", label: "She sleeps at night", kind: "bool", def: 1, hint: "during quiet hours most messages wait until morning; if she does answer she is half asleep" },
   { key: "SLEEP_REPLY_CHANCE", label: "Chance she still answers while asleep", kind: "float", def: 0.25, hint: "0 = never wakes up, 1 = always groggy-answers" },
   { key: "LIFE_EVENTS", label: "Real things happen to her", kind: "bool", def: 1, hint: "a weird stranger or a scare colours her mood, her day and what she talks about" },

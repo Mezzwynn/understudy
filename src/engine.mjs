@@ -346,7 +346,7 @@ function reDrift(session) {
 /**
  * Produce one in-character reply and update the chat state.
  */
-export async function generateReply(chat, incoming, persona, { displayName, voice, startedIt, thawed, injection, worried, sleepy } = {}) {
+export async function generateReply(chat, incoming, persona, { displayName, voice, startedIt, thawed, injection, worried, sleepy, hotTopic, boredTopic } = {}) {
   chat.mood = normalize(chat.mood);
   reDrift(chat);
 
@@ -368,7 +368,7 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
     log(`recall failed: ${err.message}`);
   }
 
-  const messages = buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled, worried, sleepy });
+  const messages = buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled, worried, sleepy, hotTopic, boredTopic });
   // she just asked a stranger who they are — do not ask again next message
   if (needsIntroduction(chat)) markIntroAsked(chat);
 

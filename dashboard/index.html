@@ -774,6 +774,7 @@ async function renderCharacter(force){
     ${traitsPanel()}
     ${contextPanel(w)}
     ${worldPanel(w)}
+    ${weekPanel(DATA.week)}
     ${eventsPanel(DATA.events)}
     ${routinePanel(DATA.routine)}`;
 
@@ -978,6 +979,28 @@ function renderTraitList(key){
   box.innerHTML = arr.map((v,i)=>`<div class="mrow" style="grid-template-columns:1fr 30px;gap:7px;align-items:center;margin-bottom:5px">
       <span style="font-size:12.5px">${esc(v)}</span>
       <button class="act" data-trait-del="${key}" data-i="${i}" style="padding:3px 7px">✕</button></div>`).join("") || '<div class="tiny">none yet</div>';
+}
+
+function weekPanel(w){
+  if(!w) return "";
+  const themes = (w.themes||[]).filter(t=>t.theme);
+  return `<div class="card">
+    <div class="row"><h2 style="margin:0">Her week</h2><span class="grow"></span>
+      <span class="badge">${esc(w.from)} → ${esc(w.to)}</span></div>
+    <div class="hint" style="margin-top:6px">Built from her own days: what her week was about, and what she still remembers from it. She can bring this up naturally — it is her life, not a report.</div>
+    ${themes.length?`<div style="margin-top:12px"><span class="kick">Days</span>
+      ${themes.slice().reverse().map(t=>`<div class="mrow" style="grid-template-columns:96px 1fr;gap:9px;margin-top:6px">
+        <span class="tiny">${esc(t.weekday||"")} ${esc(String(t.date||"").slice(5))}</span>
+        <span style="font-size:12.5px">${esc(t.theme)}</span></div>`).join("")}</div>`
+      :'<div class="empty">No days recorded yet.</div>'}
+    ${(w.highlights||[]).length?`<div style="margin-top:14px"><span class="kick">What she still remembers</span>
+      ${w.highlights.map(h=>`<div class="mrow" style="grid-template-columns:22px 1fr 60px;gap:8px;margin-top:6px">
+        <span>${KINDICON[h.kind]||"•"}</span>
+        <span style="font-size:12.5px">${esc(h.what)}</span>
+        <span class="tiny" style="text-align:right">${esc(h.date||"")}</span></div>`).join("")}</div>`:""}
+    ${(w.events||[]).length?`<div style="margin-top:14px"><span class="kick">Things that happened</span>
+      ${w.events.map(e=>`<div class="tiny" style="margin-top:5px">${new Date(e.at).toLocaleDateString("id-ID",{day:"2-digit",month:"short"})} · ${esc(e.what)}</div>`).join("")}</div>`:""}
+  </div>`;
 }
 
 function eventsPanel(e){

@@ -193,6 +193,33 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## Regenerating her day
+
+"Regenerate" used to roll a whole new day and throw away the morning you had already
+lived through. Now it keeps the blocks that are over and the moments that already
+fired, asks the model to plan **only from the current time onward**, and trims
+overlapping blocks (the model sometimes produced 22:30-23:30 and 23:00-00:30 for the
+same evening).
+
+## Topic reactions
+
+Two lists per character (Humor & interest) that are matched against every incoming
+message, with a few cross-language bridges so an English topic still catches Indonesian
+chat ("cat" ⟷ "kucing"):
+
+- **a favourite topic** → she gets livelier, writes a bit more, teases, may ask a follow-up
+- **a boring topic** → flat and short, no pretending to care
+- **a memory boundary** is touched → she visibly goes colder and changes the subject,
+  without ever explaining why
+
+## Her week
+
+`WEEK_DIGEST` builds a recap from data she already has: the themes of her last days, the
+moments she still remembers, and the real events that happened. It shows up as a card in
+the Character tab, as a Sunday-evening phone notification, and as two private lines in her
+prompt — so she can say *"this week was mostly client stuff"* like a person with a life
+instead of only ever reacting.
+
 ## She sleeps
 
 Quiet hours used to silence only the proactive side: a message at 3am still got an instant,

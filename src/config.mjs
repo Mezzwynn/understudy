@@ -94,6 +94,7 @@ function buildConfig() {
   // safety valve: stop making calls when the day's budget is spent
   budgetGuard: envFlag("BUDGET_GUARD", true),
   llmDailyCallsMax: num(envGet("LLM_DAILY_CALLS_MAX", "400"), 400),
+  weekDigest: envFlag("WEEK_DIGEST", true),
   sleepMode: envFlag("SLEEP_MODE", true),
   sleepReplyChance: num(envGet("SLEEP_REPLY_CHANCE", "0.25"), 0.25),
   humor: envFlag("HUMOR", true),

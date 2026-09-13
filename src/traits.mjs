@@ -204,3 +204,92 @@ export function interestPromptBlock(traits) {
   ];
   return lines.filter(Boolean).join("\n");
 }
+
+/* --------------------------- topic sensitivity --------------------------- */
+
+const STOP = new Set([
+  "yang","dan","di","ke","aku","kamu","dia","itu","ini","suka","tidak","jangan","the","a","an","of","to","is","it",
+  "my","your","his","her","about","with","for","on","in","and","or","soal","tentang","lagi","udah","sudah",
+]);
+
+function words(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOP.has(w));
+}
+
+/** A few cross-language bridges, so an English topic still catches Indonesian chat. */
+const SYNONYMS = {
+  kucing: ["cat", "cats", "kitten"],
+  cat: ["kucing", "cats"],
+  lagu: ["music", "song", "playlist", "musik"],
+  musik: ["music", "song", "lagu"],
+  music: ["lagu", "musik", "song"],
+  kopi: ["coffee"],
+  coffee: ["kopi"],
+  kerja: ["work", "job", "kerjaan"],
+  kerjaan: ["work", "job", "kerja"],
+  work: ["kerja", "kerjaan"],
+  film: ["movie", "movies"],
+  movie: ["film"],
+  buku: ["book", "books", "baca"],
+  book: ["buku", "baca"],
+  gosip: ["gossip"],
+  gossip: ["gosip"],
+  desain: ["design"],
+  design: ["desain"],
+  masak: ["cook", "cooking", "masakan"],
+  cooking: ["masak", "masakan"],
+  hujan: ["rain", "rainy"],
+  tidur: ["sleep", "sleeping"],
+  fashion: ["fashion", "outfit", "baju"],
+  playlist: ["playlist", "lagu", "musik"],
+  campaign: ["campaign", "klien", "client"],
+  klien: ["client", "campaign"],
+};
+
+/** Does the message touch one of a list of topics? Returns the matches. */
+function matches(list, text) {
+  const said = new Set(words(text));
+  const hits = [];
+  for (const entry of list || []) {
+    const need = words(entry);
+    if (!need.length) continue;
+    let hit = 0;
+    for (const w of need) {
+      if (said.has(w)) {
+        hit++;
+        continue;
+      }
+      const alts = SYNONYMS[w] || [];
+      if (alts.some((a) => said.has(a))) hit++;
+    }
+    // any matched word counts, including through a synonym: the topics list is
+    // written by hand, so a hit on "cat" for "kucing oren" is the point. Stopwords
+    // are already removed above, which keeps the false positives down.
+    if (hit >= 1) hits.push(entry);
+  }
+  return hits;
+}
+
+/**
+ * What this message lands on: her favourite subjects (she lights up) and the ones
+ * that bore her (she answers flat). Also used for initiative: a favourite topic is
+ * worth an extra message of her own.
+ */
+export function topicReaction(traits, incoming) {
+  const i = traits?.interest;
+  if (!i?.on) return { hot: [], bored: [] };
+  return { hot: matches(i.topics, incoming), bored: matches(i.bored, incoming) };
+}
+
+/**
+ * Things she must avoid — from her memory boundaries. Loud when the other person
+ * walks straight into one, so she can react the way she would react.
+ */
+export function touchedBoundaries(chat, incoming) {
+  const list = chat?.memory?.boundaries || [];
+  return matches(list, incoming);
+}

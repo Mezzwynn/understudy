@@ -1,5 +1,5 @@
 import { config, log, ROOT } from "./config.mjs";
-import { listChats, saveChat, loadChat } from "./store.mjs";
+import { listChats, saveChat, loadChat, loadState, saveState } from "./store.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { generateProactive, generateNudge, generateFollowup, generateCheckup } from "./engine.mjs";
 import { getSock, sendText, presence, setGlobalPresence } from "./whatsapp.mjs";
@@ -8,6 +8,7 @@ import { applyDeltas, normalize, isMoodLocked } from "./mood.mjs";
 import { ensureToday, tickMoments, momentDeltas, saveRoutine } from "./routine.mjs";
 import { isPaused } from "./pause.mjs";
 import { dueForEval, isEvalRunning, runAndRecord } from "./evals.mjs";
+import { weekNotifyDue, markWeekNotified, weekText } from "./week.mjs";
 
 /**
  * proactive.mjs — she has her own life.
@@ -128,6 +129,20 @@ export function dueSlot(spec, now = Date.now(), { jitterMin = 0, graceMin = 20, 
     if (now >= fireAt && now - fireAt <= graceMin * 60000) return { key, at: fireAt, hour: hhNum, minute };
   }
   return null;
+}
+
+/** Sunday evening: a short recap of her week, for the owner. */
+async function maybeWeekDigest() {
+  const st = loadState();
+  if (!weekNotifyDue(st)) return;
+  markWeekNotified(st);
+  saveState(st);
+  try {
+    const { execFile } = await import("node:child_process");
+    execFile("termux-notification", ["-t", "Understudy — her week", "-c", weekText()], () => {});
+  } catch {
+    /* notification is best effort */
+  }
 }
 
 /**
@@ -457,6 +472,7 @@ export function startProactive() {  if (!config.proactive) {
       await escalate(sock);
       await initiate(sock);
       await maybeRunEval();
+      await maybeWeekDigest();
     })().catch((err) => log(`proactive error: ${err.message}`));
   }, config.proactiveTickSec * 1000);
 

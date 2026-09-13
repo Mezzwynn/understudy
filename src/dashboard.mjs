@@ -12,6 +12,7 @@ import { loadPause, pauseFor, resume as resumeBot, pausedFor } from "./pause.mjs
 import { evalSummary, isEvalRunning, dueForEval } from "./evals.mjs";
 import { loadTraits, saveTraits, generateTraits } from "./traits.mjs";
 import { listEvents, recentEvents, clearEvents } from "./events.mjs";
+import { buildWeekDigest } from "./week.mjs";
 import { RELATIONS, loadWorld, saveWorld, ensureWorld, worldFile } from "./world.mjs";
 import { resolveBlockJid } from "./stranger.mjs";
 import { generateSchedule, formatSchedule, parseSchedule, addContext, cleanContext } from "./schedule.mjs";
@@ -259,6 +260,7 @@ async function summary() {
     version: appVersion(),
     traits: loadTraits(activeSlug),
     events: { recent: recentEvents(24).slice(-8), total: listEvents().length },
+    week: buildWeekDigest(activeSlug),
     evals: { ...evalSummary(), running: isEvalRunning(), due: dueForEval(), everyDays: config.evalEveryDays },
     paused: { active: isPausedDash(), minutesLeft: pausedFor(), reason: loadPause().reason || "" },
     featureKeys: FEATURES.map((f) => f.key),
