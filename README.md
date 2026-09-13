@@ -447,6 +447,19 @@ hand-edit the file. `rp test` includes `scripts/featuretest.mjs`, which proves e
 changes the prompt (it once did not: `.env` said `WORLD=true` while the running process read
 `false`, because the dashboard wrote `1` and the config compared against the string `"true"`).
 
+## Installable panel (PWA)
+
+The dashboard registers a service worker and ships a manifest, so Chrome can **Add to home
+screen** and the panel opens as an app with the logo as its icon, with shortcuts to Contacts,
+Chat and Log.
+
+`http://127.0.0.1` counts as a secure context, so this works over plain local HTTP — no
+certificate needed.
+
+The worker caches only the shell (`/`, the logo, the manifest): **`/api/*` is never cached**,
+because a dashboard showing yesterday's numbers would be worse than one that says it cannot reach
+the bot.
+
 ## Dashboard
 
 `rp dash` → http://127.0.0.1:8787, a single-file dark UI (no CDN, works offline).

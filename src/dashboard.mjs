@@ -343,12 +343,23 @@ export function startDashboard() {
       if (!authorized(req, url)) return json(res, 401, { error: "unauthorized" });
 
       // static files from the dashboard folder (logo, favicon) — whitelisted only
-      if (req.method === "GET" && ["/logo.png", "/favicon.ico", "/logo.svg"].includes(url.pathname)) {
+      const staticFiles = {
+        "/logo.png": "image/png",
+        "/favicon.ico": "image/png",
+        "/manifest.webmanifest": "application/manifest+json",
+        "/sw.js": "text/javascript",
+      };
+      if (req.method === "GET" && staticFiles[url.pathname]) {
         const name = url.pathname === "/favicon.ico" ? "logo.png" : url.pathname.slice(1);
         const file = path.join(ROOT, "dashboard", name);
         if (!fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
-        const type = name.endsWith(".svg") ? "image/svg+xml" : "image/png";
-        res.writeHead(200, { "content-type": type, "cache-control": "public, max-age=3600" });
+        if (url.pathname === "/sw.js" || url.pathname === "/manifest.webmanifest") {
+          log(`dashboard: ${url.pathname} served (panel being installed / refreshed)`);
+        }
+        const headers = { "content-type": staticFiles[url.pathname], "cache-control": "public, max-age=600" };
+        // a service worker may only control the scope it is served from
+        if (url.pathname === "/sw.js") headers["service-worker-allowed"] = "/";
+        res.writeHead(200, headers);
         return res.end(fs.readFileSync(file));
       }
 

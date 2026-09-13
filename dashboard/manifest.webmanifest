@@ -1,0 +1,21 @@
+{
+  "name": "Understudy — control panel",
+  "short_name": "Understudy",
+  "description": "Control panel for the Understudy WhatsApp roleplay agent.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#131109",
+  "theme_color": "#131109",
+  "icons": [
+    { "src": "/logo.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/logo.png", "sizes": "1080x1080", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Contacts", "url": "/?tab=contacts" },
+    { "name": "Chat", "url": "/?tab=chat" },
+    { "name": "Log", "url": "/?tab=log" }
+  ]
+}

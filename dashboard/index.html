@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#131109" />
 <link rel="icon" href="/logo.png" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Understudy" />
 <title>Understudy — Control Panel</title>
 <style>
   /* ─────────────────────────────  design tokens  ───────────────────────────── */
@@ -1588,6 +1593,21 @@ document.addEventListener("click", async (e)=>{
 });
 
 /* appearance */
+// installable + instant reload; the panel is local, so this is safe
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
+// deep links from the manifest shortcuts: /?tab=log
+{
+  const want = new URLSearchParams(location.search).get("tab");
+  if (want) {
+    const btn = document.querySelector(`#tabs button[data-t="${CSS.escape(want)}"]`);
+    if (btn) btn.click();
+  }
+}
+
 refresh();
 setInterval(()=>{
   if(document.hidden) return;
