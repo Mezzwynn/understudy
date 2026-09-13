@@ -193,6 +193,47 @@ export function tameTics(text, history = []) {
  * Handles the usual mess: markdown fences, a sentence before the JSON, trailing
  * commentary after it, and a reply that got cut off (returns null then).
  */
+/**
+ * Salvage a JSON object that was cut off mid-answer (the model ran out of tokens).
+ * Closing the braces is enough to read the items that did arrive, which beats losing the
+ * whole plan and asking again: that is exactly how a day ended up with zero statuses.
+ */
+export function salvageJsonObject(raw) {
+  let text = String(raw || "").trim();
+  const fence = text.match(/```(?:json|JSON)?\s*([\s\S]*?)(?:```|$)/);
+  if (fence) text = fence[1].trim();
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+  text = text.slice(start);
+  // drop a trailing partial value, then close what is open
+  text = text.replace(/,\s*"[^"]*"?\s*:?\s*[^,{}[\]]*$/, "");
+  text = text.replace(/,\s*$/, "");
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  const stack = [];
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "{" || c === "[") stack.push(c === "{" ? "}" : "]");
+    else if (c === "}" || c === "]") stack.pop();
+    depth++;
+  }
+  if (inStr) text += '"';
+  while (stack.length) text += stack.pop();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 export function extractJsonObject(raw) {
   let text = String(raw || "").trim();
   if (!text) return null;

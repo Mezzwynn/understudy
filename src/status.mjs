@@ -15,7 +15,7 @@ import { DATA_DIR, config, log } from "./config.mjs";
 import { chat as llmChat } from "./llm.mjs";
 import { languageDirective } from "./lang.mjs";
 import { listChats } from "./store.mjs";
-import { extractJsonObject } from "./guard.mjs";
+import { extractJsonObject, salvageJsonObject } from "./guard.mjs";
 
 function dirFor() {
   const d = path.join(DATA_DIR, "status");
@@ -274,7 +274,8 @@ export async function ensurePlan(persona, routine, chat, { force = false } = {})
     return plan;
   }
 
-  let parsed = extractJsonObject(out);
+  let parsed = extractJsonObject(out) || salvageJsonObject(out);
+  if (parsed) log("status plan: jawabannya kepotong, tapi masih bisa diselamatkan");
   if (!parsed) {
     log(`status plan was not JSON (${String(out).slice(0, 70).replace(/\s+/g, " ")}…) — asking again, minimal`);
     try {
@@ -294,7 +295,7 @@ export async function ensurePlan(persona, routine, chat, { force = false } = {})
         ],
         { json: true, temperature: 0, maxTokens: 400 },
       );
-      parsed = extractJsonObject(retry);
+      parsed = extractJsonObject(retry) || salvageJsonObject(retry);
     } catch (err) {
       log(`status plan retry failed: ${err.message}`);
     }
@@ -310,11 +311,22 @@ export async function ensurePlan(persona, routine, chat, { force = false } = {})
     return savePlan(slug, { date: todayKey(), items: fallback.map((f, n) => ({ ...f, id: `${todayKey()}-fb${n}` })), history: plan.history });
   }
 
-  const next = savePlan(slug, {
+  let next = savePlan(slug, {
     date: todayKey(),
     items: (parsed.items || []).map((i, n) => ({ ...i, id: `${todayKey()}-${n}` })),
     history: plan.history,
   });
+  if (!next.items.length) {
+    // a plan with no usable lines is worse than no model at all: her own day always has something
+    const fallback = planFromRoutine(routine, persona);
+    if (fallback.length) {
+      log(`status plan: model gave ${(parsed.items || []).length} unusable line(s) — using her routine instead`);
+      next = savePlan(slug, { date: todayKey(), items: fallback.map((f, n) => ({ ...f, id: `${todayKey()}-fb${n}` })), history: plan.history });
+    } else {
+      log(`status plan: model gave ${(parsed.items || []).length} unusable line(s) and the routine had nothing — no plan today`);
+      return plan;
+    }
+  }
   log(`status plan ${slug}: ${next.items.length} posts — ${next.items.map((i) => i.at).join(", ")}`);
   return next;
 }
