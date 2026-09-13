@@ -3,7 +3,7 @@ import path from "node:path";
 import { PERSONA_DIR, PROMPT_DIR, config } from "./config.mjs";
 import { label, tone, KEYS, normalize, newMood, baselineFor } from "./mood.mjs";
 import { routinePromptBlock, routineSparks, routineForChat } from "./routine.mjs";
-import { languageDirective } from "./lang.mjs";
+import { languageDirective, detectLanguage, isFormalRegister } from "./lang.mjs";
 import { needsIntroduction, tierOf } from "./stranger.mjs";
 import { openNotes, openVouches } from "./links.mjs";
 import { relationPromptBlock, worldForChat, worldPromptBlock } from "./world.mjs";
@@ -266,8 +266,21 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     `Sekarang: ${fmtTime()}`,
     // the persona card's `language` field used to be read and then ignored, so
     // she copied whatever language the prompt examples were written in
+    (() => {
+      // mirror them: answering a polite Indonesian client in clipped English is
+      // what makes her read as arrogant
+      const lang = detectLanguage(chat.lastIncoming || "");
+      const formal = isFormalRegister(chat.lastIncoming || "");
+      if (lang === "id") {
+        return formal
+          ? "BAHASA: dia nulis BAHASA INDONESIA yang sopan/formal. Balas pakai Bahasa Indonesia juga, dengan nada sopan dan rapi — jangan Inggris, jangan satu kata, jangan ketus."
+          : "BAHASA: dia nulis Bahasa Indonesia. Balas pakai Bahasa Indonesia juga (santai kalau dia santai).";
+      }
+      if (lang === "en") return "BAHASA: dia nulis Inggris, jadi balas Inggris.";
+      return "";
+    })(),
     persona.language
-      ? `BAHASA: ${languageDirective(persona.language)} (kartu karakter bilang: "${persona.language}"). ` +
+      ? `BAHASA UTAMA KAMU: ${languageDirective(persona.language)} (kartu karakter bilang: "${persona.language}"). ` +
         `Jangan ganti bahasa kecuali dia ganti dulu, dan jangan tiru bahasa catatan/instruksi di sini.`
       : "",
     persona.work_hours ? `Jam kerja kamu: ${persona.work_hours} (di luar itu kamu bebas)` : "",
@@ -304,6 +317,7 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     nagged.length
       ? `Kamu SUDAH nyuruh dia soal: ${nagged.join(", ")}. Itu udah cukup — JANGAN diulang lagi. Kalau diulang terus, itu ngeselin, bukan perhatian.`
       : "",
+    "Kamu cuma bisa chat. JANGAN pernah nawarin atau janjiin video call, voice call, telepon, atau ketemuan — walau lagi ramah atau profesional.",
     "Ini CUMA orang ini. Jangan pernah ketuker sama orang lain, dan jangan ceritain hal tentang orang lain ke dia. Kalau kamu belum tahu namanya, tanya dengan natural — jangan kayak interogasi.",
     "Kalau namanya belum kamu tahu atau chat pertama masih hari ini, berarti ini orang yang belum kamu kenal. Bersikap wajar sama orang baru — jangan pura-pura udah kenal lama, dan jangan ceritain hal pribadi ke orang asing.",
     "",

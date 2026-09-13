@@ -164,6 +164,7 @@ const INSULT = /(goblok|bego|bodoh|tolol|idiot|bangsat|anjing|kontol|memek|siala
 
 export function shouldSkip(chat, incoming) {
   if (config.skipChance <= 0) return false;
+  chat.lastIncoming = String(incoming || "").slice(0, 400);
   const isMedia = incoming.startsWith("[");
   const bare = isMedia ? "" : incoming.replace(/\s/g, "");
   const insult = INSULT.test(incoming);

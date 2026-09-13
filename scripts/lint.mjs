@@ -137,8 +137,10 @@ function collectCalls(code) {
     // quoted strings
     .replace(/'(?:\\[\s\S]|[^'\\\n])*'/g, "''")
     .replace(/"(?:\\[\s\S]|[^"\\\n])*"/g, '""')
-    // regex literals: a slash right after one of these, up to the closing slash
-    .replace(/(^|[=(,:;[!&|?{}+-])\s*\/(?![*/])(?:\\[\s\S]|\[[^\]\n]*\]|[^/\n\\])+\/[gimsuy]*/g, "$1 RGX")
+    // regex literals: a slash that is not preceded by a word char, ")" or "]"
+    // (which would make it division). Lookbehind keeps /\b(...)/ from being read
+    // as a call to a function named b.
+    .replace(/(?<![\w)\]$/*])\s*\/(?![*/])(?:\\[\s\S]|\[[^\]\n]*\]|[^/\n\\])+\/[gimsuy]*/g, " RGX")
     // line comments
     .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 

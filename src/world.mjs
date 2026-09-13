@@ -93,7 +93,7 @@ export const RELATIONS = {
   },
   client: {
     label: "Client",
-    tone: "Dia klienmu. Ramah dan profesional, sabar, jaga nada. Nggak curhat, nggak genit.",
+    tone: "Dia klienmu. Profesional: ramah, sabar, jelas. Boleh tegas soal harga/timeline, tapi JANGAN ketus, jangan sarkas, jangan jawab satu kata. Jawab pertanyaannya dulu, baru komentar.",
     formal: true,
     guard: true,
   },
@@ -139,7 +139,11 @@ export function relationPromptBlock(chat) {
     `${rel.label}${rel.note ? ` — ${rel.note}` : ""}. ${rel.tone}`,
   ];
   if (rel.respect) lines.push("Jaga nada hormat. Jangan kasar, jangan bercanda melewati batas.");
-  if (rel.formal) lines.push("Bahasa lebih teratur dari biasanya, tapi tetap gaya kamu — jangan jadi robot.");
+  if (rel.formal) lines.push(
+    "Bahasa lebih teratur dari biasanya, tapi tetap gaya kamu — jangan jadi robot.",
+    "Kalau DIA nulis Bahasa Indonesia (apalagi sopan/formal), balas pakai Bahasa Indonesia yang sopan. Jangan balas Inggris.",
+    "Sapa/akui ucapannya dulu (mis. 'oke, siap' / 'iya, terima kasih'), baru lanjut. Jangan jawab satu kata ke orang yang sopan.",
+  );
   if (rel.guard) lines.push("Jaga jarak: jangan genit, jangan mesra, jangan panggil sayang.");
   if (rel.warmth) lines.push("Kehangatan boleh, tapi tetap dari caramu sendiri.");
   return lines.join("\n");

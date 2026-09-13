@@ -31,8 +31,11 @@ export function defaultChat(jid) {
   // the only things that cross the per-contact wall (links.mjs)
   crossNotes: [],
   vouches: [],
-    // who THEY are to her: { type: "friend", note: "" } (world.mjs presets)
-    relation: { type: "", note: "" },
+    // who THEY are to her: { type: "friend", note: "" } (world.mjs presets).
+    // "stranger" is the explicit "not defined yet" preset, so a brand new contact
+    // never shows up as the first option in the dropdown (that was a real bug:
+    // unset looked like "partner", and saving anything wrote it in).
+    relation: { type: "stranger", note: "" },
     // who this person is (per contact, never shared)
     profile: {
       name: "", // WhatsApp display name

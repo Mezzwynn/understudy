@@ -26,3 +26,28 @@ export function languageDirective(language) {
   }
   return `Write in: ${l}.`;
 }
+
+/**
+ * Cheap language detection for the incoming message: enough to know whether she
+ * should mirror it. A client writing polite Indonesian should not get clipped
+ * English back — that reads as arrogance.
+ */
+const ID_WORDS =
+  /\b(kak|saya|aku|kamu|anda|bisa|boleh|terima kasih|makasih|baik|iya|tidak|nggak|gak|sudah|udah|belum|apa|apakah|bagaimana|gimana|kalau|jika|silakan|tolong|maaf|besok|hari|jam|nanti|mau|ada|ini|itu|untuk|dengan|dari|ke|dan|yang|di|suka|kenal|nama)\b/gi;
+const EN_WORDS = /\b(the|you|your|are|is|can|could|would|thanks|thank you|please|sorry|hello|hey|what|how|when|where|why|i'm|im|dont|don't|u|ya)\b/gi;
+
+export function detectLanguage(text) {
+  const t = String(text || "");
+  if (t.trim().length < 3) return null;
+  const id = (t.match(ID_WORDS) || []).length;
+  const en = (t.match(EN_WORDS) || []).length;
+  if (id === 0 && en === 0) return null;
+  if (id > en) return "id";
+  if (en > id) return "en";
+  return null;
+}
+
+/** Is this message written in a formal/respectful register? */
+export function isFormalRegister(text) {
+  return /\b(anda|saya|kak|bapak|ibu|pak|bu|terima kasih|silakan|mohon|maaf sebelumnya|dengan hormat)\b/i.test(String(text || ""));
+}

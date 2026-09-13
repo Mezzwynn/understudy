@@ -546,7 +546,8 @@ function personCard(c){
         <div><label>Name you go by for her</label><input class="f-nick" data-jid="${esc(c.jid)}" value="${esc(c.nick)}" placeholder="e.g. honey"></div>
         <div><label>Character (optional)</label><input class="f-persona" data-jid="${esc(c.jid)}" value="${esc(c.persona)}" placeholder="(default)"></div>
         <div><label>Who they are to her</label><select class="f-relation" data-jid="${esc(c.jid)}">
-          ${(DATA.relations||[]).map(r=>`<option value="${esc(r.id)}" ${r.id===(c.relation||"")?"selected":""}>${esc(r.label)}</option>`).join("")}
+          <option value="" ${c.relation?"":"selected"}>— not set —</option>
+          ${(DATA.relations||[]).map(r=>`<option value="${esc(r.id)}" ${r.id===c.relation?"selected":""}>${esc(r.label)}</option>`).join("")}
         </select></div>
         <div><label>Phone number (if known)</label><input class="f-phone" data-jid="${esc(c.jid)}" value="${esc(c.phone||"")}" placeholder="+62… — needed to block a hidden LID"></div>
         <div><label>Relationship note</label><input class="f-relation-note" data-jid="${esc(c.jid)}" value="${esc(c.relationNote||"")}" placeholder="e.g. we met at work"></div>
