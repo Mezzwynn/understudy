@@ -779,6 +779,7 @@ async function renderCharacter(force){
     </div>
 
     ${traitsPanel()}
+    ${facePanel(DATA.face)}
     ${contextPanel(w)}
     ${worldPanel(w)}
     ${changesPanel(DATA.changes)}
@@ -824,7 +825,18 @@ async function renderCharacter(force){
       if(out) out.textContent=Math.round(Number(e.target.value)*100)+"%";
     }
   });
-  $("#tab-character").addEventListener("click",(e)=>{
+  $("#tab-character").addEventListener("click",async (e)=>{
+  const pick=e.target.closest("[data-face-pick]");
+  if(pick){
+    const r=await api("/api/face",{ action:"pick", file:pick.dataset.facePick });
+    toast(r.note||(r.ok?"Dijadikan avatar":"Gagal"));
+    return refresh(true);
+  }
+  const drop=e.target.closest("[data-face-drop]");
+  if(drop){
+    await api("/api/face",{ action:"discard", file:drop.dataset.faceDrop });
+    toast("Dibuang"); return refresh(true);
+  }
     const t=e.target.closest("[data-trait-toggle]");
     if(t && t.dataset.traitToggle){
       const [g,k]=t.dataset.traitToggle.split(".");
@@ -878,6 +890,28 @@ async function renderCharacter(force){
     if(!item) return;
     await api("/api/context",{ slug:CHAR_SLUG, action:"remove", text:item.text });
     toast("Note removed"); await refresh(true);
+  };
+  const fg=$("#btn-face-gen"); if(fg) fg.onclick=async ()=>{
+    fg.disabled=true; toast("Bikin kandidat wajah… (10-30 detik tiap gambar)");
+    const r=await api("/api/face",{ action:"gen" });
+    fg.disabled=false;
+    toast(r.ok?("Kandidat siap: "+r.made.length+" gambar"):("Gagal: "+(r.errors?.[0]||r.error||"")));
+    await refresh(true);
+  };
+  const fp=$("#btn-face-push"); if(fp) fp.onclick=async ()=>{
+    const r=await api("/api/face",{ action:"push" });
+    toast(r.ok?"Foto profil WhatsApp diperbarui":("WhatsApp menolak: "+(r.error||"")));
+    await refresh(true);
+  };
+  const fu=$("#face-upload"); if(fu) fu.onchange=async ()=>{
+    const file=fu.files?.[0]; if(!file) return;
+    if(file.size>6*1024*1024) return toast("Fotonya kegedhean (maks 6MB)");
+    const ext=(file.name.split(".").pop()||"jpg").toLowerCase();
+    const data=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(",")[1]);fr.readAsDataURL(file);});
+    toast("Mengunggah…");
+    const r=await api("/api/face",{ action:"upload", data, ext });
+    toast(r.note||(r.ok?"Tersimpan":"Gagal"));
+    await refresh(true);
   };
   const sp=$("#btn-status-plan"); if(sp) sp.onclick=async ()=>{
     toast("Planning her story…");
@@ -1034,6 +1068,48 @@ function statusPanel(st, audience){
     </div>
     ${hist.length?`<details style="margin-top:10px"><summary>Already posted (${(st.history||[]).length})</summary>
       <div style="margin-top:8px">${hist.map(h=>`<div class="tiny" style="margin-bottom:5px">${new Date(h.at).toLocaleString("id-ID",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})} · "${esc(h.text)}"</div>`).join("")}</div></details>`:""}
+  </div>`;
+}
+
+function facePanel(f){
+  f = f || { candidates: [] };
+  const cand = f.candidates || [];
+  return `<div class="card fadein">
+    <div class="row"><h2 style="margin:0">Face &amp; avatar</h2><span class="grow"></span>
+      <span class="badge">${f.faceModel ? esc(String(f.faceModel).split("/")[0]) : "—"}</span></div>
+    <div class="hint" style="margin-top:6px">Wajahnya dipilih <b>sekali</b>, lalu dipakai terus — bukan digenerate tiap saat.
+      Yang kamu pilih di sini jadi foto profil WhatsApp-nya <i>dan</i> acuan kalau nanti perlu foto wajah baru.</div>
+
+    <div class="row" style="align-items:flex-start;gap:16px;margin-top:14px;flex-wrap:wrap">
+      <div style="text-align:center">
+        <img src="/face?f=avatar&t=${Date.now()}" alt="avatar" style="width:132px;height:132px;border-radius:50%;object-fit:cover;border:2px solid var(--line-2);background:#000" onerror="this.style.opacity=.25">
+        <div class="tiny" style="margin-top:6px">${f.hasAvatar?("dipilih "+esc(f.avatarMeta||"")):"belum ada"}</div>
+      </div>
+      <div style="flex:1;min-width:220px">
+        <div class="btns" style="margin:0">
+          <button class="act" id="btn-face-gen">Bikin ${f.photoCandidateCount||4} kandidat</button>
+          <label class="act" style="cursor:pointer">Upload dari HP<input type="file" id="face-upload" accept="image/*" hidden></label>
+          <button class="act" id="btn-face-push" ${f.hasAvatar?"":"disabled"}>Kirim ke WhatsApp</button>
+        </div>
+        <div class="hint" style="margin-top:8px">
+          Model: <b>${esc(f.faceModel||"—")}</b> · ${f.photoCandidateCount||4} gambar ≈ $${((Number(f.photoCandidateCount)||4)*0.07).toFixed(2)}
+          ${f.whatsappUrl?`<br>Foto profil di WhatsApp sekarang: <a href="${esc(f.whatsappUrl)}" target="_blank">lihat</a>`:"<br>Belum ada foto profil di WhatsApp."}
+          <br>Disetujui: ${f.approved||0} · dibuang: ${f.rejected||0}
+        </div>
+      </div>
+    </div>
+
+    ${cand.length?`<h3 style="margin:18px 0 8px;font-size:14px">Kandidat — pilih satu</h3>
+      <div class="candgrid">${cand.map(c=>`<div class="cand">
+        <img src="/face?f=${encodeURIComponent(c.file)}" loading="lazy" alt="">
+        <div class="candbtns">
+          <button class="act" data-face-pick="${esc(c.file)}">Jadikan avatar</button>
+          <button class="act" data-face-drop="${esc(c.file)}" style="color:var(--bad)">Buang</button>
+        </div></div>`).join("")}</div>`
+      : '<div class="empty" style="margin-top:14px">Belum ada kandidat. Tekan <b>Bikin '+(f.photoCandidateCount||4)+' kandidat</b> — hasilnya muncul di sini buat kamu pilih.</div>'}
+
+    <details style="margin-top:12px"><summary class="tiny">Prompt wajahnya (dari kartu karakternya)</summary>
+      <div class="tiny" style="margin-top:8px;line-height:1.6">${esc(f.prompt||"")}</div></details>
   </div>`;
 }
 

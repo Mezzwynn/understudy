@@ -28,6 +28,20 @@ function writeRating(entry) {
 
 import { listChats, loadChat, saveChat, loadState } from "./store.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
+import {
+  loadFace,
+  saveFace,
+  faceDir,
+  candidatesDir,
+  listCandidates,
+  avatarPath,
+  facePrompt,
+  generateCandidates,
+  approveCandidate,
+  rejectCandidate,
+  pushAvatar,
+  currentAvatarUrl,
+} from "./face.mjs";
 import { runAdmin } from "./admin.mjs";
 import { exportPersona, importPersona, deletePersona, listSlugs, trashContents, restoreFromTrash } from "./persona-io.mjs";
 import { tierOf, strangerState, unblock } from "./stranger.mjs";
@@ -305,6 +319,20 @@ async function summary() {
     status: { ...statusState(activeSlug), audienceCount: statusAudience().length },
     statusAudienceCount: statusAudience().length,
     statusColors: STATUS_COLORS,
+    face: (() => {
+      const slug = loadPersona().slug;
+      const face = loadFace(slug);
+      return {
+        hasAvatar: !!avatarPath(slug),
+        avatarMeta: face.updatedAt ? new Date(face.updatedAt).toLocaleString("id-ID") : "",
+        approved: (face.approved || []).length,
+        rejected: (face.rejected || []).length,
+        candidates: listCandidates(slug),
+        faceModel: config.faceModel,
+        photoCandidateCount: config.photoCandidateCount,
+        prompt: facePrompt(loadPersona(slug)),
+      };
+    })(),
     evals: { ...evalSummary(), running: isEvalRunning(), due: dueForEval(), everyDays: config.evalEveryDays },
     paused: { active: isPausedDash(), minutesLeft: pausedFor(), reason: loadPause().reason || "" },
     featureKeys: FEATURES.map((f) => f.key),
@@ -442,6 +470,41 @@ export function startDashboard() {
           }
         }
         return json(res, 200, { photos: list.sort((a, b) => a.file.localeCompare(b.file)) });
+      }
+
+      // her face: the avatar and the candidates, served from her own folder
+      if (req.method === "GET" && url.pathname === "/face") {
+        const slug = loadPersona().slug;
+        const name = String(url.searchParams.get("f") || "avatar");
+        let file = "";
+        if (name === "avatar") file = avatarPath(slug);
+        else if (name.startsWith("cand-")) file = path.join(candidatesDir(slug), path.basename(name));
+        if (!file || !fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
+        res.writeHead(200, { "content-type": /\.png$/i.test(file) ? "image/png" : "image/jpeg", "cache-control": "no-store" });
+        return res.end(fs.readFileSync(file));
+      }
+      if (req.method === "GET" && url.pathname === "/api/face") {
+        const slug = loadPersona().slug;
+        const face = loadFace(slug);
+        let whatsappUrl = "";
+        try {
+          const { getSock } = await import("./whatsapp.mjs");
+          whatsappUrl = await currentAvatarUrl(getSock());
+        } catch {
+          /* WhatsApp may not be up yet */
+        }
+        return json(res, 200, {
+          slug,
+          hasAvatar: !!avatarPath(slug),
+          avatarMeta: face.updatedAt ? new Date(face.updatedAt).toLocaleString("id-ID") : "",
+          approved: (face.approved || []).length,
+          rejected: (face.rejected || []).length,
+          candidates: listCandidates(slug),
+          whatsappUrl,
+          faceModel: config.faceModel,
+          photoCandidateCount: config.photoCandidateCount,
+          prompt: facePrompt(loadPersona(slug)),
+        });
       }
 
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
@@ -609,6 +672,58 @@ export function startDashboard() {
 
       if (req.method === "POST") {
         const body = await readBody(req);
+
+        if (url.pathname === "/api/face") {
+          const slug = loadPersona().slug;
+          const act = String(body.action || "");
+          const { getSock } = await import("./whatsapp.mjs");
+
+          if (act === "gen") {
+            const persona = loadPersona(slug);
+            const r = await generateCandidates(persona, { count: body.count, slug });
+            return json(res, r.ok ? 200 : 400, { ...r, candidates: listCandidates(slug) });
+          }
+          if (act === "pick") {
+            const r = await approveCandidate(slug, body.file, getSock());
+            return json(res, r.ok ? 200 : 400, {
+              ...r,
+              candidates: listCandidates(slug),
+              note: r.ok
+                ? r.whatsapp?.ok
+                  ? "Saved — and her WhatsApp profile picture is updated too."
+                  : `Saved here, but WhatsApp refused the picture: ${r.whatsapp?.error || "unknown"}. The photo is still on file.`
+                : "",
+            });
+          }
+          if (act === "discard") {
+            const r = rejectCandidate(slug, body.file);
+            return json(res, r.ok ? 200 : 400, { ...r, candidates: listCandidates(slug) });
+          }
+          if (act === "upload") {
+            const file = saveMedia(body.data, String(body.ext || "jpg"));
+            if (!file) return json(res, 400, { ok: false, error: "could not read that file" });
+            const target = path.join(faceDir(slug), `avatar.${String(body.ext || "jpg").replace(/[^a-z]/gi, "") || "jpg"}`);
+            fs.copyFileSync(file, target);
+            for (const ext of ["jpg", "jpeg", "png"]) {
+              const other = path.join(faceDir(slug), `avatar.${ext}`);
+              if (other !== target) fs.rmSync(other, { force: true });
+            }
+            const face = loadFace(slug);
+            saveFace(slug, { ...face, avatar: target, reference: target });
+            const pushed = body.push === false ? { ok: false, error: "not sent" } : await pushAvatar(getSock(), target);
+            return json(res, 200, {
+              ok: true,
+              whatsapp: pushed,
+              note: pushed.ok ? "Uploaded and set as her WhatsApp profile picture." : `Uploaded. WhatsApp: ${pushed.error}`,
+            });
+          }
+          if (act === "push") {
+            const file = avatarPath(slug);
+            const r = await pushAvatar(getSock(), file);
+            return json(res, r.ok ? 200 : 400, { ...r, note: r.ok ? "Profile picture updated on WhatsApp." : `WhatsApp refused: ${r.error}` });
+          }
+          return json(res, 400, { ok: false, error: "unknown action" });
+        }
 
         if (url.pathname === "/api/rate") {
           const name = String(body.file || "");

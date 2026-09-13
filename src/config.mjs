@@ -112,6 +112,13 @@ function buildConfig() {
   statusQuietEnd: num(envGet("STATUS_QUIET_END", "8"), 8),
   statusMinGapMin: num(envGet("STATUS_MIN_GAP_MIN", "150"), 150),
   statusMedia: envFlag("STATUS_MEDIA", true),
+  // ── gambar: Atlas Cloud (pilihan Hik: nano-banana-pro buat wajah, seedream-v5 buat scene)
+  atlasApiKey: envGet("ATLAS_API_KEY", ""),
+  atlasBaseUrl: envGet("ATLAS_BASE_URL", "https://api.atlascloud.ai"),
+  faceModel: envGet("FACE_MODEL", "google/nano-banana-pro/text-to-image-developer"),
+  sceneModel: envGet("SCENE_MODEL", "bytedance/seedream-v5.0-pro/text-to-image"),
+  objectModel: envGet("OBJECT_MODEL", "openai/gpt-image-1-mini/text-to-image"),
+  photoCandidateCount: num(envGet("PHOTO_CANDIDATE_COUNT", "4"), 4),
   topicFatigue: envFlag("TOPIC_FATIGUE", true),
   lateReplyNote: envFlag("LATE_REPLY_NOTE", true),
   lateReplyMinMin: num(envGet("LATE_REPLY_MIN_MIN", "90"), 90),
