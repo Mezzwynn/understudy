@@ -125,6 +125,35 @@ a whim, however cheap the image is. Faces come from a **curated, fixed library**
 are ever truly needed, they come from a trained model, on a service that trains them.
 
 
+
+### Correction (14 Sep, later the same night)
+
+I misread Hik's "gg sih nano banana pro sama seedream 5.0" as *these two are bad*. It means the
+opposite: **those two are his picks.** So the record, corrected:
+
+| what | verdict |
+|---|---|
+| `google/nano-banana-pro/text-to-image` ($0.070) | **Hik's pick** — the judge also gave it 10/10 |
+| `bytedance/seedream-v5.0-pro/text-to-image` ($0.036) | **Hik's pick** — judge 9/10 |
+
+Two lessons, and the second one is the expensive one:
+
+1. **The judge was right and my own index was wrong.** The vision reviewer put both of his picks at
+   the top (9-10/10). The "distance from a real phone photo" index I invented a few minutes later
+   ranked them **6th and 4th of 8**, and ranked the judge's favourite last. A hand-made metric that
+   disagrees with a careful human is not a refinement, it is a mistake: the measurements
+   (contrast, saturation, sharpness, noise) stay as *descriptions*, and they no longer decide
+   anything.
+2. **Ask before building on an interpretation.** "gg" is praise; I took it as a complaint, then
+   spent a re-judging pass, a statistics pass and a rating page on the opposite premise. One
+   clarifying question would have cost ten seconds.
+
+His picks are also the two **pro tiers**, which is worth remembering: for a face, he prefers the
+expensive end, and the price difference ($0.07 against $0.03) is irrelevant for a library built once.
+
+The rating page stays, with its wording fixed: it now asks for **bagus / lumayan / kurang** and an
+optional "kelihatan aneh" tick, because that is the question actually being answered.
+
 ---
 
 ## 2. The plan: a library, not a generator

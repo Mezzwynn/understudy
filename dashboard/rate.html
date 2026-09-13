@@ -30,8 +30,8 @@
 </style>
 </head>
 <body>
-<h1>Nilai foto ini</h1>
-<p class="sub">Kalau kamu bilang "kelihatan asli", itu patokannya. Juri model sudah kucoba dan <b>nggak bisa dipercaya</b> — jadi matamu yang jadi kunci. Ragu itu jawaban yang sah.</p>
+<h1>Foto mana yang paling bagus</h1>
+<p class="sub">Nilainya <b>bagus atau tidak menurut matamu</b> — bukan soal AI atau bukan. Kalau ada yang kelihatan aneh, centang kotaknya. Ini yang jadi patokan buat milih model.</p>
 <div id="list"></div>
 <div class="bar">
   <span id="count">…</span>
@@ -60,45 +60,55 @@ function render(){
   document.getElementById("prog").style.width = (PHOTOS.length ? (done/PHOTOS.length*100) : 0) + "%";
   document.getElementById("list").innerHTML = PHOTOS.map(p => {
     const r = RATINGS[p.file] || {};
-    const c = (v) => r.verdict === v ? " sel " + ({asli:"good",ai:"bad",ragu:"warn"}[v]) : "";
+    const c = (v) => r.verdict === v ? " sel " + ({bagus:"good",lumayan:"warn",kurang:"bad"}[v]) : "";
     return `<div class="card">
       <img src="${p.url}" loading="lazy" alt="">
       <div class="body">
         <div class="name">${p.file}</div>
         ${statChips(p.stats)}
         <div class="btns">
-          <button class="vt${c("asli")}" data-f="${p.file}" data-v="asli">Kelihatan asli</button>
-          <button class="vt${c("ai")}" data-f="${p.file}" data-v="ai">Kelihatan AI/aneh</button>
-          <button class="vt${c("ragu")}" data-f="${p.file}" data-v="ragu">Ragu</button>
+          <button class="vt${c("bagus")}" data-f="${p.file}" data-v="bagus">Paling bagus</button>
+          <button class="vt${c("lumayan")}" data-f="${p.file}" data-v="lumayan">Lumayan</button>
+          <button class="vt${c("kurang")}" data-f="${p.file}" data-v="kurang">Kurang</button>
         </div>
-        <input class="note" data-f="${p.file}" placeholder="kenapa? (opsional) — misal: kulit terlalu mulus, mata aneh, tangan" value="${(r.note||"").replace(/"/g,"&quot;")}">
+        <label style="display:flex;gap:8px;align-items:center;margin-top:9px;font-size:13px;color:var(--dim)">
+          <input type="checkbox" class="ai" data-f="${p.file}" ${r.ai?"checked":""}> kelihatan aneh / AI
+        </label>
+        <input class="note" data-f="${p.file}" placeholder="kenapa? (opsional)" value="${(r.note||"").replace(/"/g,"&quot;")}">
       </div></div>`;
   }).join("");
 }
 
-async function save(file, verdict, note){
+async function save(file, verdict, note, ai){
   const stats = PHOTOS.find(p => p.file === file)?.stats || null;
-  const res = await fetch("/api/rate", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ file, verdict, note, stats }) });
-  if(res.ok){ RATINGS[file] = { file, verdict, note }; document.getElementById("saved").innerHTML = '<span class="done">tersimpan ✓</span>'; setTimeout(()=>{document.getElementById("saved").textContent="";},1500); }
+  const res = await fetch("/api/rate", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ file, verdict, note, ai, stats }) });
+  if(res.ok){ RATINGS[file] = { file, verdict, note, ai }; document.getElementById("saved").innerHTML = '<span class="done">tersimpan ✓</span>'; setTimeout(()=>{document.getElementById("saved").textContent="";},1500); }
 }
 
 document.addEventListener("click", async (e) => {
   const b = e.target.closest(".vt"); if(!b) return;
   const f = b.dataset.f, v = b.dataset.v;
   const note = document.querySelector(`.note[data-f="${CSS.escape(f)}"]`)?.value || "";
-  CUR[f] = v; RATINGS[f] = { file:f, verdict:v, note };
+  const ai = document.querySelector(`.ai[data-f="${CSS.escape(f)}"]`)?.checked || false;
+  CUR[f] = v; RATINGS[f] = { file:f, verdict:v, note, ai };
   b.closest(".btns").querySelectorAll(".vt").forEach(x => x.classList.remove("sel","good","bad","warn"));
-  b.classList.add("sel", {asli:"good",ai:"bad",ragu:"warn"}[v]);
+  b.classList.add("sel", {bagus:"good",lumayan:"warn",kurang:"bad"}[v]);
   const done = PHOTOS.filter(p => RATINGS[p.file]).length;
   document.getElementById("count").textContent = `${done}/${PHOTOS.length} dinilai`;
   document.getElementById("prog").style.width = (done/PHOTOS.length*100) + "%";
-  await save(f, v, note);
+  await save(f, v, note, ai);
+});
+
+document.addEventListener("change", async (e) => {
+  const box = e.target.closest(".ai"); if(!box) return;
+  const f = box.dataset.f;
+  if(RATINGS[f]?.verdict) await save(f, RATINGS[f].verdict, RATINGS[f].note || "", box.checked);
 });
 
 document.addEventListener("change", async (e) => {
   const i = e.target.closest(".note"); if(!i) return;
   const f = i.dataset.f, v = RATINGS[f]?.verdict || CUR[f];
-  if(v) await save(f, v, i.value);
+  if(v) await save(f, v, i.value, RATINGS[f]?.ai || false);
 });
 
 (async () => {
