@@ -131,7 +131,7 @@ async function review(file, place) {
               type: "text",
               text: `A 20-year-old woman in Denpasar, Bali sends casual photos on WhatsApp. This candidate is meant for: "${place}". Answer with JSON only:
 {"ok":true|false,"what":"what is actually in the photo, one short line","why":"if not ok, why"}
-Reject when: it is a car, motorbike or signage by itself with no place in it, or it plainly does not match the note above; it is an aerial or drone shot, a brochure or professional landscape, a monument or tourist postcard, a diagram or map, focus is on a stranger's face, it is clearly not Indonesia, it is a plane or a building interior that nobody would photograph, or it is visibly a stock/studio photo. Accept when it looks like an ordinary photo a person took with a phone of something ordinary around them.`,
+Reject when: the place is plainly not in Indonesia (New Zealand bush, a delegation in Bangladesh, a European street, an American interior), or it is a car, motorbike or signage by itself with no place in it, or it plainly does not match the note above; it is an aerial or drone shot, a brochure or professional landscape, a monument or tourist postcard, a diagram or map, focus is on a stranger's face, it is clearly not Indonesia, it is a plane or a building interior that nobody would photograph, or it is visibly a stock/studio photo. Accept when it looks like an ordinary photo a person took with a phone of something ordinary around them.`,
             },
           ],
         },

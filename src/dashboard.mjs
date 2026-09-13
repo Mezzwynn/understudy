@@ -6,6 +6,11 @@ import { spawn } from "node:child_process";
 import { ROOT, PERSONA_DIR, DATA_DIR, config, envGet, STARTED_AT, log, reloadConfig } from "./config.mjs";
 
 /** Where the model-comparison photos live — the rating page reads and serves them. */
+/** The photo rules in one line, for the panel to show. */
+function photoRule() {
+  return `max ${config.photoDailyMax}/day · gap ${config.photoMinGapMin}m · chance ${Math.round((config.photoChance || 0) * 100)}% · strangers ${config.photoTrustStrangers ? "yes" : "no"} · library ${config.photoLibrary ? "on" : "off"}`;
+}
+
 const PHOTO_TEST_DIR = envGet("PHOTO_TEST_DIR", "/sdcard/Download/Understudy/model-test");
 /** Semua folder hasil tes foto: dinilai dalam satu halaman. */
 const PHOTO_TEST_DIRS = envGet("PHOTO_TEST_DIRS", "model-test,scenario-test,face-test")
@@ -33,6 +38,7 @@ function writeRating(entry) {
 
 import { listChats, loadChat, saveChat, loadState } from "./store.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
+import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent } from "./photo-library.mjs";
 import {
   loadFace,
   saveFace,
@@ -497,6 +503,11 @@ export function startDashboard() {
         res.writeHead(200, { "content-type": /\.png$/i.test(file) ? "image/png" : "image/jpeg", "cache-control": "no-store" });
         return res.end(fs.readFileSync(file));
       }
+      if (req.method === "GET" && url.pathname === "/api/photos") {
+        const slug = loadPersona().slug;
+        return json(res, 200, { ...librarySummary(slug), rule: photoRule() });
+      }
+
       if (req.method === "GET" && url.pathname === "/api/face") {
         const slug = loadPersona().slug;
         const face = loadFace(slug);
@@ -713,6 +724,40 @@ export function startDashboard() {
 
       if (req.method === "POST") {
         const body = await readBody(req);
+
+        if (url.pathname === "/api/photos") {
+          const slug = loadPersona().slug;
+          const act = String(body.action || "");
+          const { getSock } = await import("./whatsapp.mjs");
+          if (act === "remove") {
+            const r = removePhoto(slug, String(body.id || ""));
+            return json(res, r.ok ? 200 : 400, { ...r, ...librarySummary(slug) });
+          }
+          if (act === "send") {
+            const sock = getSock();
+            if (!sock) return json(res, 400, { ok: false, error: "WhatsApp is not connected" });
+            const jid = String(body.jid || "");
+            if (!jid) return json(res, 400, { ok: false, error: "no contact given" });
+            const hour = Number(body.hour);
+            const now = Number.isFinite(hour) ? new Date(new Date().setHours(hour, 0, 0, 0)) : new Date();
+            const photo = body.id
+              ? loadLibrary(slug).photos.find((p) => p.id === body.id)
+              : pickPhoto({ slug, chat: { jid, trusted: true, mood: { valence: 0.6 } }, now });
+            if (!photo) return json(res, 400, { ok: false, error: "nothing in the library fits right now" });
+            const file = path.join(DATA_DIR, "photos", "library", slug, photo.file);
+            if (!fs.existsSync(file)) return json(res, 400, { ok: false, error: "file missing" });
+            try {
+              const { sendImage } = await import("./whatsapp.mjs");
+              await sendImage(sock, jid, fs.readFileSync(file), "image/jpeg", String(body.caption || "") || undefined);
+              markSent(slug, photo.id, jid);
+              log(`photo (manual test) → ${jid} "${photo.scene}"`);
+              return json(res, 200, { ok: true, sent: photo.scene, why: photo.why || "dipilih manual" });
+            } catch (err) {
+              return json(res, 400, { ok: false, error: err.message.slice(0, 140) });
+            }
+          }
+          return json(res, 400, { ok: false, error: "unknown action" });
+        }
 
         if (url.pathname === "/api/face") {
           const slug = loadPersona().slug;

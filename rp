@@ -44,6 +44,7 @@ cmd="${1:-status}"
 case "$cmd" in
   routine|rout)  node scripts/routine.mjs "$@" ;;
   places)        node scripts/places.mjs "$@" ;;
+  photos)        node scripts/library.mjs "$@" ;;
   imagetest)     node scripts/imagetest.mjs "$@" ;;
   pause)
     node --input-type=module -e '

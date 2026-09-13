@@ -119,6 +119,13 @@ function buildConfig() {
   sceneModel: envGet("SCENE_MODEL", "bytedance/seedream-v5.0-pro/text-to-image"),
   // model yang menerima foto referensi (dia yang dipakai buat foto dengan wajahnya)
   editModel: envGet("EDIT_MODEL", "bytedance/seedream-v4.7/edit"),
+  // ── perpustakaan foto (dia kirim dari sini, bukan generate tiap kali)
+  photoLibrary: envFlag("PHOTO_LIBRARY", true),
+  photoSend: envFlag("PHOTO_SEND", true),
+  photoDailyMax: num(envGet("PHOTO_DAILY_MAX", "1"), 1),
+  photoMinGapMin: num(envGet("PHOTO_MIN_GAP_MIN", "600"), 600),
+  photoTrustStrangers: envFlag("PHOTO_TRUST_STRANGERS", false),
+  photoGenerateOnDemand: envFlag("PHOTO_GENERATE_ON_DEMAND", false),
   objectModel: envGet("OBJECT_MODEL", "openai/gpt-image-1-mini/text-to-image"),
   photoCandidateCount: num(envGet("PHOTO_CANDIDATE_COUNT", "4"), 4),
   topicFatigue: envFlag("TOPIC_FATIGUE", true),

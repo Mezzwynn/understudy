@@ -1,4 +1,4 @@
-import { config, log } from "./config.mjs";
+import { config, log, DATA_DIR } from "./config.mjs";
 import { loadChat, saveChat, loadState, saveState, listChats } from "./store.mjs";
 import { isPaused, pausedFor } from "./pause.mjs";
 import { recordEvent } from "./events.mjs";
@@ -14,6 +14,7 @@ import { synthesize, toSpeakable } from "./voice.mjs";
 import { stripAudioTags, detectInjection } from "./guard.mjs";
 import { applyDeltas, normalize, isMoodLocked, baselineFor, KEYS as MOOD_KEYS } from "./mood.mjs";
 import { generateImage, randomSticker, saveUserSticker } from "./image.mjs";
+import { shouldSendPhoto, markSent } from "./photo-library.mjs";
 import {
   decide,
   promoteIfReady,
@@ -771,11 +772,47 @@ async function respond(sock, jid, p) {
   const textKeys = [];
   if (
     !sleepy &&
-    trusted &&
-    (wantsPhoto || Math.random() < config.photoChance) &&
-    (chat.stats.photoCount || 0) < config.photoDailyMax &&
-    takePhotoBudget()
+    (wantsPhoto || config.photoSend) &&
+    (chat.stats.photoCount || 0) < Math.max(1, config.photoDailyMax) + (wantsPhoto ? 1 : 0)
   ) {
+    // From the library, matched to what she is doing right now — not generated on the spot.
+    // Generation is off by default: it costs money every time and the face does not hold.
+    const moment = (() => {
+      try {
+        const r = loadRoutine(persona.slug || config.persona);
+        return (r.moments || [])[(r.moments || []).length - 1] || null;
+      } catch {
+        return null;
+      }
+    })();
+    const decision = shouldSendPhoto({ chat, moment, sleepy, force: wantsPhoto });
+    if (decision.ok) {
+      const photo = decision.photo;
+      try {
+        const file = path.join(DATA_DIR, "photos", "library", String(persona.slug || config.persona), photo.file);
+        if (fs.existsSync(file)) {
+          await presence(sock, jid, "composing");
+          await sleep(1200 + Math.random() * 1800);
+          // a photo goes first, and the line that follows never describes the picture
+          const caption = chatText.length <= 160 ? chatText : undefined;
+          await sendImage(sock, jid, fs.readFileSync(file), "image/jpeg", caption);
+          chat.stats.outbound = (chat.stats.outbound || 0) + 1;
+          chat.stats.photoCount = (chat.stats.photoCount || 0) + 1;
+          chat.stats.photoDay = today;
+          chat.stats.lastPhotoAt = Date.now();
+          sentMedia = true;
+          markSent(persona.slug || config.persona, photo.id, jid);
+          log(`photo → ${jid} "${photo.scene}" (${chat.stats.photoCount}/${config.photoDailyMax} today) · ${photo.why}`);
+        }
+      } catch (err) {
+        log(`photo send failed: ${err.message}`);
+      }
+    } else if (wantsPhoto && decision.reason !== "chance (5%)") {
+      log(`photo not sent (${decision.reason})`);
+    }
+  }
+
+  if (wantsPhoto && config.photoGenerateOnDemand && !sentMedia) {
     const look = persona.appearance || "cewek Indonesia umur 20-an, gaya casual";
     const prompt =
       `Foto HP candid ${persona.name}, ${look}. ` +
@@ -783,15 +820,13 @@ async function respond(sock, jid, p) {
       `Natural, tidak berpose, pencahayaan alami, sedikit blur, seperti foto yang dikirim lewat WhatsApp.`;
     const img = await generateImage(prompt);
     if (img) {
-      await presence(sock, jid, "composing");
-      await sleep(1500 + Math.random() * 2000);
       try {
-        const caption = chatText.length <= 180 ? chatText : undefined;
-        await sendImage(sock, jid, img.buffer, img.mimetype, caption);
-        chat.stats.outbound = (chat.stats.outbound || 0) + 1;
+        await sendImage(sock, jid, img.buffer, img.mimetype, chatText.length <= 180 ? chatText : undefined);
         chat.stats.photoCount = (chat.stats.photoCount || 0) + 1;
+        chat.stats.photoDay = today;
+        chat.stats.lastPhotoAt = Date.now();
         sentMedia = true;
-        log(`photo → ${jid} (${chat.stats.photoCount}/${config.photoDailyMax} today)`);
+        log(`photo generated on demand → ${jid}`);
       } catch (err) {
         log(`photo send failed: ${err.message}`);
       }
