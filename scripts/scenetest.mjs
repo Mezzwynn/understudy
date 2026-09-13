@@ -105,7 +105,18 @@ async function main() {
     }
   }
 
-  fs.writeFileSync(path.join(OUT, "results.json"), JSON.stringify({ at: Date.now(), mode: REF ? "edit (reference image)" : "text-to-image", avatar: AVATAR, reference: REF_FILE, scenes: WANT, models: MODELS, rows }, null, 2));
+  // gabung dengan hasil sebelumnya di folder yang sama, biar jalan berkali-kali tidak saling menimpa
+const prevFile = path.join(OUT, "results.json");
+let prev = { rows: [], scenes: [], models: [] };
+try {
+  prev = JSON.parse(fs.readFileSync(prevFile, "utf8"));
+} catch {
+  /* first run in this folder */
+}
+const merged = [...(prev.rows || []).filter((r) => !rows.some((n) => n.scene === r.scene && n.modelShort === r.modelShort)), ...rows];
+const allScenes = [...new Set([...(prev.scenes || []), ...WANT])];
+const allModels = [...new Set([...(prev.models || []), ...MODELS])];
+fs.writeFileSync(prevFile, JSON.stringify({ at: Date.now(), mode: REF ? "edit (reference image)" : "text-to-image", avatar: AVATAR, reference: REF_FILE, scenes: allScenes, models: allModels, rows: merged }, null, 2));
 
   const md = [
     "# 5 skenario × 2 model pilihan Hik",
@@ -130,7 +141,7 @@ async function main() {
   ].join("\n");
   fs.writeFileSync(path.join(OUT, "results.md"), md);
 
-  const byScene = WANT.map((s) => ({ scene: s, rows: rows.filter((r) => r.scene === s && r.ok) })).filter((s) => s.rows.length);
+  const byScene = allScenes.map((s) => ({ scene: s, rows: merged.filter((r) => r.scene === s && r.ok) })).filter((s) => s.rows.length);
   const html = `<!doctype html><meta charset="utf-8"><title>5 skenario × 2 model</title>
 <style>
 body{background:#131109;color:#f3e6d2;font:15px/1.5 system-ui,sans-serif;margin:0;padding:20px}

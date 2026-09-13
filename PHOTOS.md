@@ -221,6 +221,35 @@ the rating page now shows his avatar pinned at the top with all 37 photos groupe
 generated photo of a real person's face is a step past sending their existing photo: that decision is his,
 but it is the reason the library approach is the default rather than endless generation.
 
+
+### Five scenarios with the avatar as reference (the re-run Hik asked for)
+
+Every scene was regenerated through an **edit** model with his avatar attached, so she is the same
+person in the frame. Two models: `nano-banana-pro/edit` ($0.14) and `bytedance/seedream-v4.7/edit`
+($0.030). Judged the same way, and the two selfies also against the avatar.
+
+| scene | nano-banana-pro/edit | seedream-v4.7/edit |
+|---|---|---|
+| the cat on the laptop | **9/10** | **9/10** |
+| morning desk | **9/10** | 3/10 |
+| warung at night | **9/10** | 5/10 |
+| night selfie | 5/10 — *identity: yes, "very high-fidelity"* | 6/10 — *identity: yes* |
+| afternoon selfie | 3/10 — *identity: no* | 4/10 — *identity: yes* |
+
+**The useful discovery is not the model, it is the prompt.** The first pass at the desk and warung
+scenes scored **3/10** for both models, and the judge's reason was the same each time: *"a young woman
+posing with a laptop and iced coffee in a sunlit room"*. The prompts had invited a pose. Rewritten to
+put her **absorbed in what she is doing, not looking at the camera, caught mid-movement, edges slightly
+out of focus**, those two scenes went to **9/10** with the same model and the same reference.
+
+So the ranking of what actually makes a photo pass is: *what she is doing and whether she knows the
+camera is there* first, the model second, the reference third. A posed photo of a real face is still a
+posed photo.
+
+Still unsolved: a selfie. One night selfie keeps the identity ("very high-fidelity") at 5/10; the
+afternoon one loses it. Two attempts is not a pattern, but it is consistent with everything else in
+this file — the face is the part that does not survive generation reliably.
+
 ---
 
 ## 2. The plan: a library, not a generator

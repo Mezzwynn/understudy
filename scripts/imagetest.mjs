@@ -41,6 +41,13 @@ No text, no watermark.`,
 Object.assign(SCENES, {
   "pagi-kerja": {
     aspect: "4:3",
+    editPrompt: `Keep the same woman as the reference photo — the same face, the same features, the same hair.
+Do not change her. Only the scene changes: she is at a small wooden desk in the morning with an iced coffee in a
+plastic cup and an open laptop, absorbed in the screen and NOT looking at the camera, caught mid-movement,
+the photo taken quickly by someone standing beside her and slightly out of focus at the edges, soft window
+daylight from the left, a plain lived-in room behind her, no makeup, tired flat expression, crooked framing,
+mild phone noise, not tidy. A real snapshot sent to a friend, absolutely not a posed or staged photo.
+No text, no watermark.`,
     prompt: `A casual phone photo taken by a 20-year-old in Denpasar, Bali in the morning: an iced coffee in a
 plastic cup, a phone and a closed laptop on a small wooden desk, a hair tie and a pair of earphones beside them.
 Photographed from slightly above at an angle, no people and no hands in frame. Soft morning daylight through a
@@ -49,6 +56,12 @@ No text, no watermark.`,
   },
   "warung-malam": {
     aspect: "4:3",
+    editPrompt: `Keep the same woman as the reference photo — the same face, the same features, the same hair.
+Do not change her. Only the scene changes: she is at a plastic table at a small outdoor warung in Denpasar at
+night, mid-bite over a plate of nasi campur, NOT looking at the camera, photographed quickly by the person
+across the table, harsh single bulb above the table, a blurred motorbike and a lit shop sign behind her,
+grainy low-light phone photo, crooked framing, slightly blurred from movement. A real snapshot sent to a
+friend, not posed or staged. No text, no watermark.`,
     prompt: `A casual phone photo taken at night at a small outdoor warung in Denpasar, Bali: a plastic plate of
 nasi campur, a glass of iced tea, a paper napkin, a motorbike parked in the blurred background under a yellow
 street light. No people and no hands in frame. Photographed from the seat across the table, handheld, grainy in
@@ -57,6 +70,11 @@ No text, no watermark.`,
   },
   momo: {
     aspect: "4:3",
+    editPrompt: `Keep the same woman as the reference photo — the same face, the same features, the same hair.
+Do not change her. Only the scene changes: she is sitting at her desk with a grey and white street cat lying on
+the closed laptop in front of her, one hand resting on the desk beside it, photographed from slightly above by
+the person beside her, indoor daylight, mild noise, slightly crooked framing, unposed, a small half-smile at
+most. A real snapshot sent to a friend. No text, no watermark.`,
     prompt: `A casual phone photo taken by a 20-year-old in Denpasar: a grey and white street cat lying on a
 closed laptop on a wooden desk, one paw hanging off the edge, a half-full glass of iced tea beside it.
 Photographed from slightly above, handheld, indoor daylight from the left, mild noise, slightly crooked framing,
