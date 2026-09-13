@@ -93,3 +93,82 @@ export const BUSY_REPLIES = [
   "kerja dulu. i'll reply when i'm done.",
   "nggak bisa sekarang. nanti.",
 ];
+
+/* ------------------------- the rest of being human ------------------------ */
+
+const FILLER = new Set(["yang","dan","di","ke","aku","kamu","itu","ini","sih","deh","lah","kan","ya","a","the","and","of","to","is","it","my","your"]);
+
+function keywords(text) {
+  return new Set(
+    String(text || "")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 3 && !FILLER.has(w)),
+  );
+}
+
+/**
+ * One topic, over and over. If the last stretch of chat keeps landing on the same
+ * words, she notices — people do ("kita bahas ini terus ya").
+ */
+export function topicFatigue(chat, { window = 14, minMessages = 10 } = {}) {
+  if (!config.topicFatigue) return "";
+  const recent = (chat.history || []).slice(-window);
+  if (recent.length < minMessages) return "";
+  const counts = new Map();
+  for (const m of recent) for (const w of keywords(m.content)) counts.set(w, (counts.get(w) || 0) + 1);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (!top) return "";
+  const share = top[1] / recent.length;
+  if (share < 0.5) return "";
+  return [
+    "## Kalian udah lama di topik yang sama",
+    `Topik "${top[0]}" udah keulang-ulang (${top[1]} dari ${recent.length} pesan terakhir).`,
+    "Kamu mulai bosen. Boleh ganti arah, bahas hal lain, atau bilang singkat bahwa ini muter-muter.",
+    "Jangan ceramah, jangan nyalahin. Cukup geser topiknya dengan wajar.",
+  ].join("\n");
+}
+
+/**
+ * They wrote hours ago and she is only answering now. People explain that, briefly.
+ */
+export function lateReplyNote(chat, now = new Date()) {
+  if (!config.lateReplyNote) return "";
+  const last = (chat.history || []).filter((h) => h.role === "user").slice(-1)[0];
+  if (!last?.ts) return "";
+  const mins = (now.getTime() - last.ts) / 60000;
+  if (mins < config.lateReplyMinMin) return "";
+  const hours = Math.floor(mins / 60);
+  const when = new Date(last.ts).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  return [
+    "## Kamu telat bales",
+    `Dia nulis jam ${when} (${hours >= 1 ? hours + " jam" : Math.round(mins) + " menit"} lalu), dan kamu baru bales sekarang.`,
+    "Boleh disinggung sekali, singkat, dengan alasan yang wajar (sibuk, HP ketinggalan, ketiduran, lagi di luar).",
+    "Jangan minta maaf berlebihan dan jangan njelasin panjang.",
+  ].join("\n");
+}
+
+/** Writing at 4am is its own topic. */
+export function oddHourNote(now = new Date()) {
+  if (!config.oddHourNote) return "";
+  const h = now.getHours();
+  if (h < 0 || h >= 6) return "";
+  return [
+    "## Jam aneh",
+    `Sekarang jam ${h}:00-an. Orang normal lagi tidur.`,
+    "Kalau nyambung, kamu boleh nyindir soal jamnya sekali — kenapa masih bangun, atau nyuruh dia tidur.",
+  ].join("\n");
+}
+
+/* ------------------------------ message edits ----------------------------- */
+
+/** A little afterthought she adds by editing the message she just sent. */
+export const EDIT_AFTERMATH = [
+  "…oh and drink water.",
+  "…and eat something.",
+  "…jangan lupa tidur.",
+  "…also: no.",
+  "…don't reply to that.",
+  "…kamu tau maksudku.",
+];

@@ -193,6 +193,38 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## She does not answer everything
+
+A person answers because it matters, because they are curious, because they have the energy, or
+because ignoring it would be rude. `src/worth.mjs` scores each message and decides, and every
+skip logs its reason so the behaviour is inspectable instead of mysterious:
+
+| Situation | Skip chance |
+|---|---|
+| a direct question | **0%** |
+| health, safety, a crisis, or an apology after a fight | **0%** |
+| a bare acknowledgement ("ok", "iya", "wkwk") | 60% |
+| nothing in it for her (no hook, no interest match) | 15% |
+| a topic on her bored list | 24% |
+| the same message twice, or 5+ per minute | 75–80% |
+| she is out of energy | 35% |
+| her patience is shot | 30% |
+| she has been carrying the conversation for a while | 25% |
+| they never answered her last question | 35% |
+
+Each is a knob (`SKIP_*`), so the balance is yours.
+
+## The rest of being human
+
+- **topic fatigue** — when the last stretch of chat keeps landing on the same words she notices
+  and moves it on: *"u said that like five times already / nervous or your keyboard glitching
+  honey"*
+- **late replies** — if their message has been sitting there for 90+ minutes she owns it briefly,
+  with a believable reason, rather than answering as if no time passed
+- **odd hours** — being written to at 4am is its own topic, and she may say so
+- **afterthoughts** — 5% of the time she **edits** the message she just sent to add a clause
+  ("…oh and drink water."), which is exactly what the edit button is for
+
 ## Everyday unpredictability
 
 - **`DAILY_VARIANCE`** — a small random mood offset per person per day, applied on the first

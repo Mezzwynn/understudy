@@ -97,6 +97,18 @@ function buildConfig() {
   // when someone writes something that is no longer roleplay
   // push character changes to every conversation, with a diff
   // everyday unpredictability
+  // why she may leave a message on read (see worth.mjs)
+  skipTerminalChance: num(envGet("SKIP_TERMINAL_CHANCE", "0.6"), 0.6),
+  skipBoredChance: num(envGet("SKIP_BORED_CHANCE", "0.15"), 0.15),
+  skipFloodPerMin: num(envGet("SKIP_FLOOD_PER_MIN", "5"), 5),
+  skipLowEnergyChance: num(envGet("SKIP_LOW_ENERGY_CHANCE", "0.35"), 0.35),
+  skipColdChance: num(envGet("SKIP_COLD_CHANCE", "0.3"), 0.3),
+  skipCarryingChance: num(envGet("SKIP_CARRYING_CHANCE", "0.25"), 0.25),
+  topicFatigue: envFlag("TOPIC_FATIGUE", true),
+  lateReplyNote: envFlag("LATE_REPLY_NOTE", true),
+  lateReplyMinMin: num(envGet("LATE_REPLY_MIN_MIN", "90"), 90),
+  oddHourNote: envFlag("ODD_HOUR_NOTE", true),
+  editChance: num(envGet("EDIT_CHANCE", "0.05"), 0.05),
   dailyVariance: envFlag("DAILY_VARIANCE", true),
   dailySpread: num(envGet("DAILY_SPREAD", "0.08"), 0.08),
   busyBlocks: envFlag("BUSY_BLOCKS", true),

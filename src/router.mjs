@@ -4,7 +4,8 @@ import { isPaused, pausedFor } from "./pause.mjs";
 import { recordEvent } from "./events.mjs";
 import { isSleeping, shouldIgnore, sleepiness } from "./sleep.mjs";
 import { detectCrisis, alertOwner } from "./crisis.mjs";
-import { dailyVariance, busyNow, BUSY_REPLIES } from "./natural.mjs";
+import { worthReplying } from "./worth.mjs";
+import { dailyVariance, busyNow, BUSY_REPLIES, EDIT_AFTERMATH } from "./natural.mjs";
 import { generateReply, generateDryReply } from "./engine.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst } from "./texting.mjs";
@@ -651,11 +652,17 @@ async function respond(sock, jid, p) {
   await subscribePresence(sock, jid);
   // sometimes she just reads it and doesn't reply
   // never leave a health message on read
-  if (!worried && shouldSkip(chat, incoming)) {
+  const worth = worthReplying(chat, incoming, {
+    mood: chat.mood,
+    worried,
+    crisis: crisisActive,
+    cameBack: pstate.state === "awaiting" || pstate.state === "nudged",
+  });
+  if (!worried && worth.skip) {
     chat.stats.skips = (chat.stats.skips || 0) + 1;
     chat.lastSkipAt = Date.now();
     saveChat(chat);
-    log(`left on read: ${incoming}`);
+    log(`left on read (${worth.chance * 100}%): ${worth.reason} — ${String(incoming).slice(0, 40)}`);
     return;
   }
 
@@ -761,6 +768,7 @@ async function respond(sock, jid, p) {
     chat.stats.photoCount = 0;
   }
   let sentMedia = false;
+  const textKeys = [];
   if (
     !sleepy &&
     trusted &&
@@ -894,6 +902,7 @@ async function respond(sock, jid, p) {
       }
       try {
         const sent = await sendText(sock, jid, bubbles[i], i === 0 ? quoted : undefined);
+        if (sent?.key) textKeys.push({ key: sent.key, text: bubbles[i] });
         chat.stats.outbound = (chat.stats.outbound || 0) + 1;
         chat.lastReplyAt = Date.now();
         if (config.debug) log(`→ ${jid}${i === 0 && quoted ? " (quote)" : ""}: ${bubbles[i]}`);
@@ -964,6 +973,22 @@ async function respond(sock, jid, p) {
     }
     chat.pendingTasks = [];
     saveChat(chat);
+  }
+
+  // ── an afterthought: she edits the message she just sent ──
+  if (textKeys.length && config.editChance > 0 && Math.random() < config.editChance) {
+    try {
+      const lastOne = textKeys[textKeys.length - 1];
+      const extra = pick(EDIT_AFTERMATH);
+      const edited = `${lastOne.text.replace(/\s+$/, "")}\n${extra}`;
+      await sleep(1500 + Math.random() * 4000);
+      await sock.sendMessage(jid, { text: edited, edit: lastOne.key });
+      chat.history.push({ role: "assistant", content: edited, ts: Date.now(), edited: true });
+      saveChat(chat);
+      log(`edited her own message: +${extra}`);
+    } catch (err) {
+      log(`edit failed (older client?): ${err.message}`);
+    }
   }
 
   // ── sticker as an addition (only on top of a text reply) ──
