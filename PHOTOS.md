@@ -39,6 +39,32 @@ Three conclusions, and the third is the one that matters:
 So the plan cannot be "generate a photo of her when she feels like it". That path fails on
 identity, fails on cost (every photo paid for), and fails on consistency over months.
 
+
+### Progress: the place library exists (14 Sep)
+
+`rp places` is built and running: **20 real photographs** in `data/photos/places/`, each one
+fetched from Wikimedia Commons, checked for licence, judged by a vision reviewer, and recorded in
+a credits file.
+
+```
+  ✓ warung: a Balinese Nasi Campur meal served in a woven basket      [CC BY 2.0]
+  ✓ kucing: a black cat walking on a concrete wall                    [CC BY 2.0]
+  ✗ gang:   a professional news photograph of government officials    (rejected)
+  ✗ kelas:  a studio photograph of a biological specimen              (rejected)
+  ✗ jalan:  this is an aerial or drone shot                           (rejected)
+```
+
+26 reviewed, 11 kept — a **42% acceptance rate**, which is the real cost of this approach: the
+filtering is the work, not the fetching. Licences so far: CC BY-SA 13, CC BY 3, public domain 3,
+CC0 1, all written down with author and source.
+
+Kinds covered: kopi 4, kucing 4, pasar 4, hujan 2, kantor 2, pantai 2, warung 2. **Gaps**: `gang`
+(no usable alley yet) and `kelas`. `rp places` resumes where it left off, so re-running it later
+keeps filling the same library.
+
+Openverse answers 500/504 from this network and each failed call costs a minute, so it is
+**opt-in** (`--openverse`); Wikimedia alone carries the library for now.
+
 ---
 
 ## 2. The plan: a library, not a generator

@@ -24,6 +24,7 @@
 #   rp stats          quota + usage
 #   rp doctor         health check (keys, quota, dependencies)
 #   rp watchdog       keep the bot alive (auto-restart + notification)
+#   rp places ...     real photos of her city, reviewed and licence-tracked
 #   rp routine ...    today | --new | --history | --at HH:MM
 #   rp boot           install auto-start on reboot
 
@@ -42,6 +43,7 @@ cmd="${1:-status}"
 
 case "$cmd" in
   routine|rout)  node scripts/routine.mjs "$@" ;;
+  places)        node scripts/places.mjs "$@" ;;
   pause)
     node --input-type=module -e '
       const { pauseFor } = await import("./src/pause.mjs");
