@@ -179,6 +179,8 @@ function collectBindings(code) {
   for (const m of code.matchAll(/\b([A-Za-z_$][\w$]*)\s*=>/g)) names.add(m[1]);
   for (const m of code.matchAll(/\bcatch\s*\(\s*([A-Za-z_$][\w$]*)/g)) names.add(m[1]);
   for (const m of code.matchAll(/\bfor\s*\(\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g)) names.add(m[1]);
+  // namespace imports: import * as PHOTOS from "..."
+  for (const m of code.matchAll(/\bimport\s*\*\s*as\s+([A-Za-z_$][\w$]*)/g)) names.add(m[1]);
   // object method shorthand: "  close() {" inside a literal
   for (const m of code.matchAll(/^[ \t]*([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{/gm)) names.add(m[1]);
 
