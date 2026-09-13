@@ -96,6 +96,16 @@
     .logobox{width:44px;height:44px;border-radius:14px}
   }
 
+  .feat{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .feat:last-child{border-bottom:0}
+  .switch{width:48px;height:28px;border-radius:999px;border:1px solid var(--line-2);background:var(--track);
+    position:relative;cursor:pointer;flex:none;transition:.2s;padding:0}
+  .switch span{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+    background:var(--dim);transition:.2s cubic-bezier(.2,.8,.2,1)}
+  .switch.on{background:color-mix(in srgb,var(--accent) 38%,transparent);border-color:var(--accent)}
+  .switch.on span{left:25px;background:var(--accent);box-shadow:0 0 12px var(--accent-glow)}
+  .switch:active span{width:24px}
+
   /* tabs */
   nav{display:flex;gap:3px;margin:12px 0 0;overflow-x:auto;padding-bottom:11px;scrollbar-width:none;position:relative;
     scroll-behavior:smooth;-webkit-overflow-scrolling:touch;
@@ -909,6 +919,9 @@ function renderSchedule(){
 }
 
 /* ═══════════════════════════════ settings ═══════════════════════════════ */
+// filled from /api/summary so the list stays in one place (scripts/_settings.mjs)
+let KNOB_FEATURES = [];
+const FEATURE_KEYS = KNOB_FEATURES;
 const GROUPS = [
   ["Reply style",["REACTION_CHANCE","QUOTE_CHANCE","SKIP_CHANCE","TYPO_CHANCE","BURST_CHANCE"]],
   ["Read & typing timing",["READ_MIN_MS","READ_MAX_MS","PRETYPE_MIN_MS","PRETYPE_MAX_MS","TYPING_PAUSE_CHANCE","DEBOUNCE_MS","DEBOUNCE_MAX_MS"]],
@@ -932,13 +945,27 @@ function knobField(k){
 function renderSettings(){
   if(SETTINGS_LOADED) return;
   const s=DATA.settings, root=$("#tab-settings");
+  if(DATA.featureKeys) KNOB_FEATURES=DATA.featureKeys;
   const seen=new Set();
   const groups=GROUPS.map(([title,keys])=>{
     const fields=keys.map(key=>{ const k=s.knobs.find(x=>x.key===key); if(!k) return ""; seen.add(key); return knobField(k); }).join("");
     return fields?`<div style="border-bottom:1px solid var(--line);padding:12px 0"><div class="kick" style="margin-bottom:9px">${esc(title)}</div><div class="grid">${fields}</div></div>`:"";
   }).join("");
   const rest=s.knobs.filter(k=>!seen.has(k.key)).map(knobField).join("");
+  const feats = s.knobs.filter(k=>FEATURE_KEYS.includes(k.key));
   root.innerHTML=`
+    <div class="card hero">
+      <div class="row"><h2 style="margin:0">Features</h2><span class="grow"></span>
+        <span class="tiny">switch a subsystem off without touching anything else</span></div>
+      <div id="feat-list" style="margin-top:12px">
+        ${feats.map(k=>`<div class="feat" data-key="${esc(k.key)}" data-search="${esc((k.label+" "+k.key).toLowerCase())}">
+          <div class="grow"><div style="font-size:13.5px">${esc(k.label)}</div>
+            <div class="tiny">${esc(k.hint||"")} <span class="tiny">· ${esc(k.key)}</span></div></div>
+          <button class="switch ${Number(k.value)?"on":""}" data-toggle="${esc(k.key)}" aria-pressed="${Number(k.value)?"true":"false"}">
+            <span></span></button>
+        </div>`).join("")}
+      </div>
+    </div>
     <div class="card">
       <h2>Search</h2>
       <input id="knob-q" placeholder="filter settings…">
@@ -960,6 +987,15 @@ function renderSettings(){
     if(r.ok){ toast("Automatic settings applied"); SETTINGS_LOADED=false; await refresh(true); } else toast("Failed: "+(r.error||"?"));
   };
   $("#btn-restart").onclick=async ()=>{ await api("/api/restart",{}); toast("Restarting…"); };
+  $("#feat-list").onclick=async (e)=>{
+    const b=e.target.closest("[data-toggle]"); if(!b) return;
+    const key=b.dataset.toggle;
+    const on=!b.classList.contains("on");
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on?"true":"false");
+    await api("/api/settings",{ values:{ [key]: on?1:0 } });
+    toast(`${key} ${on?"on":"off"} — applied immediately`);
+  };
   $("#knob-q").oninput=(e)=>{
     const q=e.target.value.trim().toLowerCase();
     $$(".kfield").forEach(f=>{ f.style.display=(!q||f.dataset.search.includes(q))?"":"none"; });

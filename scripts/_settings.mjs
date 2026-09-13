@@ -39,7 +39,36 @@ export function readEnvFile() {
   return out;
 }
 
+/**
+ * Feature switches. Rendered as toggles in the dashboard, saved as 1/0, and every
+ * one of them actually gates its code path (not just the prompt).
+ */
+export const FEATURES = [
+  { key: "WORLD", label: "Backstory & the people around her", kind: "bool", def: 1, hint: "her private history and cast — off: she has no past to reference" },
+  { key: "ROUTINE", label: "Her own daily routine", kind: "bool", def: 1, hint: "a generated day with hour blocks and moments" },
+  { key: "ROUTINE_MOOD", label: "Routine affects her mood", kind: "bool", def: 1, hint: "a bad client at 13:00 actually sours her" },
+  { key: "PROACTIVE", label: "She may message first", kind: "bool", def: 1, hint: "off: she only ever replies" },
+  { key: "SULKING", label: "Sulking & going silent", kind: "bool", def: 1, hint: "off: no nudge, no cold replies, no silence — she just answers" },
+  { key: "SOFT_MODE", label: "Soft window (melts, then pulls back)", kind: "bool", def: 1, hint: "off: no sudden warmth, no 'forget what i said'" },
+  { key: "COMMITMENTS", label: "Promises & follow-ups", kind: "bool", def: 1, hint: "she remembers what she said she would report back on" },
+  { key: "INSTRUCTION_FOLLOWUP", label: "Checks up on eat / sleep / rest", kind: "bool", def: 1, hint: "off: she stops asking whether you ate" },
+  { key: "CROSS_CHAT", label: "Cross-chat notes (referrals)", kind: "bool", def: 1, hint: "off: contacts stay fully sealed from each other" },
+  { key: "TASKS", label: "Errands (message a third number)", kind: "bool", def: 1, hint: "off: you cannot ask her to order food for you" },
+  { key: "STRANGER_GUARD", label: "Guard & block strangers", kind: "bool", def: 1, hint: "off: no spam scoring, no warnings, no blocking" },
+  { key: "MEMORY_EMBEDDINGS", label: "Semantic memory", kind: "bool", def: 1, hint: "off: she still remembers facts, but cannot recall by meaning" },
+  { key: "MILESTONES", label: "Milestones", kind: "bool", def: 1, hint: "notices anniversaries and firsts" },
+  { key: "PRESENCE", label: "Online / offline presence", kind: "bool", def: 1, hint: "off: she never appears online or typing" },
+  { key: "MARK_READ", label: "Read receipts", kind: "bool", def: 1, hint: "off: your messages stay unread (blue ticks never appear)" },
+  { key: "MOOD_MEDIA", label: "Mood affects media", kind: "bool", def: 1, hint: "off: voice/sticker/reaction odds ignore her mood" },
+  { key: "SAVE_USER_STICKERS", label: "Keep stickers people send", kind: "bool", def: 1, hint: "off: she never reuses your stickers" },
+  { key: "INJECTION_GUARD", label: "Prompt-injection guard", kind: "bool", def: 1, hint: "keep on unless you are testing" },
+  { key: "NICK_ACCEPT_WARM", label: "Accepts pet names when warm", kind: "bool", def: 1, hint: "off: she refuses them even when close" },
+  { key: "BACKUP", label: "Daily backup", kind: "bool", def: 1, hint: "writes a tarball to your Downloads every day" },
+];
+
 export const KNOBS = [
+  ...FEATURES,
+
   { key: "VOICE_CHANCE", label: "Reply with a voice note", kind: "float", def: 0.15, hint: "0 = never" },
   { key: "VOICE_MIRROR_CHANCE", label: "Answer a voice note with a voice note", kind: "float", def: 0.7 },
   { key: "TEXT_THEN_VOICE_CHANCE", label: "Text first, then a voice note", kind: "float", def: 0.2 },
@@ -70,15 +99,11 @@ export const KNOBS = [
   { key: "DEFAULT_NICK", label: "What she calls you", kind: "text", def: "" },
   { key: "NICK_MOOD_MIN", label: "How warm before the pet name is allowed", kind: "float", def: 0.55 },
   { key: "NICK_CHANCE", label: "How often she uses the pet name", kind: "float", def: 0.25 },
-  { key: "TASKS", label: "Owner can ask her to message a third number (1 = yes)", kind: "int", def: 1 },
   { key: "TASK_DAILY_MAX", label: "Maximum errands she runs per day", kind: "int", def: 5 },
-  { key: "STRANGER_GUARD", label: "Guard against spam from strangers (1 = on)", kind: "int", def: 1 },
   { key: "STRANGER_WARN_SCORE", label: "Suspicion score that triggers a warning", kind: "int", def: 3 },
   { key: "STRANGER_BLOCK_SCORE", label: "Suspicion score that blocks the number", kind: "int", def: 7 },
   { key: "STRANGER_FLOOD_PER_MIN", label: "Messages per minute that count as flooding", kind: "int", def: 6 },
   { key: "STRANGER_PROMOTE_AFTER", label: "Safe messages before a stranger becomes an acquaintance", kind: "int", def: 6 },
-  { key: "ROUTINE", label: "She has her own daily routine (1 = yes)", kind: "int", def: 1 },
-  { key: "ROUTINE_MOOD", label: "Her routine affects her mood (1 = yes)", kind: "int", def: 1 },
   { key: "ROUTINE_KEEP_DAYS", label: "Keep ordinary days for (days)", kind: "int", def: 3 },
   { key: "ROUTINE_HIGHLIGHT_MIN", label: "Minimum intensity to become a highlight", kind: "float", def: 0.5 },
   { key: "ROUTINE_HIGHLIGHT_MAX", label: "Maximum stored highlights", kind: "int", def: 30 },
@@ -94,6 +119,10 @@ export function currentValues() {
       out[k.key] = raw === "" ? k.def : raw;
       continue;
     }
+    if (k.kind === "bool") {
+      out[k.key] = raw === "" ? k.def : (/^(1|true|on|yes)$/i.test(String(raw)) ? 1 : 0);
+      continue;
+    }
     const n = Number(raw);
     out[k.key] = raw === "" || !Number.isFinite(n) ? k.def : n;
   }
@@ -103,6 +132,12 @@ export function currentValues() {
 export function applyValues(values) {
   for (const k of KNOBS) {
     if (values[k.key] === undefined) continue;
+    // booleans go to .env as true/false, whatever the caller sent (1, 0, "on"…)
+    if (k.kind === "bool") {
+      const on = /^(1|true|on|yes)$/i.test(String(values[k.key]));
+      setEnv(k.key, on ? "true" : "false");
+      continue;
+    }
     setEnv(k.key, String(values[k.key]));
   }
 }

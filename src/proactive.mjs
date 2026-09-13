@@ -192,6 +192,7 @@ async function deliver(sock, chat, text) {
 }
 
 function escalateKind(chat, now) {
+  if (!config.sulking) return null; // sulking is switched off
   const p = chat.proactive || {};
   if (p.state === "awaiting" && p.sentAt && mins(now - p.sentAt) > config.nudgeAfterMin) return "nudge";
   if (p.state === "nudged" && p.nudgedAt && mins(now - p.nudgedAt) > config.dryAfterMin) return "dry";
@@ -421,7 +422,7 @@ export function startProactive() {  if (!config.proactive) {
     const sock = getSock();
     if (!sock) return;
     (async () => {
-      await updatePresence(sock);
+      if (config.presence) await updatePresence(sock);
       await tickRoutines();
       await checkSoft(sock);
       await checkInstructions(sock);

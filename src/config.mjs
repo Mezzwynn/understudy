@@ -46,6 +46,16 @@ const num = (v, d) => {
   return Number.isFinite(n) ? n : d;
 };
 
+/**
+ * Booleans are written as true/false by the CLI and as 1/0 by the dashboard, and
+ * people hand-edit .env too. Accept all of them: 1, true, on, yes.
+ */
+export function envFlag(key, def = false) {
+  const raw = envGet(key, "");
+  if (raw === "") return def;
+  return /^(1|true|on|yes)$/i.test(String(raw).trim());
+}
+
 export function envGet(key, fallback = "") {
   const v = env[key];
   return v === undefined || v === "" ? fallback : v;
@@ -67,14 +77,18 @@ function buildConfig() {
     .map((s) => s.trim())
     .filter(Boolean),
   // Set true if you want every contact treated as trusted (old behaviour).
-  trustStrangers: envGet("TRUST_STRANGERS", "false") === "true",
+  trustStrangers: envFlag("TRUST_STRANGERS", false),
 
   // ── strangers: guard + block, and when someone stops being a stranger ──
   // ── errands for the owner (send a message to a third number) ──
-  tasks: envGet("TASKS", "true") === "true",
+  tasks: envFlag("TASKS", true),
   taskDailyMax: num(envGet("TASK_DAILY_MAX", "5"), 5),
 
-  strangerGuard: envGet("STRANGER_GUARD", "true") === "true",
+  strangerGuard: envFlag("STRANGER_GUARD", true),
+  // the sulking escalation (nudge -> dry -> silent) and cross-chat notes are
+  // features in their own right, so they can be switched off
+  sulking: envFlag("SULKING", true),
+  crossChat: envFlag("CROSS_CHAT", true),
   // suspicion points: link 2, scam wording 3, code/password 4, sexual 3, flood 2, repeats 2 ...
   strangerWarnScore: num(envGet("STRANGER_WARN_SCORE", "3"), 3),
   strangerBlockScore: num(envGet("STRANGER_BLOCK_SCORE", "7"), 7),
@@ -93,7 +107,7 @@ function buildConfig() {
     .filter(Boolean),
 
   // Groups: off by default (roleplay is meant for DMs).
-  allowGroups: envGet("ALLOW_GROUPS", "false") === "true",
+  allowGroups: envFlag("ALLOW_GROUPS", false),
   groupAllow: envGet("GROUP_ALLOW", "")
     .split(",")
     .map((s) => s.trim())
@@ -125,7 +139,7 @@ function buildConfig() {
   pretypeMinMs: num(envGet("PRETYPE_MIN_MS", "1500"), 1500),
   pretypeMaxMs: num(envGet("PRETYPE_MAX_MS", "9000"), 9000),
   typingPauseChance: num(envGet("TYPING_PAUSE_CHANCE", "0.25"), 0.25),
-  markRead: envGet("MARK_READ", "true") === "true",
+  markRead: envFlag("MARK_READ", true),
   readDelayMinMs: num(envGet("READ_DELAY_MIN_MS", "2500"), 2500),
   readDelayMaxMs: num(envGet("READ_DELAY_MAX_MS", "90000"), 90000),
   quoteChance: num(envGet("QUOTE_CHANCE", "0.2"), 0.2),
@@ -138,7 +152,7 @@ function buildConfig() {
   burstChance: num(envGet("BURST_CHANCE", "0.18"), 0.18),
 
   // Proactive (texting first)
-  proactive: envGet("PROACTIVE", "true") === "true",
+  proactive: envFlag("PROACTIVE", true),
   proactiveIdleMin: num(envGet("PROACTIVE_IDLE_MIN", "45"), 45),
   proactiveGapMin: num(envGet("PROACTIVE_GAP_MIN", "180"), 180),
   proactiveTickSec: num(envGet("PROACTIVE_TICK_SEC", "60"), 60),
@@ -180,13 +194,13 @@ function buildConfig() {
   // thresholds used to fight each other.
   nickMoodMin: num(envGet("NICK_MOOD_MIN", "0.55"), 0.55),
   nickChance: num(envGet("NICK_CHANCE", "0.25"), 0.25),
-  nickAcceptWarm: envGet("NICK_ACCEPT_WARM", "true") === "true",
+  nickAcceptWarm: envFlag("NICK_ACCEPT_WARM", true),
 
   // Show as "online" only during her active hours
-  presence: envGet("PRESENCE", "true") === "true",
+  presence: envFlag("PRESENCE", true),
 
   // Local web dashboard
-  dashboard: envGet("DASHBOARD", "true") === "true",
+  dashboard: envFlag("DASHBOARD", true),
   dashboardPort: num(envGet("DASHBOARD_PORT", "8787"), 8787),
   dashboardHost: envGet("DASHBOARD_HOST", "127.0.0.1"),
   dashboardToken: envGet("DASHBOARD_TOKEN", ""),
@@ -198,29 +212,29 @@ function buildConfig() {
   deleteMinMs: num(envGet("DELETE_MIN_MS", "1500"), 1500),
   deleteMaxMs: num(envGet("DELETE_MAX_MS", "6000"), 6000),
   // keep the stickers people send her and reuse them later
-  saveUserStickers: envGet("SAVE_USER_STICKERS", "true") === "true",
+  saveUserStickers: envFlag("SAVE_USER_STICKERS", true),
   userStickerKeep: num(envGet("USER_STICKER_KEEP", "30"), 30),
   preferUserSticker: num(envGet("PREFER_USER_STICKER", "0.5"), 0.5),
   // let mood influence which kind of reply she sends
-  moodMedia: envGet("MOOD_MEDIA", "true") === "true",
+  moodMedia: envFlag("MOOD_MEDIA", true),
   // prompt-injection resistance (DMs are open)
-  injectionGuard: envGet("INJECTION_GUARD", "true") === "true",
+  injectionGuard: envFlag("INJECTION_GUARD", true),
   // relationship milestones (first "I love you", first fight, ...)
-  milestones: envGet("MILESTONES", "true") === "true",
+  milestones: envFlag("MILESTONES", true),
   // promises to follow up later ("nanti aku kabarin kalau udah selesai")
-  commitments: envGet("COMMITMENTS", "true") === "true",
+  commitments: envFlag("COMMITMENTS", true),
   commitmentMinMin: num(envGet("COMMITMENT_MIN_MIN", "90"), 90),
   commitmentMaxMin: num(envGet("COMMITMENT_MAX_MIN", "480"), 480),
   // she told them to do something (eat / sleep / workout) -> check later
-  instructionFollowup: envGet("INSTRUCTION_FOLLOWUP", "true") === "true",
+  instructionFollowup: envFlag("INSTRUCTION_FOLLOWUP", true),
   // how often she actually follows up on "go eat / go sleep", so she does not
   // turn into a repeating alarm clock
   // ── her own daily life (routine.mjs) ──
   // her backstory + the people around her (world.mjs)
-  world: envGet("WORLD", "true") === "true",
+  world: envFlag("WORLD", true),
 
-  routine: envGet("ROUTINE", "true") === "true",
-  routineMood: envGet("ROUTINE_MOOD", "true") === "true",
+  routine: envFlag("ROUTINE", true),
+  routineMood: envFlag("ROUTINE_MOOD", true),
   routineKeepDays: num(envGet("ROUTINE_KEEP_DAYS", "3"), 3),
   routineHighlightMin: num(envGet("ROUTINE_HIGHLIGHT_MIN", "0.5"), 0.5),
   routineHighlightMax: num(envGet("ROUTINE_HIGHLIGHT_MAX", "30"), 30),
@@ -231,21 +245,21 @@ function buildConfig() {
   instructionMinMin: num(envGet("INSTRUCTION_MIN_MIN", "6"), 6),
   instructionMaxMin: num(envGet("INSTRUCTION_MAX_MIN", "35"), 35),
   // temporary softness: she melts, then pulls back (tsundere)
-  softMode: envGet("SOFT_MODE", "true") === "true",
+  softMode: envFlag("SOFT_MODE", true),
   softMinMin: num(envGet("SOFT_MIN_MIN", "8"), 8),
   softMaxMin: num(envGet("SOFT_MAX_MIN", "45"), 45),
   softTriggerChance: num(envGet("SOFT_TRIGGER_CHANCE", "0.55"), 0.55),
   softRetractChance: num(envGet("SOFT_RETRACT_CHANCE", "0.35"), 0.35),
 
   // ── semantic memory (embeddings) ────────────────────────
-  memoryEmbeddings: envGet("MEMORY_EMBEDDINGS", "true") === "true",
+  memoryEmbeddings: envFlag("MEMORY_EMBEDDINGS", true),
   embedModel: envGet("EMBED_MODEL", "gemini-embedding-001"),
   recallTopK: num(envGet("RECALL_TOP_K", "4"), 4),
   recallMinScore: num(envGet("RECALL_MIN_SCORE", "0.62"), 0.62),
   memoryMaxEntries: num(envGet("MEMORY_MAX_ENTRIES", "400"), 400),
 
   // ── maintenance ─────────────────────────────────────────
-  backup: envGet("BACKUP", "true") === "true",
+  backup: envFlag("BACKUP", true),
   backupDir: envGet("BACKUP_DIR", ""),
   backupKeep: num(envGet("BACKUP_KEEP", "7"), 7),
 
@@ -278,7 +292,7 @@ function buildConfig() {
   // chance the sticker is the whole reply instead of an addition to text/voice
   stickerOnlyChance: num(envGet("STICKER_ONLY_CHANCE", "0.4"), 0.4),
 
-    debug: envGet("DEBUG", "false") === "true",
+    debug: envFlag("DEBUG", false),
   };
 }
 

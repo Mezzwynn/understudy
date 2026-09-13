@@ -74,7 +74,9 @@ case "$cmd" in
     node scripts/lint-dom.mjs || exit 1
     echo "── 2. reply path (fake socket, no model calls) ──"
     node scripts/smoke.mjs || exit 1
-    echo "── 3. offline brain ──"
+    echo "── 3. feature switches ──"
+    node scripts/featuretest.mjs || exit 1
+    echo "── 4. offline brain ──"
     node scripts/selftest.mjs ;;
   stats|biaya)
     node scripts/stats.mjs ;;

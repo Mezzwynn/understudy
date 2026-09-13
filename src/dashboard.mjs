@@ -16,7 +16,7 @@ import { normalize, cohere, label as moodLabel, newMood, baselineFor, KEYS as MO
 import { suggestMood } from "./affect.mjs";
 import { isConnected, getSock } from "./whatsapp.mjs";
 import { dueSlot } from "./proactive.mjs";
-import { KNOBS, currentValues, applyValues, autoSuggest, setEnv } from "../scripts/_settings.mjs";
+import { KNOBS, FEATURES, currentValues, applyValues, autoSuggest, setEnv } from "../scripts/_settings.mjs";
 
 /**
  * dashboard.mjs — tiny local web dashboard (no dependencies).
@@ -252,6 +252,29 @@ async function summary() {
   return {
     routine: routineSummary,
     version: appVersion(),
+    featureKeys: FEATURES.map((f) => f.key),
+    // what the RUNNING process actually has switched on (not just what's in .env)
+    liveFlags: {
+      world: config.world,
+      routine: config.routine,
+      routineMood: config.routineMood,
+      proactive: config.proactive,
+      sulking: config.sulking,
+      softMode: config.softMode,
+      commitments: config.commitments,
+      instructionFollowup: config.instructionFollowup,
+      crossChat: config.crossChat,
+      tasks: config.tasks,
+      strangerGuard: config.strangerGuard,
+      presence: config.presence,
+      markRead: config.markRead,
+      memoryEmbeddings: config.memoryEmbeddings,
+      milestones: config.milestones,
+      moodMedia: config.moodMedia,
+      saveUserStickers: config.saveUserStickers,
+      injectionGuard: config.injectionGuard,
+      backup: config.backup,
+    },
     bot: {
       connected: isConnected(),
       number: getSock()?.user?.id ? String(getSock().user.id).split(":")[0].split("@")[0] : null,

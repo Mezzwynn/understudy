@@ -193,6 +193,33 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## Feature switches
+
+Settings → **Features**: twenty switches, each of which actually gates its code path rather than
+just the wording of the prompt.
+
+| Switch | Off means |
+|---|---|
+| Backstory & cast | she has no past to reference |
+| Her own daily routine | no generated day, no moments |
+| Routine affects mood | a bad client does not sour her |
+| She may message first | she only ever replies |
+| Sulking & going silent | no nudge, no cold replies, no silence — she just answers |
+| Soft window | no sudden warmth, no "forget what i said" |
+| Promises & follow-ups | nothing to report back on |
+| Checks up on eat / sleep | she stops asking whether you ate |
+| Cross-chat notes | contacts stay fully sealed from each other |
+| Errands | you cannot ask her to message a third number |
+| Guard & block strangers | no spam scoring, no warnings, no blocking |
+| Semantic memory | facts still stored, but no recall by meaning |
+| Milestones / presence / read receipts / mood-driven media / sticker reuse | as named |
+| Prompt-injection guard | only turn this off while testing |
+
+Booleans are written to `.env` as `true`/`false`, and `1`/`on`/`yes` are still accepted if you
+hand-edit the file. `rp test` includes `scripts/featuretest.mjs`, which proves each switch really
+changes the prompt (it once did not: `.env` said `WORLD=true` while the running process read
+`false`, because the dashboard wrote `1` and the config compared against the string `"true"`).
+
 ## Dashboard
 
 `rp dash` → http://127.0.0.1:8787, a single-file dark UI (no CDN, works offline).

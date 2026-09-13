@@ -388,7 +388,7 @@ async function respond(sock, jid, p) {
   }
 
   // ── cross-chat: someone mentioned another contact, or answered about one ──
-  try {
+  if (config.crossChat) try {
     await resolveNotes(chat, incoming);
     const mention = detectMention(chat, incoming);
     if (mention) {
@@ -435,12 +435,18 @@ async function respond(sock, jid, p) {
   const isMedia = incoming.startsWith("[");
   const bare = isMedia ? "" : incoming.replace(/\s/g, "");
   const mm = moodMultipliers(chat.mood);
-  detectMilestones(chat, incoming);
+  if (config.milestones) detectMilestones(chat, incoming);
   const injection = config.injectionGuard && detectInjection(incoming);
   if (injection) log(`possible prompt-injection from ${jid}`);
 
   // sulking chain: dry (contextual short replies) -> silent (no reply at all)
   const pstate = (chat.proactive ||= { state: "idle", sentAt: 0, nudgedAt: 0, drySince: 0, dryCount: 0, lastDry: "", lastSlot: "" });
+  // SULKING=0: she never goes cold or silent, she just answers
+  if (!config.sulking && pstate.state !== "idle") {
+    pstate.state = "idle";
+    pstate.dryCount = 0;
+    chat.coldUntil = 0;
+  }
   let thawed = false;
   const worried = HEALTH_CUE.test(incoming);
   if (pstate.state === "dry" || pstate.state === "silent") {
