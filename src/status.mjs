@@ -195,13 +195,40 @@ export function markPosted(slug, item, now = Date.now()) {
 }
 
 /**
- * Who can see her status: everyone she talks to, or only the trusted ones.
- * The chat's own jid is used as-is — building a phone-number jid out of an anonymous
- * LID would produce a number that does not exist.
+ * Who can see her status.
+ *
+ * WhatsApp wants the recipients as phone-number jids. A list made only of anonymous
+ * LIDs appears to be dropped server-side: the send resolves here, but the status
+ * never shows up anywhere — which is exactly what happened. So only real numbers go
+ * in, and LID-only contacts are skipped (their number is hidden from the bot) with a
+ * count in the log.
  */
 export function statusAudience() {
   const chats = listChats().filter((c) => (config.statusAudience === "trusted" ? c.trusted === true : true));
-  return [...new Set(chats.map((c) => String(c.jid)).filter((j) => /@(s\.whatsapp\.net|lid)$/.test(j)))];
+  const out = [];
+  let skipped = 0;
+  for (const c of chats) {
+    const jid = String(c.jid);
+    if (/@s\.whatsapp\.net$/.test(jid)) {
+      out.push(jid);
+      continue;
+    }
+    const lid = jid.split("@")[0];
+    const mapped = config.lidMap?.[lid];
+    if (mapped) {
+      out.push(`${String(mapped).replace(/\D/g, "")}@s.whatsapp.net`);
+      continue;
+    }
+    const num = String(c.profile?.number || "").replace(/\D/g, "");
+    // a plausible phone number, and not just the LID repeated back at us
+    if (num && num !== lid && num.length >= 8 && num.length <= 16) {
+      out.push(`${num}@s.whatsapp.net`);
+      continue;
+    }
+    skipped++;
+  }
+  if (skipped) log(`status audience: ${out.length} number(s), ${skipped} contact(s) skipped (their number is hidden)`);
+  return [...new Set(out)];
 }
 
 /**
