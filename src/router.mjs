@@ -4,6 +4,7 @@ import { isPaused, pausedFor } from "./pause.mjs";
 import { recordEvent } from "./events.mjs";
 import { isSleeping, shouldIgnore, sleepiness } from "./sleep.mjs";
 import { detectCrisis, alertOwner } from "./crisis.mjs";
+import { dailyVariance, busyNow, BUSY_REPLIES } from "./natural.mjs";
 import { generateReply, generateDryReply } from "./engine.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst } from "./texting.mjs";
@@ -400,6 +401,39 @@ async function respond(sock, jid, p) {
   }
   // a crisis keeps her present for half an hour, whatever her mood was doing
   const crisisActive = Boolean(chat.crisisAt && Date.now() - chat.crisisAt < 30 * 60000);
+
+  // ── today's mood for no particular reason (once per day, per person) ──
+  dailyVariance(chat);
+
+  // ── her routine says she is busy right now ──
+  if (!crisisActive) {
+    const busy = busyNow(chat);
+    if (busy) {
+      if (Math.random() < config.busyReplyChance) {
+        const line = pick(BUSY_REPLIES);
+        await presence(sock, jid, "composing");
+        await sleep(typingDelayFor(line));
+        try {
+          await sendText(sock, jid, line);
+          chat.stats.outbound = (chat.stats.outbound || 0) + 1;
+          chat.lastInteraction = Date.now();
+          chat.busyUntil = Date.now() + busy.minutesLeft * 60000;
+          chat.history.push({ role: "assistant", content: line, ts: Date.now() });
+          saveChat(chat);
+          log(`busy (${busy.what}) — short "can't talk" reply → ${jid}`);
+        } catch (err) {
+          log(`busy reply failed: ${err.message}`);
+        }
+        return;
+      }
+      const cap = Math.min(config.busyDelayMaxMin, busy.minutesLeft);
+      if (cap >= 2) {
+        const mins = 1 + Math.random() * (cap - 1);
+        log(`busy (${busy.what}) — answering in ~${Math.round(mins)} min → ${jid}`);
+        await sleep(mins * 60000);
+      }
+    }
+  }
 
   // ── a new day: yesterday's mood does not vanish overnight ──
   {

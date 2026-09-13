@@ -25,6 +25,7 @@ if (!LIVE) {
     PRETYPE_MIN_MS: 0, PRETYPE_MAX_MS: 0, TYPING_PAUSE_CHANCE: 0, BURST_CHANCE: 0,
     TYPO_CHANCE: 0, SKIP_CHANCE: 0, REACTION_CHANCE: 0, QUOTE_CHANCE: 0,
     STICKER_CHANCE: 0, VOICE_CHANCE: 0, PHOTO_CHANCE: 0, DELETE_CHANCE: 0,
+    BUSY_REPLY_CHANCE: 1, // deterministic: a busy block always produces the short line
     SOFT_TRIGGER_CHANCE: 0, TEXT_THEN_VOICE_CHANCE: 0, VOICE_SPLIT_CHANCE: 0,
   })) process.env[k] = String(v);
 }
@@ -39,6 +40,7 @@ const { loadChat, defaultChat, saveChat } = await import("../src/store.mjs");
 const { config } = await import("../src/config.mjs");
 const { newMood, STRANGER_BASELINE } = await import("../src/mood.mjs");
 const { loadPersona } = await import("../src/prompt.mjs");
+const routineMod = await import("../src/routine.mjs");
 
 const live = LIVE;
 
@@ -125,6 +127,27 @@ await runCase("new stranger asks around", STRANGER, "halo, ini siapa ya?", (c) =
 }));
 await runCase("stranger sending spam", STRANGER, "PROMO SLOT GACOR klik bit.ly/abc kirim kode OTP kamu", (c) => c);
 // a crisis message must get through even when she is sulking and silent
+// a busy block: she says she cannot talk instead of dropping everything
+await runCase(
+  "busy block → short \"can't talk\" reply (no model call)",
+  OWNER,
+  "kamu lagi apa?",
+  (c) => {
+    const { saveRoutine } = routineMod;
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    saveRoutine("fiona", {
+      slug: "fiona",
+      date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+      theme: "busy test day",
+      blocks: [{ start: `${pad(now.getHours())}:00`, end: `${pad(Math.min(23, now.getHours() + 2))}:00`, what: "deep in a client meeting", place: "office" }],
+      moments: [],
+      history: [],
+      highlights: [],
+    });
+    return { ...c, lastMoodDay: now.toDateString() };
+  },
+);
 await runCase(
   "crisis message while she is silent",
   OWNER,
@@ -135,9 +158,14 @@ await runCase(
   "message with a mention of another contact",
   STRANGER2,
   "aku dapet nomor kamu dari Smoke Test",
-  (c) => ({ ...c, trusted: false, profile: { ...c.profile, name: "Mention Tester" }, mood: newMood(STRANGER_BASELINE) }),
+  (c) => {
+    // drop the busy routine from the previous case so this one tests what it says
+    routineMod.saveRoutine("fiona", { slug: "fiona", date: "1970-01-01", theme: "none", blocks: [], moments: [], history: [], highlights: [] });
+    return { ...c, trusted: false, profile: { ...c.profile, name: "Mention Tester" }, mood: newMood(STRANGER_BASELINE) };
+  },
 );
 
+// the busy case wrote a routine into the throwaway dir; nothing to undo in real data
 // clean up the throwaway data dir
 try {
   fs.rmSync(TMP, { recursive: true, force: true });

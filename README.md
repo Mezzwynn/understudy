@@ -193,6 +193,20 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## Everyday unpredictability
+
+- **`DAILY_VARIANCE`** — a small random mood offset per person per day, applied on the first
+  message of the day, on top of yesterday's residue. Some days she wakes up flat for no reason;
+  some days she is fine. Moods are not deterministic.
+- **`BUSY_BLOCKS`** — her routine says what she is doing this hour. If that is work, a meeting, a
+  class or the gym, she does not drop everything: with `BUSY_REPLY_CHANCE` she sends a short
+  *"lagi kerja. nanti ya."* (no model call at all, so it is cheap) and otherwise she answers
+  later, waiting up to `BUSY_DELAY_MAX_MIN`, capped by how long the block has left. The prompt
+  also tells her she is busy, so an answer given mid-meeting reads like one.
+
+  Because the reply queue is per conversation, messages sent while she is busy are answered
+  together afterwards — which is exactly how people behave when they come out of a meeting.
+
 ## Character changes are pushed everywhere, with a diff
 
 Edit her card — from the dashboard, from the agent, or by hand in a text editor — and every

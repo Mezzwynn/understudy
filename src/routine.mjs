@@ -18,10 +18,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { chat as llmChat } from "./llm.mjs";
-import { ROOT, config, trackerProvider, log } from "./config.mjs";
+import { ROOT, DATA_DIR, config, trackerProvider, log } from "./config.mjs";
 import { languageDirective } from "./lang.mjs";
 
-const DIR = path.join(ROOT, "data", "routine");
+// under DATA_DIR so a test run with a throwaway data dir cannot touch real routines
+const DIR = path.join(DATA_DIR, "routine");
 
 const KIND_EFFECT = {
   fun: { valence: 0.09, playfulness: 0.07, energy: 0.03 },

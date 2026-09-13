@@ -96,6 +96,12 @@ function buildConfig() {
   llmDailyCallsMax: num(envGet("LLM_DAILY_CALLS_MAX", "400"), 400),
   // when someone writes something that is no longer roleplay
   // push character changes to every conversation, with a diff
+  // everyday unpredictability
+  dailyVariance: envFlag("DAILY_VARIANCE", true),
+  dailySpread: num(envGet("DAILY_SPREAD", "0.08"), 0.08),
+  busyBlocks: envFlag("BUSY_BLOCKS", true),
+  busyReplyChance: num(envGet("BUSY_REPLY_CHANCE", "0.45"), 0.45),
+  busyDelayMaxMin: num(envGet("BUSY_DELAY_MAX_MIN", "20"), 20),
   changeFeed: envFlag("CHANGE_FEED", true),
   changeWatchFiles: envFlag("CHANGE_WATCH_FILES", true),
   changeNotify: envFlag("CHANGE_NOTIFY", true),
