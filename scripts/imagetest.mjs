@@ -64,6 +64,11 @@ not composed. A normal snapshot of a pet sent to a friend. No people, no hands, 
   },
   "selfie-siang": {
     aspect: "3:4",
+    editPrompt: `Keep the same woman as the reference photo — the same face, the same features, the same hair.
+Do not change her. Only the scene changes: a candid front-camera selfie taken in the afternoon in her room in
+Denpasar, indoor daylight from a window on the left, a plain lived-in room behind her, no makeup, flat
+unimpressed expression, slightly crooked framing, unposed. A real phone snapshot sent to a friend, mildly
+noisy, not a produced photo. No text, no watermark.`,
     prompt: `A candid front-camera selfie taken by a slim 20-year-old Indonesian woman in Denpasar, Bali in the
 afternoon. Shoulder-length straight black hair, oversized plain t-shirt, no makeup, visible skin texture, a small
 mole on her cheek, flat unimpressed expression, no smile. Indoor daylight from a window on the left, a plain
@@ -72,6 +77,11 @@ sent to a friend, not a produced photo. No text, no watermark.`,
   },
   "selfie-malam": {
     aspect: "3:4",
+    editPrompt: `Keep the same woman as the reference photo — the same face, the same features, the same hair.
+Do not change her. Only the scene changes: a candid phone selfie taken at night outside a Denpasar cafe, lit by
+a warm street light and the glow of the phone screen, a dark noisy background with a blurred motorbike and a lit
+shop sign, grainy low-light sensor, slightly crooked framing, unposed. A real night snapshot sent to a friend.
+No text, no watermark.`,
     prompt: `A candid phone selfie taken at night outside a Denpasar cafe by a slim 20-year-old Indonesian woman.
 Shoulder-length straight black hair, black oversized shirt, no makeup, tired but relaxed expression, half a smile
 at most. Lit by a single warm street light and the phone screen glow, dark noisy background with a blurred

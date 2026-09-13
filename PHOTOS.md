@@ -189,6 +189,38 @@ hosting is needed for a reference.
 If new photos of her face are ever needed, they need a model trained on her (a LoRA) — a paid job on
 a service that does training, and it needs 15-20 approved photos to start from.
 
+
+### Why every selfie had a different face (and what can fix that)
+
+Hik asked the right question: *"the selfies are all different faces — didn't you use the avatar as a
+reference?"* He is right, and the reason is worth writing down because it decides how the feature works.
+
+**nano-banana-pro and seedream-v5.0-pro — his two picks — cannot accept an image at all.** They are
+text-to-image: the prompt describes her in words, so every image invents a new face. No bug, just a
+limit of those two models. The first five-scenario test therefore measured *scene* quality, not identity.
+
+The models that *can* take a reference are the **`/edit`** variants. Seven were tested with his real
+avatar as the reference (45 edit models exist; these cover the price range $0.025-0.14):
+
+| model | price | judge: identity | judge: score |
+|---|---|---|---|
+| `black-forest-labs/flux-kontext-dev` | $0.025 | yes | 3/10 |
+| `bytedance/seedream-v4.7/edit` | $0.030 | yes | 5/10 |
+| `google/nano-banana-2/edit` | $0.080 | yes then no (unstable) | 2-3/10 |
+| `qwen-image-3.0-pro/edit` | $0.040 | yes | 3/10 |
+| `google/nano-banana-pro/edit` | $0.140 | no | 4/10 |
+| `bytedance/seedream-v5.0-pro/edit` | $0.036 | no | 2/10 |
+
+A defect in the first run of this test, worth recording: the edit models were handed the *text-to-image*
+prompt, which describes the woman from scratch — so the words fought the reference photo. With a proper
+edit prompt ("keep the same woman as the reference, only the scene changes") identity holds more often.
+
+Two honest caveats. The judge is **unstable on identity**: the same model came back "yes" in one run and
+"no" in the next, so its verdict is a hint, not a measurement — Hik's eye is the measure, which is why
+the rating page now shows his avatar pinned at the top with all 37 photos grouped under it. And a
+generated photo of a real person's face is a step past sending their existing photo: that decision is his,
+but it is the reason the library approach is the default rather than endless generation.
+
 ---
 
 ## 2. The plan: a library, not a generator

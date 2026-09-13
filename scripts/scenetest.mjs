@@ -25,6 +25,9 @@ const MODELS = String(arg("models", "google/nano-banana-pro/text-to-image-develo
 const OUT = arg("out", "/sdcard/Download/Understudy/scenario-test");
 const JUDGE = arg("judge", "google/gemini-3.1-flash-lite");
 const AVATAR = avatarPath("fiona");
+// --reference: pakai foto asli sebagai acuan (base64, jadi tidak perlu hosting publik)
+const REF_FILE = arg("reference", "");
+const REF = REF_FILE && fs.existsSync(REF_FILE) ? `data:image/jpeg;base64,${fs.readFileSync(REF_FILE).toString("base64")}` : "";
 const slug = (m) => m.replace(/[^\w.-]+/g, "_");
 const short = (m) => m.split("/").slice(-2).join("/").replace(/\/text-to-image(-developer)?$/, "");
 
@@ -75,7 +78,9 @@ async function main() {
     const hasFace = /selfie|portrait|wajah/i.test(sceneName);
     for (const model of MODELS) {
       process.stdout.write(`  ${sceneName.padEnd(14)} ${short(model).padEnd(26)} `);
-      const res = await generateImage({ model, prompt: scene.prompt, aspect: scene.aspect });
+      // dengan referensi: pakai prompt gaya edit, yang menyuruh menjaga wajahnya, bukan mendeskripsikannya
+      const promptText = REF && scene.editPrompt ? scene.editPrompt : scene.prompt;
+      const res = await generateImage({ model, prompt: promptText, aspect: scene.aspect, images: REF ? [REF] : [] });
       if (!res.ok) {
         console.log(`GAGAL (${res.error.slice(0, 50)})`);
         rows.push({ scene: sceneName, model, ok: false, error: res.error, hasFace });
@@ -100,7 +105,7 @@ async function main() {
     }
   }
 
-  fs.writeFileSync(path.join(OUT, "results.json"), JSON.stringify({ at: Date.now(), avatar: AVATAR, scenes: WANT, models: MODELS, rows }, null, 2));
+  fs.writeFileSync(path.join(OUT, "results.json"), JSON.stringify({ at: Date.now(), mode: REF ? "edit (reference image)" : "text-to-image", avatar: AVATAR, reference: REF_FILE, scenes: WANT, models: MODELS, rows }, null, 2));
 
   const md = [
     "# 5 skenario × 2 model pilihan Hik",
@@ -147,7 +152,7 @@ p.sub{color:#b39a78;margin:0 0 16px}
 .ref img{width:84px;height:84px;border-radius:50%;object-fit:cover}
 </style>
 <h1>5 skenario × 2 model pilihanmu</h1>
-<p class="sub">Prompt identik per skenario · juri vision yang sama · ${new Date().toLocaleString("id-ID")}</p>
+<p class="sub">${REF ? "pakai FOTO ASLI sebagai referensi (mode edit) · " : ""}Prompt identik per skenario · juri vision yang sama · ${new Date().toLocaleString("id-ID")}</p>
 ${AVATAR ? `<div class="ref"><img src="${path.basename(AVATAR)}"><div><b>Avatar yang kamu upload</b><br><span style="color:#b39a78;font-size:13px">Dua skenario selfie dicek identitasnya terhadap foto ini — jadi kelihatan kalau wajahnya melenceng.</span></div></div>` : ""}
 ${byScene
   .map(
@@ -169,6 +174,7 @@ ${byScene
   fs.writeFileSync(path.join(OUT, "index.html"), html);
   if (AVATAR && fs.existsSync(AVATAR)) fs.copyFileSync(AVATAR, path.join(OUT, path.basename(AVATAR)));
 
+  if (REF_FILE) console.log(`\n  referensi: ${path.basename(REF_FILE)} (${Math.round(REF.length/1024)} kb base64)`);
   console.log(`\n  hasil di ${OUT}`);
   console.log(`  ${OUT}/index.html`);
 }

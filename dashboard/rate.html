@@ -27,11 +27,21 @@
   .prog{flex:1;height:8px;background:#2c2419;border-radius:5px;overflow:hidden}
   .prog i{display:block;height:100%;background:var(--accent);transition:width .25s}
   .done{color:var(--good)}
+  .refbox{display:flex;gap:12px;align-items:center;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:16px;position:sticky;top:0;z-index:5}
+  .refbox img{width:76px;height:76px;border-radius:50%;object-fit:cover;flex:0 0 auto}
+  .grp{margin:22px 0 10px;font-size:14px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em}
 </style>
 </head>
 <body>
 <h1>Foto mana yang paling bagus</h1>
 <p class="sub">Nilainya <b>bagus atau tidak menurut matamu</b> — bukan soal AI atau bukan. Kalau ada yang kelihatan aneh, centang kotaknya. Ini yang jadi patokan buat milih model.</p>
+<div id="ref" style="display:none">
+  <div class="refbox">
+    <img id="refimg" alt="wajah acuan">
+    <div><b>Wajah acuan (avatar Fio)</b><br>
+      <span style="color:var(--dim);font-size:13px">Bandingkan dengan foto selfie: <b>orangnya sama atau bukan?</b> Itu pertanyaan utamanya.</span></div>
+  </div>
+</div>
 <div id="list"></div>
 <div class="bar">
   <span id="count">…</span>
@@ -58,10 +68,12 @@ function render(){
   const done = PHOTOS.filter(p => RATINGS[p.file]).length;
   document.getElementById("count").textContent = `${done}/${PHOTOS.length} dinilai`;
   document.getElementById("prog").style.width = (PHOTOS.length ? (done/PHOTOS.length*100) : 0) + "%";
+  let grp = "";
   document.getElementById("list").innerHTML = PHOTOS.map(p => {
+    const head = p.group && p.group !== grp ? (grp = p.group, `<div class="grp">${p.group}</div>`) : "";
     const r = RATINGS[p.file] || {};
     const c = (v) => r.verdict === v ? " sel " + ({bagus:"good",lumayan:"warn",kurang:"bad"}[v]) : "";
-    return `<div class="card">
+    return head + `<div class="card">
       <img src="${p.url}" loading="lazy" alt="">
       <div class="body">
         <div class="name">${p.file}</div>
@@ -114,6 +126,7 @@ document.addEventListener("change", async (e) => {
 (async () => {
   const [list, rated] = await Promise.all([fetch("/api/ratelist").then(r=>r.json()), fetch("/api/rate").then(r=>r.json())]);
   PHOTOS = list.photos || [];
+  if(list.avatar){ document.getElementById("ref").style.display="block"; document.getElementById("refimg").src=list.avatar; }
   for(const r of (rated.ratings||[])) RATINGS[r.file] = r;
   render();
 })();

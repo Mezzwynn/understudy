@@ -7,6 +7,11 @@ import { ROOT, PERSONA_DIR, DATA_DIR, config, envGet, STARTED_AT, log, reloadCon
 
 /** Where the model-comparison photos live — the rating page reads and serves them. */
 const PHOTO_TEST_DIR = envGet("PHOTO_TEST_DIR", "/sdcard/Download/Understudy/model-test");
+/** Semua folder hasil tes foto: dinilai dalam satu halaman. */
+const PHOTO_TEST_DIRS = envGet("PHOTO_TEST_DIRS", "model-test,scenario-test,face-test")
+  .split(",")
+  .map((d) => path.join("/sdcard/Download/Understudy", d.trim()))
+  .filter(Boolean);
 
 /** Hik's verdicts on generated photos: the ground truth for the photo pipeline. */
 const ratingsFile = () => path.join(DATA_DIR, "photos", "ratings.json");
@@ -442,7 +447,8 @@ export function startDashboard() {
       }
       if (req.method === "GET" && url.pathname === "/photo") {
         const name = path.basename(String(url.searchParams.get("f") || ""));
-        const file = path.join(PHOTO_TEST_DIR, name);
+        const dir = path.basename(String(url.searchParams.get("d") || "model-test"));
+        const file = path.join("/sdcard/Download/Understudy", dir, name);
         if (!name || !fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
         res.writeHead(200, { "content-type": /\.png$/i.test(name) ? "image/png" : "image/jpeg", "cache-control": "public, max-age=3600" });
         return res.end(fs.readFileSync(file));
@@ -452,58 +458,31 @@ export function startDashboard() {
       }
       if (req.method === "GET" && url.pathname === "/api/ratelist") {
         const list = [];
-        if (fs.existsSync(PHOTO_TEST_DIR)) {
-          for (const f of fs.readdirSync(PHOTO_TEST_DIR)) {
+        for (const dir of PHOTO_TEST_DIRS) {
+          if (!fs.existsSync(dir)) continue;
+          const group = path.basename(dir);
+          for (const f of fs.readdirSync(dir)) {
             if (!/\.(jpg|jpeg|png)$/i.test(f)) continue;
+            if (f === "avatar.jpg" || f === "logo.png") continue;
             let stats = null;
             try {
-              const out = execFileSync("node", [path.join(ROOT, "scripts", "photostats.mjs"), path.join(PHOTO_TEST_DIR, f)], { encoding: "utf8", timeout: 30000 });
+              const out = execFileSync("node", [path.join(ROOT, "scripts", "photostats.mjs"), path.join(dir, f)], { encoding: "utf8", timeout: 30000 });
               const line = out.split("\n").find((l) => l.includes(f.slice(0, 18)));
               if (line) {
                 const parts = line.trim().split(/\s+/);
-                stats = { mp: parts[1], brightness: parts[2], contrast: parts[3], saturation: parts[4], colorfulness: parts[5], sharpness: parts[6], noise: parts[7] };
+                stats = { mp: parts[1], contrast: parts[3], saturation: parts[4], colorfulness: parts[5], sharpness: parts[6], noise: parts[7] };
               }
             } catch {
               /* measurements are a nice-to-have */
             }
-            list.push({ file: f, url: `/photo?f=${encodeURIComponent(f)}`, stats });
+            list.push({ file: f, group, url: `/photo?d=${encodeURIComponent(group)}&f=${encodeURIComponent(f)}`, stats });
           }
         }
-        return json(res, 200, { photos: list.sort((a, b) => a.file.localeCompare(b.file)) });
-      }
-
-      // her face: the avatar and the candidates, served from her own folder
-      if (req.method === "GET" && url.pathname === "/face") {
         const slug = loadPersona().slug;
-        const name = String(url.searchParams.get("f") || "avatar");
-        let file = "";
-        if (name === "avatar") file = avatarPath(slug);
-        else if (name.startsWith("cand-")) file = path.join(candidatesDir(slug), path.basename(name));
-        if (!file || !fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
-        res.writeHead(200, { "content-type": /\.png$/i.test(file) ? "image/png" : "image/jpeg", "cache-control": "no-store" });
-        return res.end(fs.readFileSync(file));
-      }
-      if (req.method === "GET" && url.pathname === "/api/face") {
-        const slug = loadPersona().slug;
-        const face = loadFace(slug);
-        let whatsappUrl = "";
-        try {
-          const { getSock } = await import("./whatsapp.mjs");
-          whatsappUrl = await currentAvatarUrl(getSock());
-        } catch {
-          /* WhatsApp may not be up yet */
-        }
+        const av = avatarPath(slug);
         return json(res, 200, {
-          slug,
-          hasAvatar: !!avatarPath(slug),
-          avatarMeta: face.updatedAt ? new Date(face.updatedAt).toLocaleString("id-ID") : "",
-          approved: (face.approved || []).length,
-          rejected: (face.rejected || []).length,
-          candidates: listCandidates(slug),
-          whatsappUrl,
-          faceModel: config.faceModel,
-          photoCandidateCount: config.photoCandidateCount,
-          prompt: facePrompt(loadPersona(slug)),
+          photos: list.sort((a, b) => a.group.localeCompare(b.group) || a.file.localeCompare(b.file)),
+          avatar: av ? `/face?f=avatar` : "",
         });
       }
 
