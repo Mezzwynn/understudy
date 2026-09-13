@@ -11,6 +11,7 @@ import { contextBlock } from "./schedule.mjs";
 import { pausePromptBlock } from "./pause.mjs";
 import { traitsForChat, humorPromptBlock, interestPromptBlock } from "./traits.mjs";
 import { lifePromptBlock } from "./events.mjs";
+import { sleepPromptBlock, morningNote } from "./sleep.mjs";
 import { tasksBlock } from "./tasks.mjs";
 
 const ENGINE_FILE = path.join(PROMPT_DIR, "engine.md");
@@ -134,7 +135,7 @@ function factsWithAge(mem) {
   );
 }
 
-export function buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled, worried } = {}) {
+export function buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled, worried, sleepy } = {}) {
   // always have a mood object, even for a chat that was never used
   const mood = normalize(chat.mood || newMood(baselineFor(chat)));
   chat.mood = mood;
@@ -300,7 +301,17 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     config.world ? worldPromptBlock(world, {}) : "",
     config.world ? contextBlock(world) : "",
     pausePromptBlock(),
+    sleepy ? sleepPromptBlock() : morningNote(chat),
     lifePromptBlock(chat),
+    (() => {
+      const asked = (chat.asked || []).filter((a) => Date.now() - a.at < 7 * 24 * 3600 * 1000).slice(-6);
+      if (!asked.length) return "";
+      return [
+        "## Yang udah kamu tanyain belakangan ini",
+        ...asked.map((a) => `- ${a.q}…`),
+        "JANGAN nanya hal yang sama lagi. Kalau penasaran masih ada, tanya sisi lain atau tunggu dia yang cerita.",
+      ].join("\n");
+    })(),
     (() => { const tr = traitsForChat(chat); return [
       config.humor ? humorPromptBlock(tr) : "",
       config.interest ? interestPromptBlock(tr) : "",
@@ -421,8 +432,8 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
   return [loadEngine().trim(), "---", persona.card.trim(), "---", state].join("\n\n");
 }
 
-export function buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled, worried } = {}) {
-  const system = buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled, worried });
+export function buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled, worried, sleepy } = {}) {
+  const system = buildSystem(chat, persona, { displayName, voice, startedIt, thawed, injection, recalled, worried, sleepy });
   const history = (chat.history || []).slice(-config.historyTurns).map((h) => ({
     role: h.role,
     content: h.content,

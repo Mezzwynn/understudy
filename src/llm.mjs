@@ -1,5 +1,5 @@
 import { config, providers, log } from "./config.mjs";
-import { recordUsage } from "./store.mjs";
+import { recordUsage, loadState, saveState } from "./store.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -8,6 +8,44 @@ function trackUsage(label, data) {
   const tin = u.prompt_tokens ?? u.input_tokens ?? 0;
   const tout = u.completion_tokens ?? u.output_tokens ?? 0;
   recordUsage(label, tin, tout);
+}
+
+/**
+ * Safety valve: a runaway loop or a stuck retry must not drain a prepaid balance
+ * overnight. Counts calls per day across every provider.
+ */
+function budgetCheck() {
+  if (!config.budgetGuard) return;
+  const st = loadState();
+  const day = new Date().toISOString().slice(0, 10);
+  const used = st.callsDay === day ? st.calls || 0 : 0;
+  if (used >= config.llmDailyCallsMax) {
+    if (st.callsNotifiedDay !== day) {
+      st.callsNotifiedDay = day;
+      saveState(st);
+      log(`LLM daily call limit reached (${used}/${config.llmDailyCallsMax}) — she stays quiet until tomorrow`);
+      try {
+        // best effort, never fatal
+        import("node:child_process").then(({ execFile }) =>
+          execFile("termux-notification", ["-t", "Understudy", "-c", `Daily model limit reached (${used}). She will stay quiet until tomorrow.`], () => {}),
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+    throw new Error(`budget: daily call limit reached (${used}/${config.llmDailyCallsMax})`);
+  }
+}
+
+function countCall() {
+  const st = loadState();
+  const day = new Date().toISOString().slice(0, 10);
+  if (st.callsDay !== day) {
+    st.callsDay = day;
+    st.calls = 0;
+  }
+  st.calls = (st.calls || 0) + 1;
+  saveState(st);
 }
 
 async function callProvider(p, { messages, temperature, maxTokens, json }) {
@@ -114,6 +152,8 @@ async function callProvider(p, { messages, temperature, maxTokens, json }) {
  * Chat completion with per-provider retry + cross-provider fallback.
  */
 export async function chat(messages, opts = {}) {
+  budgetCheck();
+  countCall();
   // the smoke test runs the whole reply path without touching the network
   if (process.env.SMOKE_NO_LLM) {
     const text = process.env.SMOKE_LLM_TEXT || "ya. whatever.";

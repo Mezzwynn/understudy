@@ -193,6 +193,32 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## She sleeps
+
+Quiet hours used to silence only the proactive side: a message at 3am still got an instant,
+fully composed answer, which is the least human thing this bot did. Now (`SLEEP_MODE`):
+
+- during quiet hours **most messages get no reply at all** — she is asleep and it waits until
+  morning (the chance she stirs is `SLEEP_REPLY_CHANCE`, and it drops the deeper the sleep)
+- **anything health or safety related always wakes her up**
+- if she does answer, she is groggy: short, slow, half-awake, may misread, may doze off again,
+  and she will not send a voice note or a sticker at 4am
+- in the morning she can own the gap instead of ignoring it: *"you messaged at 3:30. i saw it
+  now."* — the prompt tells her, so she does not pretend nothing happened
+
+## Not asking the same thing twice
+
+Her own questions are recorded (`chat.asked`) and the prompt lists the ones from the last week
+with "do not ask this again — ask a different side of it, or wait for them to tell you". People
+do not re-ask what they asked on Tuesday.
+
+## Cost safety valve
+
+`BUDGET_GUARD` counts model calls per day across every provider and stops at
+`LLM_DAILY_CALLS_MAX` (400 by default), logging and sending a phone notification once. A stuck
+retry loop cannot drain a prepaid balance overnight while you sleep — it just goes quiet until
+the next day.
+
 ## Real things happen to her
 
 Conversations are not the only input. `src/events.mjs` records things that happen *to her*,

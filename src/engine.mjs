@@ -303,6 +303,35 @@ function sampleMood(chat) {
   if (chat.moodHistory.length > 96) chat.moodHistory = chat.moodHistory.slice(-96);
 }
 
+/**
+ * People do not ask the same question twice in one week. Her own questions are
+ * recorded so the prompt can tell her what she has already asked about.
+ */
+function rememberAsks(chat, reply) {
+  const questions = String(reply || "")
+    .split(/(?<=[?？])/)
+    .filter((q) => q.includes("?") || q.includes("？"))
+    .map((q) =>
+      q
+        .replace(/[^\p{L}\p{N} ]/gu, " ")
+        .trim()
+        .replace(/^(hm+|hmm+|tch|so|and|but|well|jadi|terus|eh|oh|nah)\s+/i, "")
+        .split(/\s+/)
+        .slice(0, 6)
+        .join(" ")
+        .toLowerCase(),
+    )
+    .filter((q) => q.length >= 6);
+  if (!questions.length) return;
+  chat.asked = Array.isArray(chat.asked) ? chat.asked : [];
+  for (const q of questions) {
+    if (chat.asked.some((x) => x.q === q)) continue;
+    chat.asked.push({ q, at: Date.now() });
+  }
+  const week = Date.now() - 7 * 24 * 3600 * 1000;
+  chat.asked = chat.asked.filter((x) => x.at > week).slice(-20);
+}
+
 /** Change the mood — unless the dashboard locked it for this contact. */
 function bump(session, deltas) {
   if (isMoodLocked(session)) { session.mood = lockValue(session); return; }
@@ -317,7 +346,7 @@ function reDrift(session) {
 /**
  * Produce one in-character reply and update the chat state.
  */
-export async function generateReply(chat, incoming, persona, { displayName, voice, startedIt, thawed, injection, worried } = {}) {
+export async function generateReply(chat, incoming, persona, { displayName, voice, startedIt, thawed, injection, worried, sleepy } = {}) {
   chat.mood = normalize(chat.mood);
   reDrift(chat);
 
@@ -339,7 +368,7 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
     log(`recall failed: ${err.message}`);
   }
 
-  const messages = buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled, worried });
+  const messages = buildMessages(chat, persona, incoming, { displayName, voice, startedIt, thawed, injection, recalled, worried, sleepy });
   // she just asked a stranger who they are — do not ask again next message
   if (needsIntroduction(chat)) markIntroAsked(chat);
 
@@ -432,6 +461,7 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
   }
 
   sampleMood(chat);
+  rememberAsks(chat, text);
   chat.history.push({ role: "user", content: incoming, ts: Date.now() });
   chat.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
   chat.stats.inbound = (chat.stats.inbound || 0) + 1;

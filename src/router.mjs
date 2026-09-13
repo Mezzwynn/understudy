@@ -2,6 +2,7 @@ import { config, log } from "./config.mjs";
 import { loadChat, saveChat, loadState, saveState, listChats } from "./store.mjs";
 import { isPaused, pausedFor } from "./pause.mjs";
 import { recordEvent } from "./events.mjs";
+import { isSleeping, shouldIgnore, sleepiness } from "./sleep.mjs";
 import { generateReply, generateDryReply } from "./engine.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst } from "./texting.mjs";
@@ -352,6 +353,25 @@ function takePhotoBudget() {
 }
 
 async function respond(sock, jid, p) {
+  // ── sleep: it is the middle of her night ──
+  let sleepy = false;
+  {
+    const worriedNow = HEALTH_CUE.test(p.parts.join(" "));
+    if (isSleeping()) {
+      if (shouldIgnore(p.parts.join(" "), { worried: worriedNow })) {
+        const chat = loadChat(jid);
+        chat.history.push({ role: "user", content: p.parts.filter(Boolean).join("\n"), ts: Date.now() });
+        chat.stats.inbound = (chat.stats.inbound || 0) + 1;
+        chat.lastAsleepAt = Date.now();
+        saveChat(chat);
+        log(`asleep (${Math.round(sleepiness() * 100)}% deep) — saw it, did not answer → ${jid}`);
+        return;
+      }
+      sleepy = true;
+      log(`woken up (${Math.round(sleepiness() * 100)}% deep) → ${jid}`);
+    }
+  }
+
   // she is switched off (out of town, asleep on a trip…): read it, answer nothing
   if (isPaused()) {
     const chat = loadChat(jid);
@@ -611,6 +631,7 @@ async function respond(sock, jid, p) {
   const incomingVoice = /^\[voice note/i.test(incoming);
   const mirrorVoice = incomingVoice && Math.random() < config.voiceMirrorChance;
   const wantVoice =
+    !sleepy &&
     trusted &&
     !asksText &&
     (asksVoice ||
@@ -628,6 +649,7 @@ async function respond(sock, jid, p) {
   try {
     replyText = await generateReply(chat, incoming, persona, {
       displayName: p.pushName,
+      sleepy,
       voice: wantVoice,
       startedIt,
       thawed,
@@ -668,6 +690,7 @@ async function respond(sock, jid, p) {
   }
   let sentMedia = false;
   if (
+    !sleepy &&
     trusted &&
     (wantsPhoto || Math.random() < config.photoChance) &&
     (chat.stats.photoCount || 0) < config.photoDailyMax &&
@@ -697,6 +720,7 @@ async function respond(sock, jid, p) {
 
   // ── sticker: can be the whole reply, or an addition to text/voice ──
   const stickerRoll =
+    !sleepy &&
     trusted && config.stickerChance > 0 && Math.random() < Math.min(0.95, config.stickerChance * mm.sticker);
   const stickerAlone = stickerRoll && !sentMedia && Math.random() < config.stickerOnlyChance;
   const stickerPick = stickerRoll

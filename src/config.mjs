@@ -90,6 +90,12 @@ function buildConfig() {
   sulking: envFlag("SULKING", true),
   // her sense of humour and what she is interested in (traits.mjs)
   lifeEvents: envFlag("LIFE_EVENTS", true),
+  // she sleeps during quiet hours and does not answer every 3am message
+  // safety valve: stop making calls when the day's budget is spent
+  budgetGuard: envFlag("BUDGET_GUARD", true),
+  llmDailyCallsMax: num(envGet("LLM_DAILY_CALLS_MAX", "400"), 400),
+  sleepMode: envFlag("SLEEP_MODE", true),
+  sleepReplyChance: num(envGet("SLEEP_REPLY_CHANCE", "0.25"), 0.25),
   humor: envFlag("HUMOR", true),
   interest: envFlag("INTEREST", true),
   // weekly humanness check (an independent judge scores how detectable she is)
