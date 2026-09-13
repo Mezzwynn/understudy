@@ -770,6 +770,7 @@ async function renderCharacter(force){
       <div class="hint" style="margin-top:6px">This is what makes her feel alive: vocabulary, texting habits, example lines, what she hides. The more specific the better.</div>
     </div>
 
+    ${traitsPanel()}
     ${contextPanel(w)}
     ${worldPanel(w)}
     ${routinePanel(DATA.routine)}`;
@@ -804,6 +805,56 @@ async function renderCharacter(force){
     toast("Deleted"+(r.switchedTo?" · now using "+r.switchedTo:""));
     CHAR_SLUG=r.switchedTo||(DATA.personas[0]&&DATA.personas[0].slug)||null;
     DATA.personaCard=null; await refresh(true);
+  };
+  $("#tab-character").addEventListener("input",(e)=>{
+    if(e.target.classList.contains("trange")){
+      const [g]=e.target.dataset.traitField.split(".");
+      const out=$(g==="humor"?"#humor-pct":"#interest-pct");
+      if(out) out.textContent=Math.round(Number(e.target.value)*100)+"%";
+    }
+  });
+  $("#tab-character").addEventListener("click",(e)=>{
+    const t=e.target.closest("[data-trait-toggle]");
+    if(t && t.dataset.traitToggle){
+      const [g,k]=t.dataset.traitToggle.split(".");
+      traitsDraft()[g][k] = !traitsDraft()[g][k];
+      t.classList.toggle("on", traitsDraft()[g][k]);
+      return;
+    }
+    const del=e.target.closest("[data-trait-del]");
+    if(del){
+      const [g,k]=del.dataset.traitDel.split(".");
+      traitsDraft()[g][k].splice(Number(del.dataset.i),1);
+      renderTraitList(del.dataset.traitDel);
+      return;
+    }
+    const add=e.target.closest("[data-trait-addbtn]");
+    if(add){
+      const key=add.dataset.traitAddbtn;
+      const input=$(`#tab-character [data-trait-add="${key}"]`);
+      const v=(input.value||"").trim(); if(!v) return;
+      const [g,k]=key.split(".");
+      traitsDraft()[g][k].push(v);
+      input.value="";
+      renderTraitList(key);
+    }
+  });
+  const tg=$("#btn-traits-gen"); if(tg) tg.onclick=async ()=>{
+    if(!confirm("Generate humour and interests from her card and backstory?")) return;
+    toast("Working out her humour and interests…");
+    const r=await api("/api/traits/gen",{ slug:CHAR_SLUG });
+    toast(r.ok?"Generated":("Failed: "+(r.error||"")));
+    TRAITS_DRAFT=null; DATA.traits=null; await refresh(true);
+  };
+  const ts=$("#btn-traits-save"); if(ts) ts.onclick=async ()=>{
+    const root=$("#tab-character");
+    const d=traitsDraft();
+    $$("[data-trait-field]",root).forEach(i=>{ const [g,k]=i.dataset.traitField.split("."); d[g][k]= i.type==="range" ? Number(i.value) : i.value.trim(); });
+    const r=await api("/api/traits",{ slug:CHAR_SLUG, humor:d.humor, interest:d.interest });
+    if(!r.ok){ toast("Failed: "+(r.error||"")); return; }
+    toast("Saved — applied immediately");
+    await refresh(true);
+    const h=$("#traits-hint"); if(h) h.textContent="✓ saved · used from the next reply";
   };
   $("#btn-ctx-add").onclick=async ()=>{
     const text=$("#ctx-text").value.trim(); if(!text) return;
@@ -847,6 +898,83 @@ async function renderCharacter(force){
     toast(r.ok ? ("New routine: "+r.routine.theme) : ("Failed: "+(r.error||"")));
     await refresh(true);
   };
+}
+
+let TRAITS_DRAFT = null;
+function traitsDraft(){
+  if(!TRAITS_DRAFT){
+    const t = DATA.traits || {};
+    TRAITS_DRAFT = {
+      humor: { on:true, style:"", chance:0.35, dark:false, avoid:[], examples:[], ...(t.humor||{}) },
+      interest: { on:true, level:0.6, topics:[], bored:[], curious:true, ...(t.interest||{}) },
+      learned: t.learned || [],
+    };
+  }
+  return TRAITS_DRAFT;
+}
+function traitList(key, label, ph){
+  const d = traitsDraft();
+  const [g,k] = key.split(".");
+  const arr = d[g][k] || [];
+  return `<div><label>${esc(label)}</label>
+    <div id="tlist-${key.replace(".","-")}">
+      ${arr.map((v,i)=>`<div class="mrow" style="grid-template-columns:1fr 30px;gap:7px;align-items:center;margin-bottom:5px">
+        <span style="font-size:12.5px">${esc(v)}</span>
+        <button class="act" data-trait-del="${key}" data-i="${i}" style="padding:3px 7px">✕</button></div>`).join("") || '<div class="tiny">none yet</div>'}
+    </div>
+    <div class="row" style="margin-top:6px">
+      <input data-trait-add="${key}" placeholder="${esc(ph)}" style="flex:1">
+      <button class="act" data-trait-addbtn="${key}">Add</button>
+    </div></div>`;
+}
+function traitsPanel(){
+  const d = traitsDraft();
+  const h = d.humor, i = d.interest;
+  return `<div class="card">
+    <div class="row"><h2 style="margin:0">Humor &amp; interest</h2><span class="grow"></span>
+      <button class="act" id="btn-traits-gen">Generate</button></div>
+    <div class="hint" style="margin-top:6px">Her sense of humour and what she actually cares about. Write them here, generate them from the card and backstory, or ask the agent to change them.</div>
+
+    <div class="row" style="margin-top:13px"><b style="font-size:12.5px">Humour</b><span class="grow"></span>
+      <button class="switch ${h.on?"on":""}" data-trait-toggle="humor.on"><span></span></button></div>
+    <div class="grid" style="margin-top:9px">
+      <div><label>Style (how she jokes)</label><input data-trait-field="humor.style" value="${esc(h.style)}" placeholder="dry, deadpan, teasing"></div>
+      <div><label>How often a reply has a joke — <b id="humor-pct">${Math.round(h.chance*100)}%</b></label>
+        <input type="range" class="trange" data-trait-field="humor.chance" min="0" max="1" step="0.05" value="${h.chance}"></div>
+    </div>
+    <div class="row" style="margin-top:9px"><label style="margin:0">Dark humour is allowed</label>
+      <button class="switch ${h.dark?"on":""}" data-trait-toggle="humor.dark"><span></span></button></div>
+    <div class="grid" style="margin-top:8px">
+      ${traitList("humor.examples","Flavour lines (reference only)","a line that sounds like her")}
+      ${traitList("humor.avoid","Never joke about","his family, his job…")}
+    </div>
+
+    <div class="row" style="margin-top:16px;border-top:1px solid var(--line);padding-top:13px"><b style="font-size:12.5px">Interest</b><span class="grow"></span>
+      <button class="switch ${i.on?"on":""}" data-trait-toggle="interest.on"><span></span></button></div>
+    <div class="grid" style="margin-top:9px">
+      <div><label>How curious she is about him — <b id="interest-pct">${Math.round(i.level*100)}%</b></label>
+        <input type="range" class="trange" data-trait-field="interest.level" min="0" max="1" step="0.05" value="${i.level}"></div>
+    </div>
+    <div class="row" style="margin-top:9px"><label style="margin:0">She asks questions (not just reacts)</label>
+      <button class="switch ${i.curious?"on":""}" data-trait-toggle="interest.curious"><span></span></button></div>
+    <div class="grid" style="margin-top:8px">
+      ${traitList("interest.topics","What lights her up","cats, coffee, design…")}
+      ${traitList("interest.bored","What bores her","gossip, small talk…")}
+    </div>
+    ${d.learned.length?`<div class="tiny" style="margin-top:10px">Learned from your conversations: ${d.learned.map(esc).join(", ")}</div>`:""}
+    <div class="btns"><button class="act primary" id="btn-traits-save">Save humor &amp; interest</button>
+      <span class="muted" id="traits-hint"></span></div>
+  </div>`;
+}
+function renderTraitList(key){
+  const d = traitsDraft();
+  const [g,k] = key.split(".");
+  const arr = d[g][k] || [];
+  const box = document.getElementById(`tlist-${key.replace(".","-")}`);
+  if(!box) return;
+  box.innerHTML = arr.map((v,i)=>`<div class="mrow" style="grid-template-columns:1fr 30px;gap:7px;align-items:center;margin-bottom:5px">
+      <span style="font-size:12.5px">${esc(v)}</span>
+      <button class="act" data-trait-del="${key}" data-i="${i}" style="padding:3px 7px">✕</button></div>`).join("") || '<div class="tiny">none yet</div>';
 }
 
 function contextPanel(w){

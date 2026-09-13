@@ -9,6 +9,7 @@ import { openNotes, openVouches } from "./links.mjs";
 import { relationPromptBlock, worldForChat, worldPromptBlock } from "./world.mjs";
 import { contextBlock } from "./schedule.mjs";
 import { pausePromptBlock } from "./pause.mjs";
+import { traitsForChat, humorPromptBlock, interestPromptBlock } from "./traits.mjs";
 import { tasksBlock } from "./tasks.mjs";
 
 const ENGINE_FILE = path.join(PROMPT_DIR, "engine.md");
@@ -285,6 +286,10 @@ export function buildSystem(chat, persona, { displayName, voice, startedIt, thaw
     config.world ? worldPromptBlock(world, {}) : "",
     config.world ? contextBlock(world) : "",
     pausePromptBlock(),
+    (() => { const tr = traitsForChat(chat); return [
+      config.humor ? humorPromptBlock(tr) : "",
+      config.interest ? interestPromptBlock(tr) : "",
+    ].join("\n"); })(),
     config.crossChat ? crossBlock : "",
     config.crossChat ? vouchBlock : "",
     trusted ? tasksBlock(chat) : "",

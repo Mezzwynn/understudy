@@ -10,6 +10,7 @@ import { exportPersona, importPersona, deletePersona, listSlugs, trashContents, 
 import { tierOf, strangerState, unblock } from "./stranger.mjs";
 import { loadPause, pauseFor, resume as resumeBot, pausedFor } from "./pause.mjs";
 import { evalSummary, isEvalRunning, dueForEval } from "./evals.mjs";
+import { loadTraits, saveTraits, generateTraits } from "./traits.mjs";
 import { RELATIONS, loadWorld, saveWorld, ensureWorld, worldFile } from "./world.mjs";
 import { resolveBlockJid } from "./stranger.mjs";
 import { generateSchedule, formatSchedule, parseSchedule, addContext, cleanContext } from "./schedule.mjs";
@@ -255,6 +256,7 @@ async function summary() {
   return {
     routine: routineSummary,
     version: appVersion(),
+    traits: loadTraits(activeSlug),
     evals: { ...evalSummary(), running: isEvalRunning(), due: dueForEval(), everyDays: config.evalEveryDays },
     paused: { active: isPausedDash(), minutesLeft: pausedFor(), reason: loadPause().reason || "" },
     featureKeys: FEATURES.map((f) => f.key),
@@ -530,6 +532,26 @@ export function startDashboard() {
             log("dashboard: auto settings applied");
           }
           return json(res, 200, { ok: true, suggested });
+        }
+
+        if (url.pathname === "/api/traits") {
+          const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
+          const current = loadTraits(slug);
+          const saved = saveTraits(slug, {
+            humor: body.humor !== undefined ? { ...current.humor, ...body.humor } : current.humor,
+            interest: body.interest !== undefined ? { ...current.interest, ...body.interest } : current.interest,
+            learned: current.learned,
+            source: "manual",
+          });
+          log(`dashboard: traits ${slug} saved (humour ${Math.round(saved.humor.chance * 100)}%, interest ${Math.round(saved.interest.level * 100)}%)`);
+          return json(res, 200, { ok: true, traits: saved });
+        }
+
+        if (url.pathname === "/api/traits/gen") {
+          const slug = String(body.slug || config.persona).replace(/[^\w.-]/g, "");
+          const p = loadPersona(slug);
+          const t = await generateTraits(p, loadWorld(slug), { force: true });
+          return json(res, 200, { ok: true, traits: t });
         }
 
         if (url.pathname === "/api/persona/import") {

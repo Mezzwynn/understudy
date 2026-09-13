@@ -11,7 +11,7 @@ import { label, snapshot, KEYS } from "./mood.mjs";
 const SYSTEM = `You are the internal affect tracker for a roleplay character. You are shown the character's current mood, what the character remembers, the other person's message, and the character's reply. Update the character's emotional state and long-term memory.
 
 Respond with ONLY a JSON object, no prose, no markdown:
-{"mood":{"valence":0.0,"energy":0.0,"arousal":0.0,"affection":0.0,"patience":0.0,"playfulness":0.0},"remember":[],"forget":[],"plans":[],"jokes":[],"boundaries":[],"relationship":"","name":"","nick":"","followup":{"what":"","due":"","for":""},"task":{}}
+{"mood":{"valence":0.0,"energy":0.0,"arousal":0.0,"affection":0.0,"patience":0.0,"playfulness":0.0},"remember":[],"forget":[],"plans":[],"jokes":[],"boundaries":[],"relationship":"","name":"","nick":"","followup":{"what":"","due":"","for":""},"task":{},"interests":[]}
 
 Rules:
 - mood values are DELTAS applied to the current mood, each between -0.2 and 0.2. Omit a key if it did not change.
@@ -25,6 +25,7 @@ Rules:
 - followup: fill this ONLY when a future update was agreed — the character promised to report back ("nanti aku kabarin kalau udah selesai", "I'll let you know") OR the other person asked to be told ("kabarin ya kalau udah beres", "tell me when it's done"). Set what = short description of what will be reported; due = ISO-8601 datetime if a time was agreed, otherwise empty string; for = "me" if the character promised, "them" if they asked her to report. Otherwise use an empty object {}.
 - Never invent mood changes for a flat, neutral exchange: an all-zero mood object is valid.
 - task: fill this ONLY when the other person asks the character to contact somebody else for them (order food, tell someone something, ask a third person). Format {"type":"message","to":"<phone number>","text":"<the message to send>","why":"<short reason>"}. Otherwise {}. Never invent a number that was not given in the conversation. The character may agree in her reply; she does not send it herself, the system does.
+- interests: fill ONLY with a topic the OTHER PERSON brought up that the character clearly enjoyed or engaged with (1-3 words each, 0-2 items). Empty array if nothing stood out. Not topics she merely tolerated.
 - Output JSON only.`;
 
 function safeParse(text) {

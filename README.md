@@ -193,6 +193,28 @@ DASHBOARD_TOKEN=some-long-secret     # then use http://<phone-ip>:8787/?token=..
 
 ---
 
+## Humour and interest
+
+Two character traits that shape how she talks, stored per character in
+`personas/<slug>.traits.json` and visible in the Character tab.
+
+**Humour** — style (dry, deadpan, teasing…), how often a reply carries a joke (a percentage,
+so it is a flavour and not a stand-up routine), whether dark humour is allowed, lines that
+sound like her (reference only), and the things she must never joke about. She is told not to
+be funny at the wrong moment: if you are upset, the humour switches off first.
+
+**Interest** — how curious she is about your life (a percentage: ask questions and dig, or
+mostly react), whether she asks at all, what lights her up, and what bores her (she answers
+those flat and short). She is also told that interest must not be fake — if something matters
+to you, she listens even when the topic is not hers.
+
+Both are **manual** (edit the fields), **automatic** (`Generate` works them out from the card
+and the backstory, or just ask the agent: "make her joke more", "what would she care about?"),
+and **switchable** off entirely from Features.
+
+Interests also **learn**: the tracker may add a topic you brought up that she clearly enjoyed,
+and those appear under "learned from your conversations".
+
 ## Reading and steering her head
 
 **Chat tab** — the whole stored conversation per contact, searchable, with day separators and

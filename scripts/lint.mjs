@@ -158,6 +158,25 @@ for (const dir of ["src", "scripts"]) {
   for (const f of fs.readdirSync(p)) if (f.endsWith(".mjs")) files.push(path.join(p, f));
 }
 
+// A duplicated `if (x) {` left behind by a text patch parses fine but is always a
+// bug — it happened three times while adding agent actions.
+let dupes = 0;
+{
+  const files = [];
+  for (const dir of ["src", "scripts"]) {
+    const p = path.join(ROOT, dir);
+    if (!fs.existsSync(p)) continue;
+    for (const f of fs.readdirSync(p)) if (f.endsWith(".mjs")) files.push(path.join(p, f));
+  }
+  for (const file of files) {
+    const code = fs.readFileSync(file, "utf8");
+    for (const m of code.matchAll(/^(\s*)if\s*\(([^)]{1,120})\)\s*\{\s*if\s*\(\2\)\s*\{/gm)) {
+      dupes++;
+      console.log(`  ${path.relative(ROOT, file)}: duplicated condition "if (${m[2]})"`);
+    }
+  }
+}
+
 let problems = 0;
 for (const file of files) {
   const code = fs.readFileSync(file, "utf8");
@@ -169,5 +188,5 @@ for (const file of files) {
   }
 }
 
-if (!quiet) console.log(problems ? "" : "  ✓ no undefined identifiers");
-process.exit(problems ? 1 : 0);
+if (!quiet && !dupes) console.log("  ✓ no duplicated if-blocks");
+process.exit(problems + dupes ? 1 : 0);

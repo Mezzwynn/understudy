@@ -28,6 +28,7 @@ import { KNOBS, applyValues, currentValues } from "../scripts/_settings.mjs";
 import { ensureToday, tickMoments, saveRoutine, prune, loadRoutine, KINDS } from "./routine.mjs";
 import { RELATIONS, loadWorld, saveWorld } from "./world.mjs";
 import { generateSchedule, formatSchedule, parseSchedule, addContext, cleanContext } from "./schedule.mjs";
+import { loadTraits, saveTraits, generateTraits } from "./traits.mjs";
 
 const KNOB_KEYS = new Set(KNOBS.map((k) => k.key));
 
@@ -60,6 +61,8 @@ export const ACTION_TYPES = [
   "set_contact",
   "set_relation",
   "set_world",
+  "set_traits",
+  "gen_traits",
   "set_schedule",
   "gen_schedule",
   "add_context",
@@ -107,6 +110,9 @@ Actions you may use (nothing else exists):
    an extra note she should keep in mind. ADDITIVE only: it can never replace the card, the mood
    or the rules. "until" is optional (YYYY-MM-DD).
 - {"type":"remove_context","slug":"fiona","text":"..."} — drop that note again.
+- {"type":"set_traits","slug":"fiona","humor":{"style":"dry, teasing","chance":0.3,"dark":false,"avoid":["his family"],"examples":["sure. believe whatever."]},"interest":{"level":0.6,"topics":["cats","coffee"],"bored":["gossip"],"curious":true}}
+   her sense of humour and what interests her. Send only the parts you want to change.
+- {"type":"gen_traits","slug":"fiona"} — the model works both out from the card and backstory
 - {"type":"switch_persona","slug":"fiona"} — make another character the active one
 
 Requests you must refuse (state the reason plainly in "say", send no action):
@@ -429,6 +435,35 @@ function validate(action, { personas = [] } = {}) {
         saveWorld(slug, { ...world, context: list });
         return { slug, context: list.length };
       },
+    };
+  }
+
+  if (t === "set_traits" || t === "gen_traits") {
+    const slug = String(action.slug || config.persona).replace(/[^\w.-]/g, "");
+    const card = readCard(slug);
+    if (!card) return { refuse: `character "${slug}" does not exist` };
+    if (t === "gen_traits") {
+      return {
+        describe: `generate humour & interests for ${slug}`,
+        reload: true,
+        apply: async () => {
+          const world = loadWorld(slug);
+          const traits = await generateTraits(loadPersona(slug), world, { force: true });
+          return { slug, humor: traits.humor.style, interests: traits.interest.topics.length };
+        },
+      };
+    }
+    const current = loadTraits(slug);
+    const next = {
+      humor: { ...current.humor, ...(action.humor || {}) },
+      interest: { ...current.interest, ...(action.interest || {}) },
+      learned: current.learned,
+      source: "agent",
+    };
+    return {
+      describe: `traits ${slug}: humour "${String(next.humor.style).slice(0, 40)}" ${Math.round(next.humor.chance * 100)}%, interest ${Math.round(next.interest.level * 100)}%`,
+      reload: true,
+      apply: () => ({ slug, ...saveTraits(slug, next) }),
     };
   }
 

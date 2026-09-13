@@ -88,6 +88,9 @@ function buildConfig() {
   // the sulking escalation (nudge -> dry -> silent) and cross-chat notes are
   // features in their own right, so they can be switched off
   sulking: envFlag("SULKING", true),
+  // her sense of humour and what she is interested in (traits.mjs)
+  humor: envFlag("HUMOR", true),
+  interest: envFlag("INTEREST", true),
   // weekly humanness check (an independent judge scores how detectable she is)
   evalWeekly: envFlag("EVAL_WEEKLY", true),
   evalEveryDays: num(envGet("EVAL_EVERY_DAYS", "7"), 7),

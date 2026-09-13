@@ -7,6 +7,7 @@ import { drift, applyDeltas, heuristicNudge, normalize, baselineFor, isMoodLocke
 import { analyzeAffect } from "./affect.mjs";
 import { needsIntroduction, markIntroAsked } from "./stranger.mjs";
 import { validateTask } from "./tasks.mjs";
+import { learnTopics } from "./traits.mjs";
 import { config, log } from "./config.mjs";
 
 /** Topics she nags about — health/safety stuff a caring person keeps checking. */
@@ -105,6 +106,10 @@ function applyControl(chat, control, incoming = "") {
     const check = validateTask(chat, control.task);
     if (check.ok) chat.pendingTasks = [...(chat.pendingTasks || []), check.task].slice(-3);
     else log(`task refused: ${check.reason}`);
+  }
+  // topics she actually enjoyed — her interests evolve from the conversation
+  if (config.interest && Array.isArray(control.interests) && control.interests.length) {
+    learnTopics(chat.persona || config.persona, control.interests);
   }
   if (typeof control.summary === "string" && control.summary.trim()) {
     mem.summary = control.summary.trim().slice(0, 1200);
