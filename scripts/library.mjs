@@ -12,6 +12,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { DATA_DIR, config, log } from "../src/config.mjs";
 import { addPhoto, removePhoto, librarySummary, loadLibrary, pickPhoto, partOfDay } from "../src/photo-library.mjs";
+import { checkPhoto } from "../src/photo-check.mjs";
+import { avatarPath } from "../src/face.mjs";
 
 const args = process.argv.slice(2);
 const cmd = args[0];
@@ -20,6 +22,20 @@ const arg = (n, d) => {
   return i >= 0 ? args[i + 1] : d;
 };
 const slug = arg("slug", config.persona);
+const skipCheck = args.includes("--no-check");
+
+/** Nothing enters the library until it passes the check: no visible phone, no third-person POV. */
+async function checked(file) {
+  const v = await checkPhoto(file, { avatar: avatarPath(slug) || null });
+  if (v.ok) return { ok: true };
+  const why = [
+    v.phone_visible ? "HP-nya kelihatan di foto (padahal HP itu yang motret)" : "",
+    v.third_person ? "POV-nya dari orang lain, bukan dari dia" : "",
+    v.professional ? "kelihatan foto profesional/stock, bukan jepretan HP" : "",
+    ...(v.problems || []),
+  ].filter(Boolean);
+  return { ok: false, why: why.join("; ") || "gagal pemeriksaan" };
+}
 
 /** Places come with a kind and a note already, from scripts/places.mjs. */
 async function importPlaces() {
@@ -43,6 +59,11 @@ async function importPlaces() {
     if (!p.file || !fs.existsSync(file)) continue;
     const scene = `tempat-${p.kind}-${(p.title || "").slice(0, 24).replace(/[^\w]+/g, "-").toLowerCase()}`;
     if (seen.has(scene)) continue;
+    const gate = skipCheck ? { ok: true } : await checked(file);
+    if (!gate.ok) {
+      console.log(`  ✗ ${scene.slice(0, 40)}: ${gate.why}`.slice(0, 110));
+      continue;
+    }
     const r = addPhoto(slug, file, {
       scene,
       kind: "view",
@@ -80,6 +101,11 @@ async function importTests() {
       const sceneName = scene.replace(/-(h|raw)$/, "");
       // meja kerja & kucing: masuk akal jam berapa saja; selfie & jalan tetap terikat jamnya
       const anyTime = ["meja-pagi", "pagi-kerja", "momo"].includes(sceneName);
+      const gate = skipCheck ? { ok: true } : await checked(path.join(dir, f));
+      if (!gate.ok) {
+        console.log(`  ✗ ${key}: ${gate.why}`.slice(0, 120));
+        continue;
+      }
       const r = addPhoto(slug, path.join(dir, f), {
         scene: key,
         kind: /selfie/i.test(scene) ? "self" : "view",
@@ -122,6 +148,11 @@ else if (cmd === "import-places") await importPlaces();
 else if (cmd === "import-tests") await importTests();
 else if (cmd === "add") {
   const file = args[1];
+  const gate = skipCheck ? { ok: true } : await checked(file);
+  if (!gate.ok) {
+    console.log(`  ditolak: ${gate.why}`);
+    process.exit(0);
+  }
   const r = addPhoto(slug, file, {
     scene: arg("scene", path.basename(file, path.extname(file))),
     note: arg("note", ""),

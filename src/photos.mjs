@@ -48,7 +48,16 @@ export function pickOutfit(persona, seed = 0) {
 const SELF_RULES = `She took this photo herself on her phone and she is NOT posing — caught mid-movement, not looking properly at
 the camera or not in a hurry to get the shot right, framing slightly crooked, edges mildly out of focus, mild
 phone sensor noise, an ordinary lived-in room or street behind her, not tidy, no filter. A real snapshot sent to
-a friend, not a produced or staged photo. No text, no watermark.`;
+a friend, not a produced or staged photo. No text, no watermark.
+
+IMPOSSIBLE THINGS — never draw these, they prove the photo is fake:
+- the phone that took this photo is NEVER visible: no phone in a hand, no phone screen, no second device, no
+  camera, no reflection of a phone. The camera is where the photo is taken from.
+- she is the only person in the photo. Nobody else's face, hands or body, not even partly.
+- if her face is in the frame she is holding the phone at arm's length herself: we see her from the front and
+  close, the background directly behind her, one arm stretched toward the lens. NOT a full-body shot from
+  across a table, NOT from a distance, NOT posed for a photographer, no free hands doing something else.
+- no mirror, no visible lens, no viewfinder, no screen glow on her face that comes from a screen in the frame.`;
 
 const KEEPS_HER = `Keep the same woman as the reference photo — the same face, the same features, the same hair, the same age.
 Do not change her face, do not beautify or stylise her. Only the outfit and the place change:`;
