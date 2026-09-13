@@ -17,6 +17,66 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const quiet = process.argv.includes("--quiet");
 
 const GLOBALS = new Set([
+  "RGX",
+  "Float32Array",
+  "Float64Array",
+  "Uint8Array",
+  "Uint8ClampedArray",
+  "ArrayBuffer",
+  "TextEncoder",
+  "TextDecoder",
+  "AbortSignal",
+  "FileReader",
+  "URL",
+  "Promise",
+  "Map",
+  "Set",
+  "JSON",
+  "Math",
+  "Date",
+  "Number",
+  "String",
+  "Object",
+  "Array",
+  "Error",
+  "RegExp",
+  "Function",
+  "Boolean",
+  "Symbol",
+  "BigInt",
+  "parseInt",
+  "parseFloat",
+  "isNaN",
+  "isFinite",
+  "encodeURIComponent",
+  "decodeURIComponent",
+  "structuredClone",
+  "queueMicrotask",
+  "fetch",
+  "process",
+  "console",
+  "globalThis",
+  "Infinity",
+  "NaN",
+  "undefined",
+  "setTimeout",
+  "clearTimeout",
+  "setInterval",
+  "clearInterval",
+  "setImmediate",
+  "crypto",
+  "Buffer",
+  "FormData",
+  "Blob",
+  "Intl",
+  "caches",
+  "Request",
+  "Response",
+  "Headers",
+  "WebSocket",
+  "atob",
+  "btoa",
+
   // language
   "if","for","while","switch","catch","return","typeof","instanceof","new","await","function","class",
   "do","else","try","finally","throw","delete","void","yield","super","this","in","of","case","default",
@@ -125,11 +185,9 @@ function collectBindings(code) {
   return names;
 }
 
-/** Identifiers that are called like a function, excluding `obj.method(`. */
-function collectCalls(code) {
-  // strip comments, strings and regex literals first, so text inside them is
-  // never mistaken for code
-  const stripped = code
+/** Remove comments, strings and regex literals so their contents are never read as code. */
+function stripCode(code) {
+  return code
     // block comments
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     // template literals (with escapes)
@@ -142,7 +200,14 @@ function collectCalls(code) {
     // as a call to a function named b.
     .replace(/(?<![\w)\]$/*])\s*\/(?![*/])(?:\\[\s\S]|\[[^\]\n]*\]|[^/\n\\])+\/[gimsuy]*/g, " RGX")
     // line comments
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");;
+}
+
+/** Identifiers that are called like a function, excluding `obj.method(`. */
+function collectCalls(code) {
+  // strip comments, strings and regex literals first, so text inside them is
+  // never mistaken for code
+    const stripped = stripCode(code);
 
   const used = new Map();
   for (const m of stripped.matchAll(/(^|[^\w$.])([A-Za-z_$][\w$]*)\s*\(/g)) {
@@ -157,7 +222,37 @@ const files = [];
 for (const dir of ["src", "scripts"]) {
   const p = path.join(ROOT, dir);
   if (!fs.existsSync(p)) continue;
-  for (const f of fs.readdirSync(p)) if (f.endsWith(".mjs")) files.push(path.join(p, f));
+  for (const f of fs.readdirSync(p)) {
+    // lint does not read its own source: the regex literals inside it confuse the scan
+    if (f.endsWith(".mjs") && f !== "lint.mjs") files.push(path.join(p, f));
+  }
+}
+
+// Constants that are used but never defined: the function check above only sees
+// `name(`, so a missing import of something used as a value slipped through once
+// (DATA_DIR in the dashboard). Our convention is ALL_CAPS for module constants, which
+// is narrow enough to check without a real parser.
+{
+  let missing = 0;
+  for (const file of files) {
+    const code = stripCode(fs.readFileSync(file, "utf8"));
+    const defined = collectBindings(fs.readFileSync(file, "utf8"));
+    const seen = new Set();
+    for (const m of code.matchAll(/(^|[^\w$.])([A-Z][A-Z0-9_]{2,})(?![A-Za-z0-9_])/g)) {
+      const name = m[2];
+      // an object key or a label ("KEY: value"), not a reference to a constant
+      const after = code.slice(m.index + m[1].length + name.length, m.index + m[1].length + name.length + 6);
+      if (/^\s*:/.test(after)) continue; // object key or label
+      if (/^\s+as\s/.test(after)) continue; // "import { KEYS as MOOD_KEYS }"
+      if (name.startsWith("RGX")) continue; // left over from stripping regex literals
+      if (seen.has(name) || GLOBALS.has(name) || defined.has(name)) continue;
+      seen.add(name);
+      const line = code.slice(0, m.index).split("\n").length;
+      console.log(`  ${path.relative(ROOT, file)}:${line}  "${name}" is used but never imported or defined`);
+      missing++;
+    }
+  }
+  if (missing) process.exitCode = 1;
 }
 
 // A duplicated `if (x) {` left behind by a text patch parses fine but is always a
@@ -168,7 +263,10 @@ let dupes = 0;
   for (const dir of ["src", "scripts"]) {
     const p = path.join(ROOT, dir);
     if (!fs.existsSync(p)) continue;
-    for (const f of fs.readdirSync(p)) if (f.endsWith(".mjs")) files.push(path.join(p, f));
+    for (const f of fs.readdirSync(p)) {
+    // lint does not read its own source: the regex literals inside it confuse the scan
+    if (f.endsWith(".mjs") && f !== "lint.mjs") files.push(path.join(p, f));
+  }
   }
   for (const file of files) {
     const code = fs.readFileSync(file, "utf8");

@@ -1,8 +1,31 @@
 import http from "node:http";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { ROOT, PERSONA_DIR, config, envGet, STARTED_AT, log, reloadConfig } from "./config.mjs";
+import { ROOT, PERSONA_DIR, DATA_DIR, config, envGet, STARTED_AT, log, reloadConfig } from "./config.mjs";
+
+/** Where the model-comparison photos live — the rating page reads and serves them. */
+const PHOTO_TEST_DIR = envGet("PHOTO_TEST_DIR", "/sdcard/Download/Understudy/model-test");
+
+/** Hik's verdicts on generated photos: the ground truth for the photo pipeline. */
+const ratingsFile = () => path.join(DATA_DIR, "photos", "ratings.json");
+function readRatings() {
+  try {
+    return JSON.parse(fs.readFileSync(ratingsFile(), "utf8"));
+  } catch {
+    return { ratings: [] };
+  }
+}
+function writeRating(entry) {
+  const store = readRatings();
+  store.ratings = (store.ratings || []).filter((r) => r.file !== entry.file);
+  store.ratings.push(entry);
+  fs.mkdirSync(path.dirname(ratingsFile()), { recursive: true });
+  fs.writeFileSync(ratingsFile(), JSON.stringify(store, null, 2));
+  return store.ratings.length;
+}
+
 import { listChats, loadChat, saveChat, loadState } from "./store.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
 import { runAdmin } from "./admin.mjs";
@@ -382,6 +405,45 @@ export function startDashboard() {
         return res.end(fs.readFileSync(file));
       }
 
+      // rating page: Hik's eye is the ground truth for photos, so it gets a page
+      if (req.method === "GET" && (url.pathname === "/rate" || url.pathname === "/rate.html")) {
+        const file = path.join(ROOT, "dashboard", "rate.html");
+        if (!fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+        return res.end(fs.readFileSync(file));
+      }
+      if (req.method === "GET" && url.pathname === "/photo") {
+        const name = path.basename(String(url.searchParams.get("f") || ""));
+        const file = path.join(PHOTO_TEST_DIR, name);
+        if (!name || !fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
+        res.writeHead(200, { "content-type": /\.png$/i.test(name) ? "image/png" : "image/jpeg", "cache-control": "public, max-age=3600" });
+        return res.end(fs.readFileSync(file));
+      }
+      if (req.method === "GET" && url.pathname === "/api/rate") {
+        return json(res, 200, readRatings());
+      }
+      if (req.method === "GET" && url.pathname === "/api/ratelist") {
+        const list = [];
+        if (fs.existsSync(PHOTO_TEST_DIR)) {
+          for (const f of fs.readdirSync(PHOTO_TEST_DIR)) {
+            if (!/\.(jpg|jpeg|png)$/i.test(f)) continue;
+            let stats = null;
+            try {
+              const out = execFileSync("node", [path.join(ROOT, "scripts", "photostats.mjs"), path.join(PHOTO_TEST_DIR, f)], { encoding: "utf8", timeout: 30000 });
+              const line = out.split("\n").find((l) => l.includes(f.slice(0, 18)));
+              if (line) {
+                const parts = line.trim().split(/\s+/);
+                stats = { mp: parts[1], brightness: parts[2], contrast: parts[3], saturation: parts[4], colorfulness: parts[5], sharpness: parts[6], noise: parts[7] };
+              }
+            } catch {
+              /* measurements are a nice-to-have */
+            }
+            list.push({ file: f, url: `/photo?f=${encodeURIComponent(f)}`, stats });
+          }
+        }
+        return json(res, 200, { photos: list.sort((a, b) => a.file.localeCompare(b.file)) });
+      }
+
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
         const html = fs.readFileSync(HTML_FILE, "utf8");
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
@@ -547,6 +609,20 @@ export function startDashboard() {
 
       if (req.method === "POST") {
         const body = await readBody(req);
+
+        if (url.pathname === "/api/rate") {
+          const name = String(body.file || "");
+          if (!name) return json(res, 400, { ok: false, error: "file is required" });
+          const count = writeRating({
+            file: name,
+            verdict: String(body.verdict || ""),
+            note: String(body.note || "").slice(0, 300),
+            stats: body.stats || null,
+            at: Date.now(),
+          });
+          log(`rating: ${name} → ${body.verdict} (${count} total)`);
+          return json(res, 200, { ok: true, count });
+        }
 
         if (url.pathname === "/api/settings") {
           if (body.values && typeof body.values === "object") applyValues(body.values);

@@ -21,3 +21,5 @@ data/bench-*.txt
 # OS noise
 .DS_Store
 Thumbs.db
+# rated photos are served from the phone, never committed
+dashboard/photos/

@@ -50,7 +50,7 @@ const OUT = arg("out", `/sdcard/Download/Understudy/model-test`);
 const JUDGE = arg("judge", "google/gemini-3.1-flash-lite");
 if (!KEY) throw new Error("ATLAS_API_KEY missing from .env");
 if (!scene) throw new Error(`unknown scene ${sceneName}`);
-if (!MODELS.length) throw new Error("--models is required");
+
 
 const slug = (m) => m.replace(/[^\w.-]+/g, "_");
 
@@ -163,7 +163,124 @@ Score 10 only if nothing in the frame would make anyone doubt it. Be blunt; a pr
   }
 }
 
+/**
+ * The first rubric only asked "is there an artifact", so a polished, pretty, instagram-looking
+ * photo scored 10/10 — which is not the same thing as an ordinary person's phone photo. Hik's
+ * eye rejected exactly those, so the rubric now scores two things separately:
+ *   artifacts — technical/visual faults
+ *   ordinary  — does she look like a random real person, or a model/AI face
+ * and asks what a friend would actually notice.
+ */
+async function judgeOrdinary(file, model) {
+  const b64 = fs.readFileSync(file).toString("base64");
+  const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${OR}` },
+    signal: AbortSignal.timeout(60000),
+    body: JSON.stringify({
+      model: JUDGE,
+      max_tokens: 500,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } },
+            {
+              type: "text",
+              text: `A 20-year-old woman in Denpasar, Bali sent this on WhatsApp. She is an ordinary person with an ordinary phone, not a model, not an influencer, not an AI image.
+
+Two scores, kept separate:
+- "artifacts": 0-10, do technical faults give it away (hands, teeth, ears, text, impossible objects, melted detail)
+- "ordinary": 0-10, does she look like a RANDOM REAL PERSON. 10 = could be anyone's classmate. 0 = looks like a model, an influencer, a beauty-filtered or AI-generated face. A flawless, symmetrical, glowing, well-lit, well-styled face scores LOW here even with no artifacts.
+
+Also answer:
+- "friend": one line — what would a real friend notice or say about this photo
+- "giveaway": one line — the single thing most likely to make someone think AI or filter, or "nothing" if truly none
+- "would_doubt": true/false — would a stranger chatting with her doubt this photo is real
+
+JSON only: {"artifacts":0-10,"ordinary":0-10,"friend":"","giveaway":"","would_doubt":true|false}`,
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  const j = await r.json();
+  const txt = j.choices?.[0]?.message?.content || "";
+  const m = txt.match(/\{[\s\S]*\}/);
+  if (!m) return { errors: "no verdict" };
+  try {
+    return JSON.parse(m[0]);
+  } catch {
+    return { errors: "unreadable" };
+  }
+}
+
+async function rejudge() {
+  const file = path.join(OUT, `results-${sceneName}.json`);
+  if (!fs.existsSync(file)) throw new Error(`no results file at ${file}`);
+  const prev = JSON.parse(fs.readFileSync(file, "utf8"));
+  const rows = [];
+  console.log(`  rubrik baru: artifacts + ordinary (${sceneName})\n`);
+  for (const r of prev.results.filter((x) => x.ok)) {
+    const img = path.join(OUT, r.file);
+    if (!fs.existsSync(img)) continue;
+    const v = await judgeOrdinary(img, r.model);
+    rows.push({ ...r, ordinary: v });
+    console.log(`  ${r.model.padEnd(46)} artifacts ${String(v.artifacts).padStart(2)}  ordinary ${String(v.ordinary).padStart(2)}  ${v.would_doubt ? "RAGU" : "aman"}  ${String(v.giveaway || "").slice(0, 34)}`);
+  }
+  rows.sort((a, b) => (b.ordinary?.ordinary ?? 0) - (a.ordinary?.ordinary ?? 0) || (b.ordinary?.artifacts ?? 0) - (a.ordinary?.artifacts ?? 0));
+  const out = path.join(OUT, `results-${sceneName}-ordinary.json`);
+  fs.writeFileSync(out, JSON.stringify({ scene: sceneName, createdAt: new Date().toISOString(), rubric: "artifacts + ordinary", rows }, null, 2));
+  const md = [
+    `# Rubrik baru — ${sceneName} (artifacts vs ordinary)`,
+    "",
+    "Rubrik lama cuma nanya \"ada cacat?\", jadi foto yang rapi dan cantik dapat 10/10.",
+    "Rubrik ini misahin dua hal: **artifacts** (cacat teknis) dan **ordinary** (kelihatan orang biasa atau model/AI).",
+    "",
+    "| model | artifacts | ordinary | ragu? | yang bikin ketahuan |",
+    "|---|---|---|---|---|",
+    ...rows.map((r) => `| \`${r.model}\` | ${r.ordinary?.artifacts ?? "?"} | **${r.ordinary?.ordinary ?? "?"}** | ${r.ordinary?.would_doubt ? "ya" : "tidak"} | ${String(r.ordinary?.giveaway || "").slice(0, 60)} |`),
+    "",
+    "## Apa kata juri soal tiap foto",
+    "",
+    ...rows.flatMap((r) => [`**${r.model}** — ordinary ${r.ordinary?.ordinary ?? "?"}/10`, `  - teman: ${r.ordinary?.friend || "-"}`, `  - ketahuan dari: ${r.ordinary?.giveaway || "-"}`, ""]),
+  ].join("\n");
+  fs.writeFileSync(path.join(OUT, `results-${sceneName}-ordinary.md`), md);
+  const html = `<!doctype html><meta charset="utf-8"><title>Rubrik baru — ${sceneName}</title>
+<style>body{background:#131109;color:#f3e6d2;font:15px/1.5 system-ui,sans-serif;margin:0;padding:22px}
+h1{font-size:20px;margin:0 0 6px}p.sub{color:#b39a78;margin:0 0 18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.card{background:#1c1810;border:1px solid #33291c;border-radius:14px;overflow:hidden}
+.card img{width:100%;display:block;background:#000}.body{padding:10px 12px}
+.model{font-weight:700;font-size:12.5px;word-break:break-all}
+.row{display:flex;gap:10px;align-items:center;margin:7px 0;font-size:12px;color:#b39a78}
+.bar{height:7px;border-radius:5px;background:#2c2419;flex:1;overflow:hidden}.bar i{display:block;height:100%}
+.good{background:#4caf72}.mid{background:#e0b64a}.bad{background:#e06a6a}
+.q{font-size:12.5px;color:#e8d6bb}.k{font-size:12px;color:#b39a78;margin-top:5px}
+</style>
+<h1>Rubrik baru — ${sceneName}</h1>
+<p class="sub">artifacts = ada cacat teknis? · ordinary = kelihatan orang biasa atau model/AI? · ${new Date().toLocaleString("id-ID")}</p>
+<div class="grid">
+${rows.map((r) => {
+  const o = r.ordinary || {};
+  const cls = (n) => (n >= 8 ? "good" : n >= 5 ? "mid" : "bad");
+  return `<div class="card"><img src="${r.file}" loading="lazy"><div class="body">
+  <div class="model">${r.model}</div>
+  <div class="row"><span style="width:56px">artifacts</span><span class="bar"><i class="${cls(o.artifacts)}" style="width:${(o.artifacts || 0) * 10}%"></i></span><b>${o.artifacts ?? "?"}</b></div>
+  <div class="row"><span style="width:56px">ordinary</span><span class="bar"><i class="${cls(o.ordinary)}" style="width:${(o.ordinary || 0) * 10}%"></i></span><b>${o.ordinary ?? "?"}</b></div>
+  <div class="q">${String(o.friend || "").replace(/</g, "&lt;")}</div>
+  <div class="k">ketahuan dari: ${String(o.giveaway || "-").replace(/</g, "&lt;")}</div>
+  ${o.would_doubt ? '<div class="k" style="color:#ff9a9a">orang asing masih bisa ragu</div>' : '<div class="k" style="color:#a8f0bd">tidak bikin ragu</div>'}
+  </div></div>`;
+}).join("")}
+</div>`;
+  fs.writeFileSync(path.join(OUT, `index-${sceneName}-ordinary.html`), html);
+  console.log(`\n  ${out}\n  ${path.join(OUT, `index-${sceneName}-ordinary.html`)}`);
+}
+
 async function main() {
+  if (!MODELS.length) throw new Error("--models is required (or use --rejudge)");
   if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
   const results = [];
   console.log(`  scene: ${sceneName} · ${MODELS.length} model · hasil ke ${OUT}\n`);
@@ -267,4 +384,7 @@ ${results.filter((r) => !r.ok).length ? `<h1 style="margin-top:26px">Gagal</h1><
   console.log(`\n  ${OUT}/index-${sceneName}.html`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) await main();
+if (import.meta.url === `file://${process.argv[1]}`) {
+  if (args.includes("--rejudge")) await rejudge();
+  else await main();
+}
