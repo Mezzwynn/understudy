@@ -13,9 +13,21 @@ export const ENV_FILE = path.join(ROOT, ".env");
 
 export function setEnv(key, value) {
   let text = fs.existsSync(ENV_FILE) ? fs.readFileSync(ENV_FILE, "utf8") : "";
-  const re = new RegExp(`^${key}=.*$`, "m");
+  // a key that appears twice would otherwise be written only at the first line, and the
+  // later one kept winning on read — that is what made settings look like they reset themselves
+  const re = new RegExp(`^${key}=.*$`, "gm");
   const line = `${key}=${value}`;
-  if (re.test(text)) text = text.replace(re, line);
+  if (re.test(text)) {
+    let first = true;
+    text = text.replace(new RegExp(`^${key}=.*$`, "gm"), () => {
+      if (first) {
+        first = false;
+        return line;
+      }
+      return `\u0000DROP`; // removed below, keeps the surrounding newlines sane
+    });
+    text = text.replace(/^\u0000DROP\n?/gm, "");
+  }
   else text += (text.endsWith("\n") || !text ? "" : "\n") + line + "\n";
   fs.writeFileSync(ENV_FILE, text, { mode: 0o600 });
 }
@@ -80,7 +92,6 @@ export const FEATURES = [
   { key: "PHOTO_SEND", label: "Photos may be sent in chat at all", kind: "bool", def: 1 },
   { key: "PHOTO_DAILY_MAX", label: "Most photos per contact per day", kind: "int", def: 1 },
   { key: "PHOTO_MIN_GAP_MIN", label: "Minutes between two photos to one person", kind: "int", def: 600 },
-  { key: "PHOTO_TRUST_STRANGERS", label: "Strangers may also get a photo", kind: "bool", def: 0 },
   { key: "PHOTO_GENERATE_ON_DEMAND", label: "Generate a new photo when asked (costs money)", kind: "bool", def: 0 },
   { key: "PHOTO_PHONE", label: "Foto-nya gaya HP apa (pixel/iphone/samsung/oppo/vivo/xiaomi/biasa)", kind: "text", def: "pixel" },
   { key: "PHOTO_GRAIN", label: "Grain (0 = ikut profil HP)", kind: "int", def: 0 },
@@ -88,6 +99,11 @@ export const FEATURES = [
   { key: "PHOTO_MAX_SIDE", label: "Ukuran sisi terpanjang (px)", kind: "int", def: 1280 },
   { key: "PHOTO_QUALITY", label: "Kualitas JPEG", kind: "int", def: 74 },
   { key: "PHOTO_LEARN", label: "Belajar dari rating foto yang sudah dikirim", kind: "bool", def: 1 },
+  { key: "PHOTO_WINDOW_START", label: "Foto: jam mulai boleh kirim", kind: "int", def: 8 },
+  { key: "PHOTO_WINDOW_END", label: "Foto: jam terakhir boleh kirim", kind: "int", def: 22 },
+  { key: "PHOTO_KINDS", label: "Foto: jenis yang boleh (view,self)", kind: "text", def: "view,self" },
+  { key: "PHOTO_MAX_PER_CONV", label: "Foto: maksimal per percakapan", kind: "int", def: 1 },
+  { key: "PHOTO_FIRST", label: "Foto: kirim foto duluan, baru kalimatnya", kind: "bool", def: 1 },
   { key: "TOPIC_FATIGUE", label: "She notices when one topic goes on too long", kind: "bool", def: 1 },
   { key: "LATE_REPLY_NOTE", label: "She owns a late reply", kind: "bool", def: 1, hint: "answers hours later and says why, briefly" },
   { key: "LATE_REPLY_MIN_MIN", label: "How late counts as late (minutes)", kind: "int", def: 90 },

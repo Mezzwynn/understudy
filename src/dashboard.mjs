@@ -127,9 +127,9 @@ function setPersonaField(slug, key, value) {
   let text = fs.readFileSync(file, "utf8");
   const m = text.match(/^---\n([\s\S]*?)\n---/);
   if (!m) return false;
-  const re = new RegExp(`^${key}:.*$`, "m");
+  const re = new RegExp(`^${key}:.*$`, "gm");
   const line = `${key}: ${value}`;
-  const fm = re.test(m[1]) ? m[1].replace(re, line) : `${m[1]}\n${line}`;
+  const fm = re.test(m[1]) ? m[1].replace(re, line).replace(new RegExp(`^${key}: ${value}\n(?=[\\s\\S]*^${key}:)`, "gm"), "") : `${m[1]}\n${line}`;
   text = text.replace(m[0], `---\n${fm}\n---`);
   fs.writeFileSync(file, text);
   return true;
