@@ -400,6 +400,8 @@ export function markPosted(slug, item, key = null, now = Date.now()) {
  * in, and LID-only contacts are skipped (their number is hidden from the bot) with a
  * count in the log.
  */
+let lastAudienceLog = { key: "", at: 0 };
+
 export function statusAudience() {
   const chats = listChats().filter((c) => (config.statusAudience === "trusted" ? c.trusted === true : true));
   const out = [];
@@ -423,7 +425,16 @@ export function statusAudience() {
     }
     skipped++;
   }
-  if (skipped) log(`status audience: ${out.length} number(s), ${skipped} contact(s) skipped (their number is hidden)`);
+  // Said once per change, not on every call: this runs on every status tick and every panel refresh, and
+  // repeating the same line turned the log into noise.
+  if (skipped) {
+    const key = `${out.length}/${skipped}`;
+    const stale = Date.now() - lastAudienceLog.at > 12 * 3600 * 1000;
+    if (key !== lastAudienceLog.key || stale) {
+      log(`status audience: ${out.length} number(s), ${skipped} contact(s) skipped (their number is hidden)`);
+      lastAudienceLog = { key, at: Date.now() };
+    }
+  }
   return [...new Set(out)];
 }
 
