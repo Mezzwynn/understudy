@@ -50,6 +50,8 @@ function mustAnswerSomething(text) {
   if (/\b(kenapa|gimana|bagaimana|kapan|dimana|di mana|berapa|siapa|kok|apa)\b/.test(t)) return true;
   if (/\b(makan|makanan|sehat|sakit|demam|obat|tidur|istirahat|minum|rumah sakit|dokter|puskesmas)\b/.test(t)) return true;
   if (/\b(sorry|maaf|sori|forgive|sayang|kangen|rindu|miss you)\b/.test(t)) return true;
+  // a photo request is a direct ask: never leave it on read because she is working
+  if (/\b(foto|photo|pic|pics|selfie|potret|gambar)\b/.test(t)) return true;
   return false;
 }
 
@@ -425,12 +427,17 @@ async function respond(sock, jid, p) {
   // answered (a question, anything about health, a crisis) still gets through.
   if (!crisisActive) {
     const busy = busyNow(chat);
-    if (busy && !mustAnswerSomething(incoming)) {
-      chat.busyUntil = Date.now() + busy.minutesLeft * 60000;
+    // Being busy must not mean being gone for three hours. She goes quiet once, and after that
+    // window she answers even mid-shift — a person at work still replies to a friend eventually.
+    const sinceLastSkip = Date.now() - Number(chat.stats.lastBusySkipAt || 0);
+    const mayGoQuiet = sinceLastSkip > Number(config.busyMaxMin || 40) * 60000;
+    if (busy && mayGoQuiet && !mustAnswerSomething(incoming)) {
+      chat.busyUntil = Date.now() + Math.min(busy.minutesLeft, Number(config.busyMaxMin || 40)) * 60000;
+      chat.stats.lastBusySkipAt = Date.now();
       chat.stats.skips = (chat.stats.skips || 0) + 1;
       chat.lastSkipAt = Date.now();
       saveChat(chat);
-      log(`left on read (busy — ${busy.what}, ${busy.minutesLeft}m left) — ${String(incoming).slice(0, 40)}`);
+      log(`left on read (busy — ${busy.what}; quiet at most ${config.busyMaxMin}m) — ${String(incoming).slice(0, 40)}`);
       return;
     }
   }

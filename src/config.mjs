@@ -149,7 +149,7 @@ function buildConfig() {
   dailyVariance: envFlag("DAILY_VARIANCE", true),
   dailySpread: num(envGet("DAILY_SPREAD", "0.08"), 0.08),
   busyBlocks: envFlag("BUSY_BLOCKS", true),
-  busyReplyChance: num(envGet("BUSY_REPLY_CHANCE", "0.45"), 0.45),
+  busyMaxMin: num(envGet("BUSY_MAX_MIN", "40"), 40),
   busyDelayMaxMin: num(envGet("BUSY_DELAY_MAX_MIN", "20"), 20),
   changeFeed: envFlag("CHANGE_FEED", true),
   changeWatchFiles: envFlag("CHANGE_WATCH_FILES", true),

@@ -9,8 +9,8 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Understudy" />
-<title>Understudy — Control Panel</title>
+<meta name="apple-mobile-web-app-title" content="Fio" />
+<title id="doctitle">Understudy — Control Panel</title>
 <style>
   /* ─────────────────────────────  design tokens  ───────────────────────────── */
   :root{
@@ -301,6 +301,7 @@
           <span class="tiny" id="num">—</span>
           <span class="chip" id="pstate">—</span>
           <span class="chip" id="chip-up">—</span>
+          <span class="chip" id="chip-now" style="display:none">—</span>
           <span class="chip accent" id="chip-next">—</span>
           <span class="chip warn" id="chip-pause" style="display:none">—</span>
         </div>
@@ -351,7 +352,7 @@
 // no service worker: it only ever hid updates
 if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
 
-const BUILD_STAMP = "2026-09-14 16:05 foto-rapi"; // naikkan tiap kali UI berubah
+const BUILD_STAMP = "2026-09-14 17:20 header-busy"; // naikkan tiap kali UI berubah
 
 /* ═══════════════════════════════ helpers ═══════════════════════════════ */
 // surface any runtime error instead of leaving a half-dead page behind
@@ -493,6 +494,20 @@ function dayTimeline(info){
 function renderHeader(){
   const b=DATA.bot;
   $("#pname").textContent = `${b.persona.emoji||""} ${b.persona.name}`.trim();
+  document.title = `${b.persona.name} — panel`;
+  // what she is doing right now, from her own routine
+  try {
+    const now = new Date();
+    const mins = now.getHours()*60 + now.getMinutes();
+    const blocks = (DATA.routine && DATA.routine.blocks) || [];
+    const cur = blocks.find(x => {
+      const t = (v) => { const [h,m] = String(v||"").split(":").map(Number); return h*60 + (m||0); };
+      return mins >= t(x.start) && mins < t(x.end);
+    }) || (DATA.routine && DATA.routine.now) || null;
+    const el = $("#chip-now");
+    if (el && cur) { el.innerHTML = `${esc(cur.what)} <b>${cur.start}–${cur.end}</b>`; el.style.display=""; }
+    else if (el) { el.style.display="none"; }
+  } catch (e) { /* the chip is a nicety */ }
   $("#chip-ver").textContent = "v" + (DATA.version || "0.0.0") + " · " + String(BUILD_STAMP).slice(11, 16);
   $("#chip-ver").title = BUILD_STAMP;
   $("#dot").className = "pulse" + (b.connected ? " on" : "");
