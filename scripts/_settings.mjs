@@ -101,6 +101,7 @@ export const FEATURES = [
   { key: "SELFIE_FACE", label: "Selfie: tampilan wajah (full/half/hide)", kind: "text", def: "half" },
   { key: "SELFIE_POSE", label: "Selfie: pose (auto/natural/peace/hip/hair/sit/shoulder)", kind: "text", def: "auto" },
   { key: "SELFIE_TYPE", label: "Selfie: tipe (mirror/pap)", kind: "text", def: "mirror" },
+  { key: "SELFIE_EXPRESSION", label: "Selfie: ekspresi (auto/flat/tired/...)", kind: "text", def: "auto" },
   { key: "PHOTO_PHONE", label: "Foto-nya gaya HP apa (pixel/iphone/samsung/oppo/vivo/xiaomi/biasa)", kind: "text", def: "pixel" },
   { key: "PHOTO_GRAIN", label: "Grain (0 = ikut profil HP)", kind: "int", def: 0 },
   { key: "PHOTO_BLOOM", label: "Bloom highlight (0.00-0.30, -1 = ikut profil)", kind: "float", def: -1 },

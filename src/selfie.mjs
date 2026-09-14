@@ -56,18 +56,20 @@ const LIGHT = [
   "bright ceiling light, unflattering and honest",
   "dim, as if she did not bother turning anything on",
 ];
-const MOOD = [
-  "flat and unimpressed, no expression at all",
-  "tired eyes, half a sigh",
-  "in a hurry, mid-movement, slightly blurred",
-  "a small dry half-smile, the closest she gets",
-  "annoyed at something she is looking at on the screen",
-  "caught between two thoughts, eyes on the mirror not the lens",
-  "the corner of her mouth pulled up just barely, almost a smirk",
-  "soft for a second, not fully hiding that she is pleased",
-  "a short real laugh, caught before she could stop it",
-  "one eyebrow raised, amused at her own reflection",
-];
+/** Her expression in a selfie — the panel exposes this as a dropdown; "auto" rotates. */
+const EXPRESSIONS = {
+  flat: { label: "flat — datar", text: "flat and unimpressed, no expression at all" },
+  tired: { label: "capek", text: "tired eyes, half a sigh" },
+  hurry: { label: "buru-buru", text: "in a hurry, mid-movement, slightly blurred" },
+  halfsmile: { label: "senyum tipis", text: "a small dry half-smile, the closest she gets" },
+  annoyed: { label: "kesel", text: "annoyed at something she is looking at on the screen" },
+  distant: { label: "melamun", text: "caught between two thoughts, eyes on the mirror not the lens" },
+  smirk: { label: "nyengir", text: "the corner of her mouth pulled up just barely, almost a smirk" },
+  soft: { label: "lembut", text: "soft for a second, not fully hiding that she is pleased" },
+  laugh: { label: "ketawa", text: "a short real laugh, caught before she could stop it" },
+  amused: { label: "angkat alis", text: "one eyebrow raised, amused at her own reflection" },
+};
+const MOOD_TEXTS = Object.values(EXPRESSIONS).map((e) => e.text);
 
 /** How much of her face is visible in a mirror selfie — the panel exposes this as full | half | hide. */
 const FACE_LINES = (mood) => ({
@@ -148,7 +150,7 @@ const POSE_DEFS = {
  * The prompt. The spot comes from the character (bedroom mirror by the door by default) and is the same
  * every time; everything else is drawn from the lists above by day, so two selfies never look alike.
  */
-export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, typeMode = null, style = "casual", why = "", slug: slugIn = null } = {}) {
+export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, typeMode = null, expressionMode = null, style = "casual", why = "", slug: slugIn = null } = {}) {
   const slug = slugIn || persona?.slug || config.persona;
   const d = day || new Date();
   // Vary per shot, not per day: with a day-only seed every selfie on the same day shared the same
@@ -166,7 +168,8 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   if (outfitRef) refs.push(`Image ${n++} is the outfit she must wear: put that exact garment on her, matching its fabric, colour, cut and pattern.`);
   if (spotRef) refs.push(`Image ${n++} is the place: reproduce that exact room, wall, mirror and objects in the same layout every time — only the camera angle, framing and light change.`);
   const who = `${persona?.name || "a young woman"}, ${String(persona?.appearance || "slim, 20, shoulder-length black hair, minimal monochrome clothes").slice(0, 160)}`;
-  const mood = pickR(MOOD, seed + 4);
+  const moodKey = String(expressionMode || config.selfieExpression || "auto").toLowerCase();
+  const mood = EXPRESSIONS[moodKey]?.text || pickR(MOOD_TEXTS, seed + 4);
   const mode = String(faceMode || config.selfieFace || "half").toLowerCase();
   const fm = FACE_LINES(mood)[mode] || FACE_LINES(mood).half;
   const isPap = String(typeMode || config.selfieType || "mirror").toLowerCase() === "pap";
@@ -350,6 +353,8 @@ export const selfieSettings = (persona = null) => ({
   pose: String(config.selfiePose || "auto"),
   type: String(config.selfieType || "mirror"),
   poses: [{ value: "auto", label: "auto (rotasi)", type: "both" }, ...Object.entries(POSE_DEFS).map(([value, d]) => ({ value, label: d.label, type: d.type }))],
+  expression: String(config.selfieExpression || "auto"),
+  expressions: [{ value: "auto", label: "auto (rotasi)" }, ...Object.entries(EXPRESSIONS).map(([value, d]) => ({ value, label: d.label }))],
   spotImage: persona?.mirror_spot_image ? "/spot" : "",
   sent: loadState(persona?.slug || config.persona).sent,
 });

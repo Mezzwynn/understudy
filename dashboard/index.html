@@ -1383,6 +1383,11 @@ function selfieCard(ph, gowns, styles) {
           ${(sf.poses || []).filter((p) => p.type === "both" || p.type === (sf.type || "mirror")).map((p) => `<option value="${esc(p.value)}" ${(sf.pose || "auto") === p.value ? "selected" : ""}>${esc(p.label)}</option>`).join("")}
         </select></div>
 
+      <div class="mrow2"><span>Ekspresi</span>
+        <select class="sin" id="sf-expr">
+          ${(sf.expressions || []).map((e) => `<option value="${esc(e.value)}" ${(sf.expression || "auto") === e.value ? "selected" : ""}>${esc(e.label)}</option>`).join("")}
+        </select></div>
+
       <div class="mrow2"><span>Tempat (jangan diubah-ubah)</span>
         <input class="sin" id="sf-spot" value="${esc(sf.spot || "")}"></div>
 
@@ -1445,6 +1450,7 @@ window.uwSelfieSave = async () => {
     SELFIE_FACE: document.getElementById("sf-face").value,
     SELFIE_POSE: document.getElementById("sf-pose").value,
     SELFIE_TYPE: document.getElementById("sf-type").value,
+    SELFIE_EXPRESSION: document.getElementById("sf-expr").value,
   };
   const spot = document.getElementById("sf-spot").value.trim();
   const typed = document.getElementById("sf-outfit-text").value.trim();
@@ -1461,7 +1467,7 @@ window.uwSelfieSave = async () => {
   const now = read && read.selfie ? read.selfie : null;
   if (st) {
     st.textContent = now
-      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · tipe: ${now.type || "mirror"} · baju: ${now.outfit || "rotasi"} · wajah: ${now.face || "half"} · pose: ${now.pose || "auto"} · maks: ${now.maxPerDay}${extra}`
+      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · tipe: ${now.type || "mirror"} · baju: ${now.outfit || "rotasi"} · wajah: ${now.face || "half"} · pose: ${now.pose || "auto"} · ekspresi: ${now.expression || "auto"} · maks: ${now.maxPerDay}${extra}`
       : "tersimpan ✓";
   }
   PHOTO_PICK = { outfit: document.getElementById("sf-outfit").value, style: document.getElementById("sf-style").value, typed };
