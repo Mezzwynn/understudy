@@ -296,12 +296,15 @@ export function shouldSendPhoto({ chat, moment = null, sleepy = false, force = f
   if (perConv >= Number(config.photoMaxPerConv || 1) && Date.now() - Number(chat?.stats?.lastPhotoAt || 0) < 3600000) {
     return { ok: false, reason: `already ${perConv} in this conversation` };
   }
+  // A direct request is not an unprompted photo: the daily cap and the gap are there to stop her
+  // spamming, and refusing a photo he just asked for because she already sent one this morning is
+  // what made her answer "still not sending pics" over and over.
   const today = new Date(now).toISOString().slice(0, 10);
   const sent = chat?.stats?.photoDay === today ? Number(chat.stats.photoCount || 0) : 0;
-  if (sent >= Number(config.photoDailyMax || 1)) return { ok: false, reason: `already ${sent} today` };
+  if (!force && sent >= Number(config.photoDailyMax || 1)) return { ok: false, reason: `already ${sent} today` };
   const last = Number(chat?.stats?.lastPhotoAt || 0);
   const gapMin = Number(config.photoMinGapMin || 0);
-  if (last && Date.now() - last < gapMin * 60000) return { ok: false, reason: "too soon" };
+  if (!force && last && Date.now() - last < gapMin * 60000) return { ok: false, reason: "too soon" };
   // force = he asked for a photo; the daily cap and the gap still apply, the dice do not
   if (!force) {
     const chance = Number(config.photoChance || 0.05);
