@@ -319,6 +319,8 @@
 </div>
 
 <script>
+const BUILD_STAMP = "2026-09-14 15:20 foto-wardrobe"; // naikkan tiap kali UI berubah
+
 /* ═══════════════════════════════ helpers ═══════════════════════════════ */
 // surface any runtime error instead of leaving a half-dead page behind
 function showError(msg){
@@ -459,7 +461,8 @@ function dayTimeline(info){
 function renderHeader(){
   const b=DATA.bot;
   $("#pname").textContent = `${b.persona.emoji||""} ${b.persona.name}`.trim();
-  $("#chip-ver").textContent = "v" + (DATA.version || "0.0.0");
+  $("#chip-ver").textContent = "v" + (DATA.version || "0.0.0") + " · " + String(BUILD_STAMP).slice(11, 16);
+  $("#chip-ver").title = BUILD_STAMP;
   $("#dot").className = "pulse" + (b.connected ? " on" : "");
   $("#num").textContent = b.number ? "+"+b.number : "not connected";
   $("#pstate").textContent = b.connected ? "online" : "disconnected";
@@ -2107,7 +2110,7 @@ document.addEventListener("click", async (e)=>{
 // installable + instant reload; the panel is local, so this is safe
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then(r=>r.update()).catch(() => {});
   });
 }
 // deep links from the manifest shortcuts: /?tab=log

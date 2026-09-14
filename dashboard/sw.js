@@ -8,7 +8,7 @@
  *   - never caches /api/*: a dashboard that shows yesterday's numbers is worse than
  *     one that says it cannot reach the bot
  */
-const SHELL = "understudy-shell-v2";
+const SHELL = "understudy-shell-v3";
 const FILES = ["/", "/index.html", "/logo.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

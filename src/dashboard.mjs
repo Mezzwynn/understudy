@@ -490,6 +490,25 @@ export function startDashboard() {
       }
 
       // rating page: Hik's eye is the ground truth for photos, so it gets a page
+      // escape hatch: open /reset-sw once when the panel keeps showing an old version
+      if (req.method === "GET" && url.pathname === "/reset-sw") {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+        return res.end(`<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<body style="background:#131109;color:#f3e6d2;font:16px/1.6 system-ui;padding:24px">
+<h1 style="font-size:19px">Menyegarkan panel…</h1>
+<p id=s style="color:#b39a78">Menghapus cache lama dan service worker.</p>
+<script>
+(async ()=>{
+  const out=[];
+  try{ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs){ await r.unregister(); out.push("service worker dibuang"); } }catch(e){ out.push("sw: "+e.message); }
+  try{ const keys=await caches.keys(); for(const k of keys){ await caches.delete(k); out.push("cache "+k+" dibuang"); } }catch(e){ out.push("cache: "+e.message); }
+  document.getElementById("s").textContent = out.join(" · ") || "tidak ada yang perlu dibuang";
+  setTimeout(()=>location.replace("/?t="+Date.now()), 1200);
+})();
+</script>
+<p style="color:#ffb257">Sebentar lagi kamu dibawa ke panel versi baru.</p>`);
+      }
+
       if (req.method === "GET" && (url.pathname === "/rate" || url.pathname === "/rate.html")) {
         const file = path.join(ROOT, "dashboard", "rate.html");
         if (!fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
