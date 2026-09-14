@@ -1258,9 +1258,20 @@ function renderPhotos(){
       <div class="mrow2"><span>Maksimal per orang per hari</span><input class="nin" data-pk="PHOTO_DAILY_MAX" type="number" min="0" max="10" value="${st.PHOTO_DAILY_MAX ?? 1}"></div>
       <div class="mrow2"><span>Jeda minimal (menit)</span><input class="nin" data-pk="PHOTO_MIN_GAP_MIN" type="number" min="0" max="2880" value="${st.PHOTO_MIN_GAP_MIN ?? 720}"></div>
       <div class="mrow2"><span>Peluang per balasan (%)</span><input class="nin" data-pk="PHOTO_CHANCE_PCT" type="number" min="0" max="100" value="${Math.round((st.PHOTO_CHANCE ?? 0.05)*100)}"></div>
-      <div class="mrow2"><span>Orang asing boleh dapat foto</span><label class="sw"><input type="checkbox" class="sn" data-pk="PHOTO_TRUST_STRANGERS" ${st.PHOTO_TRUST_STRANGERS?"checked":""}><span></span></label></div>
-      <div class="mrow2"><span>Generate foto baru kalau diminta (bayar)</span><label class="sw"><input type="checkbox" class="sn" data-pk="PHOTO_GENERATE_ON_DEMAND" ${st.PHOTO_GENERATE_ON_DEMAND?"checked":""}><span></span></label></div>
+      <div class="mrow2"><span>Maksimal per percakapan</span><input class="nin" data-pk="PHOTO_MAX_PER_CONV" type="number" min="1" max="5" value="${st.PHOTO_MAX_PER_CONV ?? 1}"></div>
+      <div class="mrow2"><span>Jam boleh kirim foto (dari–sampai)</span><span class="row"><input class="nin" data-pk="PHOTO_WINDOW_START" type="number" min="0" max="23" value="${st.PHOTO_WINDOW_START ?? 8}"><span class="tiny">s/d</span><input class="nin" data-pk="PHOTO_WINDOW_END" type="number" min="0" max="24" value="${st.PHOTO_WINDOW_END ?? 22}"></span></div>
+      <div class="mrow2"><span>Jenis yang boleh dikirim</span><span class="row">
+        <label class="tiny" style="display:flex;gap:5px;align-items:center"><input type="checkbox" data-kind="view" ${String(st.PHOTO_KINDS||"view,self").includes("view")?"checked":""}> foto tempat/benda</label>
+        <label class="tiny" style="display:flex;gap:5px;align-items:center"><input type="checkbox" data-kind="self" ${String(st.PHOTO_KINDS||"").includes("self")?"checked":""}> selfie</label></span></div>
+      <div class="mrow2"><span>Foto duluan, baru kalimatnya</span><label class="sw"><input type="checkbox" class="sn" data-pk="PHOTO_FIRST" ${st.PHOTO_FIRST?"checked":""}><span></span></label></div>
+      <div class="mrow2"><span>Dia boleh generate foto baru kalau diminta</span><label class="sw"><input type="checkbox" class="sn" data-pk="PHOTO_GENERATE_ON_DEMAND" ${st.PHOTO_GENERATE_ON_DEMAND?"checked":""}><span></span></label></div>
     </div>
+
+    <h3 style="margin:18px 0 6px;font-size:14px">Siapa yang boleh menerima foto</h3>
+    <div class="cg">
+      ${(ph.contacts||[]).map(c=>`<label class="ci"><input type="checkbox" class="sn" data-contact="${esc(c.jid)}" ${c.allowed?"checked":""}><span>${esc(c.name)}${c.trusted?" · trusted":""}</span><span class="tiny">${c.sentCount||0} foto</span></label>`).join("") || '<div class="empty">Belum ada kontak.</div>'}
+    </div>
+    <div class="hint" style="margin-top:6px">Centang = dia boleh kirim foto ke orang itu. Yang tidak dicentang nggak akan pernah dapat foto.</div>
 
     <h3 style="margin:18px 0 6px;font-size:14px">Tampilan — "HP"-nya</h3>
     <div class="rows">
@@ -1283,8 +1294,15 @@ function renderPhotos(){
     <div class="btns"><button class="act" data-pact="save-settings">Simpan setelan</button>
       <span class="tiny">berlaku langsung, tanpa restart</span></div>
 
-    <h3 style="margin:18px 0 6px;font-size:14px">Baju (diputar per hari)</h3>
-    <textarea class="sin" data-pk="WARDROBE" rows="3" style="width:100%;resize:vertical">${esc((ph.wardrobe||[]).join(" | "))}</textarea>
+    <h3 style="margin:18px 0 6px;font-size:14px">Baju — teks &amp; gambar</h3>
+    <div class="wg">
+      ${(ph.wardrobe||[]).map((w,i)=>`<div class="wi">
+        ${w.image?`<img src="/wardrobe?i=${i}&t=${Date.now()}" alt="">`:'<div class="noimg">tanpa gambar</div>'}
+        <div class="wn">${esc(w.name)}</div>
+        <label class="act" style="cursor:pointer;font-size:11px">Gambar<input type="file" accept="image/*" data-wup="${i}" hidden></label>
+      </div>`).join("")}
+    </div>
+    <textarea class="sin" data-pk="WARDROBE" rows="3" style="width:100%;resize:vertical;margin-top:10px">${esc((ph.wardrobe||[]).map(w=>w.name).join(" | "))}</textarea>
     <div class="btns"><button class="act" data-pact="save-wardrobe">Simpan baju</button>
       <span class="tiny">pisahkan dengan <b>|</b> — dipakai di prompt foto &amp; dirotasi</span></div>
   </div>
@@ -1326,9 +1344,15 @@ $("#tab-photos").addEventListener("click", async (e)=>{
       else if(k==="PHOTO_BLOOM" && Number(el.value)<0) values[k] = "";
       else values[k] = el.value;
     });
+    values.PHOTO_KINDS = $$('#tab-photos [data-kind]').filter(x=>x.checked).map(x=>x.dataset.kind).join(",");
     const r = await api("/api/photos",{ action:"settings", values });
     toast(r.ok?"Setelan foto disimpan (langsung berlaku)":("Gagal: "+(r.error||"")));
     return refresh(true);
+  }
+  if(act==="wardrobe-upload"){
+    const inp = b.querySelector("input[type=file]");
+    if(inp) inp.click();
+    return;
   }
   if(act==="save-wardrobe"){
     const r = await api("/api/photos",{ action:"wardrobe", wardrobe: $("#tab-photos [data-pk=WARDROBE]").value });
@@ -1345,6 +1369,23 @@ $("#tab-photos").addEventListener("click", async (e)=>{
 });
 
 $("#tab-photos").addEventListener("change", async (e)=>{
+  const up = e.target.closest("[data-wup]");
+  if(up && up.files?.[0]){
+    const file = up.files[0];
+    if(file.size > 6*1024*1024) return toast("Gambarnya kegedhean (maks 6MB)");
+    const ext = (file.name.split(".").pop()||"jpg").toLowerCase();
+    const data = await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(",")[1]);fr.readAsDataURL(file);});
+    toast("Mengunggah gambar baju…");
+    const r = await api("/api/photos",{ action:"wardrobe-upload", index: Number(up.dataset.wup), data, ext });
+    toast(r.ok?"Gambar baju disimpan":("Gagal: "+(r.error||"")));
+    return refresh(true);
+  }
+  const cb = e.target.closest("[data-contact]");
+  if(cb){
+    await api("/api/photos",{ action:"contact", jid: cb.dataset.contact, allowed: cb.checked });
+    toast(cb.checked?"Boleh kirim foto ke dia":"Nggak akan kirim foto ke dia");
+    return;
+  }
   const box = e.target.closest(".hw"); if(!box) return;
   const card = box.closest("[data-h]");
   await api("/api/photos",{ action:"rate", id: card.dataset.h, weird: box.checked });

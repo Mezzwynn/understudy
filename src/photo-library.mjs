@@ -136,7 +136,10 @@ export function pickPhoto({ slug = config.persona, chat = null, moment = null, b
   if (!lib.photos.length) return null;
   const who = persona || loadPersona(slug);
   // a photo from the wrong class of place is a tell: filter before scoring
-  const eligible = lib.photos.filter((p) => fitsPersonaClass(`${p.scene} ${p.note || ""}`, who, { allowOneStep: true }));
+  const kinds = String(config.photoKinds || "view,self").split(",").map((k) => k.trim()).filter(Boolean);
+  const eligible = lib.photos.filter(
+    (p) => fitsPersonaClass(`${p.scene} ${p.note || ""}`, who, { allowOneStep: true }) && (!kinds.length || kinds.includes(p.kind)),
+  );
   if (!eligible.length) return null;
   const pod = partOfDay(now.getHours());
   const context = `${block?.what || ""} ${block?.place || ""} ${moment?.what || ""} ${moment?.kind || ""} ${chat?.summary || ""}`.toLowerCase();
@@ -282,8 +285,17 @@ export function rateSent(slug, historyId, { rating = "", weird = null, note = ""
 export function shouldSendPhoto({ chat, moment = null, sleepy = false, force = false, now = new Date() } = {}) {
   if (!config.photoLibrary || !config.photoSend) return { ok: false, reason: "off" };
   if (sleepy) return { ok: false, reason: "asleep" };
-  if (!chat?.trusted && !config.photoTrustStrangers) return { ok: false, reason: "not trusted" };
-  if (chat?.photoOptOut) return { ok: false, reason: "opted out" };
+  // per contact, not a global switch: a contact is allowed because Hik said so, or because they are trusted
+  if (chat?.photoAllowed === false) return { ok: false, reason: "turned off for this contact" };
+  if (chat?.photoAllowed !== true && !chat?.trusted) return { ok: false, reason: "not allowed for this contact" };
+  const hour = new Date(now).getHours();
+  const ws = Number(config.photoWindowStart ?? 0);
+  const we = Number(config.photoWindowEnd ?? 24);
+  if (ws !== we && (hour < ws || hour >= we)) return { ok: false, reason: `outside her photo hours (${ws}-${we})` };
+  const perConv = Number(chat?.stats?.photoConvCount || 0);
+  if (perConv >= Number(config.photoMaxPerConv || 1) && Date.now() - Number(chat?.stats?.lastPhotoAt || 0) < 3600000) {
+    return { ok: false, reason: `already ${perConv} in this conversation` };
+  }
   const today = new Date(now).toISOString().slice(0, 10);
   const sent = chat?.stats?.photoDay === today ? Number(chat.stats.photoCount || 0) : 0;
   if (sent >= Number(config.photoDailyMax || 1)) return { ok: false, reason: `already ${sent} today` };

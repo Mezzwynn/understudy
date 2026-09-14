@@ -40,7 +40,7 @@ import { listChats, loadChat, saveChat, loadState } from "./store.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
 import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent, photoHistory, rateSent, sceneScores } from "./photo-library.mjs";
 import { PHONE_PROFILES } from "./humanize.mjs";
-import { wardrobeFor } from "./photos.mjs";
+import { wardrobeFor, setWardrobePhoto, wardrobePhotos } from "./photos.mjs";
 import {
   loadFace,
   saveFace,
@@ -345,6 +345,8 @@ async function summary() {
             return { ...h, url: p ? `/photo?d=library/${slug}&f=${encodeURIComponent(p.file)}` : "" };
           }),
         scores: sceneScores(slug),
+        wardrobeIndex: wardrobePhotos(slug),
+        contacts: listChats().map((c) => ({ jid: c.jid, name: c.profile?.name || c.name || String(c.jid).split("@")[0], trusted: c.trusted === true, allowed: c.photoAllowed !== false && (c.photoAllowed === true || c.trusted === true), sentCount: (c.stats?.photoCount || 0), lastAt: c.stats?.lastPhotoAt || 0 })),
         profiles: Object.fromEntries(Object.entries(PHONE_PROFILES).map(([k, v]) => [k, v.label])),
         wardrobe: wardrobeFor(loadPersona(slug)),
         settings: {
@@ -358,6 +360,11 @@ async function summary() {
           PHOTO_CHANCE: config.photoChance,
           PHOTO_TRUST_STRANGERS: config.photoTrustStrangers,
           PHOTO_GENERATE_ON_DEMAND: config.photoGenerateOnDemand,
+          PHOTO_WINDOW_START: config.photoWindowStart,
+          PHOTO_WINDOW_END: config.photoWindowEnd,
+          PHOTO_KINDS: config.photoKinds,
+          PHOTO_MAX_PER_CONV: config.photoMaxPerConv,
+          PHOTO_FIRST: config.photoFirst,
           PHOTO_PHONE: config.photoPhone,
           PHOTO_GRAIN: config.photoGrain,
           PHOTO_BLOOM: config.photoBloom,
@@ -488,6 +495,15 @@ export function startDashboard() {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
         return res.end(fs.readFileSync(file));
       }
+      if (req.method === "GET" && url.pathname === "/wardrobe") {
+        const slug2 = loadPersona().slug;
+        const idx = String(Number(url.searchParams.get("i")));
+        const map = wardrobePhotos(slug2);
+        const file = map[idx];
+        if (!file || !fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
+        res.writeHead(200, { "content-type": /\.png$/i.test(file) ? "image/png" : "image/jpeg", "cache-control": "no-store" });
+        return res.end(fs.readFileSync(file));
+      }
       if (req.method === "GET" && url.pathname === "/photo") {
         const name = path.basename(String(url.searchParams.get("f") || ""));
         const dir = path.basename(String(url.searchParams.get("d") || "model-test"));
@@ -550,6 +566,8 @@ export function startDashboard() {
           .map((h) => ({ ...h, url: (() => { const p = loadLibrary(slug).photos.find((x) => x.id === h.photoId); return p ? `/photo?d=library/${slug}&f=${encodeURIComponent(p.file)}` : ""; })() }));
         return json(res, 200, {
           ...lib,
+          wardrobeIndex: wardrobePhotos(slug),
+          contacts: listChats().map((c) => ({ jid: c.jid, name: c.profile?.name || c.name || String(c.jid).split("@")[0], trusted: c.trusted === true, allowed: c.photoAllowed !== false && (c.photoAllowed === true || c.trusted === true), sentCount: (c.stats?.photoCount || 0), lastAt: c.stats?.lastPhotoAt || 0 })),
           history,
           scores: sceneScores(slug),
           profiles: Object.fromEntries(Object.entries(PHONE_PROFILES).map(([k, v]) => [k, v.label])),
@@ -563,8 +581,12 @@ export function startDashboard() {
             PHOTO_DAILY_MAX: config.photoDailyMax,
             PHOTO_MIN_GAP_MIN: config.photoMinGapMin,
             PHOTO_CHANCE: config.photoChance,
-            PHOTO_TRUST_STRANGERS: config.photoTrustStrangers,
             PHOTO_GENERATE_ON_DEMAND: config.photoGenerateOnDemand,
+            PHOTO_WINDOW_START: config.photoWindowStart,
+            PHOTO_WINDOW_END: config.photoWindowEnd,
+            PHOTO_KINDS: config.photoKinds,
+            PHOTO_MAX_PER_CONV: config.photoMaxPerConv,
+            PHOTO_FIRST: config.photoFirst,
             PHOTO_PHONE: config.photoPhone,
             PHOTO_GRAIN: config.photoGrain,
             PHOTO_BLOOM: config.photoBloom,
@@ -795,6 +817,28 @@ export function startDashboard() {
         if (url.pathname === "/api/photos") {
           const slug = loadPersona().slug;
           const act = String(body.action || "");
+          if (act === "contact") {
+            const chat2 = loadChat(String(body.jid || ""));
+            if (!chat2?.jid) return json(res, 404, { ok: false, error: "contact not found" });
+            if (body.allowed === null || body.allowed === undefined) delete chat2.photoAllowed;
+            else chat2.photoAllowed = !!body.allowed;
+            saveChat(chat2);
+            log(`photo permission: ${body.jid} → ${chat2.photoAllowed === undefined ? "default" : chat2.photoAllowed}`);
+            return json(res, 200, { ok: true });
+          }
+          if (act === "wardrobe-upload") {
+            const idx = Number(body.index);
+            const ext = String(body.ext || "jpg").replace(/[^a-z]/gi, "") || "jpg";
+            const dir = path.join(DATA_DIR, "photos", "wardrobe", slug);
+            fs.mkdirSync(dir, { recursive: true });
+            const target = path.join(dir, `${idx}.${ext}`);
+            const data = String(body.data || "").replace(/^data:[^,]+,/, "");
+            if (!data || data.length < 100) return json(res, 400, { ok: false, error: "empty upload" });
+            fs.writeFileSync(target, Buffer.from(data, "base64"));
+            setWardrobePhoto(slug, idx, target);
+            log(`wardrobe: photo set for outfit ${idx}`);
+            return json(res, 200, { ok: true, wardrobe: wardrobeFor(loadPersona(slug)) });
+          }
           if (act === "rate") {
             const r = rateSent(slug, String(body.id || ""), { rating: body.rating, weird: body.weird, note: body.note });
             return json(res, r.ok ? 200 : 400, { ...r, scores: sceneScores(slug) });

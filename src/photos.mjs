@@ -14,7 +14,9 @@
  * The wardrobe rotates so she is not wearing the same shirt in every photo — a person's photos
  * from a week do not show one outfit seven times.
  */
-import { config } from "./config.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import { config, DATA_DIR } from "./config.mjs";
 
 /** Monochrome-leaning, because her card says so, but not one shirt forever. */
 export const WARDROBE = [
@@ -28,17 +30,44 @@ export const WARDROBE = [
   "a simple black dress with a thin cardigan",
 ];
 
-/** From the character's own card when it lists one, otherwise the default rotation. */
+/**
+ * From the character's own card when it lists one, otherwise the default rotation. An outfit may also
+ * carry a photo (data/photos/wardrobe/<slug>.json) — a picture of the clothes is more use than a
+ * sentence when the point is to draw her wearing them.
+ */
 export function wardrobeFor(persona) {
   const raw = String(persona?.wardrobe || "").trim();
-  if (!raw) return WARDROBE;
-  const list = raw.split("|").map((s) => s.trim()).filter(Boolean);
-  return list.length ? list : WARDROBE;
+  const names = raw
+    ? raw.split("|").map((s) => s.trim()).filter(Boolean)
+    : WARDROBE;
+  const photos = wardrobePhotos(persona?.slug);
+  return (names.length ? names : WARDROBE).map((name, i) => ({
+    name,
+    image: photos[String(i)] || "",
+  }));
+}
+
+const wardrobeFile = (slug) => path.join(DATA_DIR, "photos", "wardrobe", `${String(slug || "character").replace(/[^\w.-]/g, "")}.json`);
+
+export function wardrobePhotos(slug) {
+  try {
+    return JSON.parse(fs.readFileSync(wardrobeFile(slug), "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+export function setWardrobePhoto(slug, index, file) {
+  const map = wardrobePhotos(slug);
+  map[String(index)] = String(file);
+  fs.mkdirSync(path.dirname(wardrobeFile(slug)), { recursive: true });
+  fs.writeFileSync(wardrobeFile(slug), JSON.stringify(map, null, 2));
+  return map;
 }
 
 /** Deterministic per day and per photo, so a single day's photos do not all share one outfit. */
 export function pickOutfit(persona, seed = 0) {
-  const list = wardrobeFor(persona);
+  const list = wardrobeFor(persona).map((w) => (typeof w === "string" ? w : w.name));
   const day = new Date();
   const dayIndex = day.getFullYear() * 372 + (day.getMonth() + 1) * 31 + day.getDate();
   return list[Math.abs(dayIndex + Number(seed || 0)) % list.length];
@@ -153,7 +182,8 @@ is NOT in the frame. ${SELF_RULES}`,
 export function scenePrompt(sceneId, { persona = null, outfit = "", edit = false, seed = 0 } = {}) {
   const scene = SCENES[sceneId];
   if (!scene) return "";
-  const wear = outfit || pickOutfit(persona, seed);
+  const pick = outfit || pickOutfit(persona, seed);
+  const wear = typeof pick === "string" ? pick : pick.name;
   const fn = edit ? scene.editPrompt : scene.prompt;
   return fn(wear);
 }

@@ -126,7 +126,11 @@ function buildConfig() {
   photoSend: envFlag("PHOTO_SEND", true),
   photoDailyMax: num(envGet("PHOTO_DAILY_MAX", "1"), 1),
   photoMinGapMin: num(envGet("PHOTO_MIN_GAP_MIN", "600"), 600),
-  photoTrustStrangers: envFlag("PHOTO_TRUST_STRANGERS", false),
+  photoWindowStart: num(envGet("PHOTO_WINDOW_START", "8"), 8),
+  photoWindowEnd: num(envGet("PHOTO_WINDOW_END", "22"), 22),
+  photoKinds: envGet("PHOTO_KINDS", "view,self"),
+  photoMaxPerConv: num(envGet("PHOTO_MAX_PER_CONV", "1"), 1),
+  photoFirst: envFlag("PHOTO_FIRST", true),
   photoGenerateOnDemand: envFlag("PHOTO_GENERATE_ON_DEMAND", false),
   // tampilan foto: "HP"-nya, dan knob olah gambarnya
   photoPhone: envGet("PHOTO_PHONE", "pixel"),
