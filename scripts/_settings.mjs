@@ -201,7 +201,11 @@ export function applyValues(values) {
       setEnv(k.key, on ? "true" : "false");
       continue;
     }
-    setEnv(k.key, String(values[k.key]));
+    // An empty value never overwrites: the panel sends the whole form, and a field it renders blank (a
+    // setting that has no value yet, or a card he is not editing) would otherwise wipe what is there.
+    const raw = String(values[k.key] ?? "").trim();
+    if (!raw) continue;
+    setEnv(k.key, raw);
   }
 }
 
