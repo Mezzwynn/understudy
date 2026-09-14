@@ -85,6 +85,8 @@ export const FEATURES = [
   { key: "STATUS_QUIET_END", label: "Status: no posting until this hour", kind: "int", def: 8 },
   { key: "STATUS_MIN_GAP_MIN", label: "Status: minutes between two posts", kind: "int", def: 150 },
   { key: "STATUS_MEDIA", label: "Status: she may post a photo or video", kind: "bool", def: 1 },
+  { key: "IMAGE_ENGINE", label: "Mesin gambar (atlas / openrouter)", kind: "text", def: "atlas" },
+  { key: "EDIT_MODEL", label: "Model foto referensi (wajah asli)", kind: "text", def: "google/gemini-3.1-flash-image" },
   { key: "FACE_MODEL", label: "Image model for her face", kind: "text", def: "google/nano-banana-pro/text-to-image-developer" },
   { key: "SCENE_MODEL", label: "Image model for scenes and places", kind: "text", def: "bytedance/seedream-v5.0-pro/text-to-image" },
   { key: "PHOTO_CANDIDATE_COUNT", label: "Face candidates made per run", kind: "int", def: 4 },
