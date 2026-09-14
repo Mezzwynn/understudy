@@ -6,6 +6,16 @@ import { spawn } from "node:child_process";
 import { ROOT, PERSONA_DIR, DATA_DIR, config, envGet, STARTED_AT, log, reloadConfig } from "./config.mjs";
 
 /** Where the model-comparison photos live — the rating page reads and serves them. */
+/**
+ * The settings the panel renders, taken from the switch list and read straight from .env.
+ * Hand-listing them was the bug behind "it resets a few seconds later": the card saves fine, the panel then
+ * refreshes from this payload, and any key missing here came back empty and overwrote what was on screen.
+ */
+function panelSettings() {
+  const wanted = (k) => k.startsWith("PHOTO_") || k.startsWith("SELFIE_") || k === "IMAGE_ENGINE";
+  return Object.fromEntries(FEATURES.filter((f) => wanted(f.key)).map((f) => [f.key, envGet(f.key, f.def)]));
+}
+
 /** The photo rules in one line, for the panel to show. */
 function photoRule() {
   return `izin per kontak · library ${config.photoLibrary ? "on" : "off"} · belajar ${config.photoLearn ? "on" : "off"}`;
@@ -353,22 +363,7 @@ async function summary() {
         contacts: listChats().map((c) => ({ jid: c.jid, name: c.profile?.name || c.name || String(c.jid).split("@")[0], trusted: c.trusted === true, allowed: c.photoAllowed !== false && (c.photoAllowed === true || c.trusted === true), sentCount: (c.stats?.photoCount || 0), lastAt: c.stats?.lastPhotoAt || 0 })),
         profiles: Object.fromEntries(Object.entries(PHONE_PROFILES).map(([k, v]) => [k, v.label])),
         wardrobe: wardrobeFor(loadPersona(slug)),
-        settings: {
-          IMAGE_ENGINE: config.imageEngine,
-          FACE_MODEL: config.faceModel,
-          SCENE_MODEL: config.sceneModel,
-          EDIT_MODEL: config.editModel,
-          PHOTO_CANDIDATE_COUNT: config.photoCandidateCount,
-          PHOTO_TRUST_STRANGERS: config.photoTrustStrangers,
-          PHOTO_GENERATE_ON_DEMAND: config.photoGenerateOnDemand,
-          PHOTO_FIRST: config.photoFirst,
-          PHOTO_PHONE: config.photoPhone,
-          PHOTO_GRAIN: config.photoGrain,
-          PHOTO_BLOOM: config.photoBloom,
-          PHOTO_MAX_SIDE: config.photoMaxSide,
-          PHOTO_QUALITY: config.photoQuality,
-          PHOTO_LEARN: config.photoLearn,
-        },
+        settings: panelSettings(),
       };
     })(),
     face: (() => {
@@ -632,21 +627,7 @@ f.addEventListener("load", () => {
           scores: sceneScores(slug),
           profiles: Object.fromEntries(Object.entries(PHONE_PROFILES).map(([k, v]) => [k, v.label])),
           wardrobe: wardrobeFor(persona),
-          settings: {
-            IMAGE_ENGINE: config.imageEngine,
-            FACE_MODEL: config.faceModel,
-            SCENE_MODEL: config.sceneModel,
-            EDIT_MODEL: config.editModel,
-            PHOTO_CANDIDATE_COUNT: config.photoCandidateCount,
-            PHOTO_GENERATE_ON_DEMAND: config.photoGenerateOnDemand,
-            PHOTO_FIRST: config.photoFirst,
-            PHOTO_PHONE: config.photoPhone,
-            PHOTO_GRAIN: config.photoGrain,
-            PHOTO_BLOOM: config.photoBloom,
-            PHOTO_MAX_SIDE: config.photoMaxSide,
-            PHOTO_QUALITY: config.photoQuality,
-            PHOTO_LEARN: config.photoLearn,
-          },
+          settings: panelSettings(),
         });
       }
 
