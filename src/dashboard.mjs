@@ -41,6 +41,7 @@ import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
 import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent, photoHistory, rateSent, sceneScores } from "./photo-library.mjs";
 import { PHONE_PROFILES } from "./humanize.mjs";
 import { wardrobeFor, loadWardrobe, addWardrobeItem, updateWardrobeItem, removeWardrobeItem, setWardrobeImage, TIMES, STYLES } from "./photos.mjs";
+import { describeOutfit } from "./photo-check.mjs";
 import {
   loadFace,
   saveFace,
@@ -868,9 +869,26 @@ export function startDashboard() {
             const data = String(body.data || "").replace(/^data:[^,]+,/, "");
             if (!data || data.length < 100) return json(res, 400, { ok: false, error: "upload kosong" });
             fs.writeFileSync(target, Buffer.from(data, "base64"));
-            const r = setWardrobeImage(slug, id, target);
-            log(`wardrobe: photo set for ${id}`);
-            return json(res, r.ok ? 200 : 400, { ...r, wardrobe: loadWardrobe(slug).items });
+            setWardrobeImage(slug, id, target);
+            // read the clothes off the picture: the description writes itself, and categories are suggested
+            let auto = { ok: false };
+            if (body.describe !== false) {
+              auto = await describeOutfit(target);
+              if (auto.ok) {
+                const before = loadWardrobe(slug).items.find((i) => i.id === id) || {};
+                updateWardrobeItem(slug, id, {
+                  description: auto.description,
+                  times: (before.times || []).length ? before.times : auto.times,
+                  styles: (before.styles || []).length ? before.styles : auto.styles,
+                });
+                log(`wardrobe: deskripsi otomatis untuk ${id} — ${auto.description.slice(0, 60)}`);
+              }
+            }
+            return json(res, 200, {
+              ok: true,
+              auto,
+              wardrobe: loadWardrobe(slug).items,
+            });
           }
           if (act === "rate") {
             const r = rateSent(slug, String(body.id || ""), { rating: body.rating, weird: body.weird, note: body.note });

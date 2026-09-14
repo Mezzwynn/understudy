@@ -89,3 +89,53 @@ export async function checkPhoto(file, { apiKey = null, avatar = null } = {}) {
   if (!fs.existsSync(file)) return { ok: false, problems: ["file missing"], note: "" };
   return ask(file, key, avatar);
 }
+
+
+/** Read an outfit from its picture: what it is, its colours, material and cut, plus categories. */
+export async function describeOutfit(file, { apiKey = null } = {}) {
+  const key =
+    apiKey ||
+    (() => {
+      try {
+        return (fs.readFileSync(".env", "utf8").match(/^OPENROUTER_API_KEY=(.+)$/m) || [])[1]?.trim();
+      } catch {
+        return "";
+      }
+    })();
+  if (!key || !fs.existsSync(file)) return { ok: false, error: "no key or no file" };
+  const b64 = fs.readFileSync(file).toString("base64");
+  const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(90000),
+    body: JSON.stringify({
+      model: JUDGE,
+      max_tokens: 300,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } },
+            {
+              type: "text",
+              text: `This is a photo of a piece of clothing. Describe it for a wardrobe list, in Indonesian, in one short line: what it is, the colour, the material if visible, and the cut (oversized, loose, fitted...). No commentary, no adjectives about the person wearing it.
+{"description":"...","times":["pagi"|"siang"|"malam"...],"styles":["casual"|"kerja"|"formal"|"fitness"|"santai"|"tidur"...],"kind":"what it is in 3 words"}
+Allowed times: pagi, siang, malam. Allowed styles: casual, kerja, formal, fitness, santai, tidur.
+JSON only.`,
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  const j = await r.json();
+  const txt = j.choices?.[0]?.message?.content || "";
+  const m = txt.match(/\{[\s\S]*\}/);
+  if (!m) return { ok: false, error: "no description" };
+  try {
+    const v = JSON.parse(m[0]);
+    return { ok: true, description: String(v.description || "").slice(0, 200), times: Array.isArray(v.times) ? v.times : [], styles: Array.isArray(v.styles) ? v.styles : [], kind: String(v.kind || "") };
+  } catch {
+    return { ok: false, error: "unreadable description" };
+  }
+}

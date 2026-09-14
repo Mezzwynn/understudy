@@ -1349,7 +1349,8 @@ function renderPhotos(){
         <input class="sin wdesc" data-wf="description" value="${esc(w.description||"")}" placeholder="deskripsi — bahan, warna, potongan">
       </div>
       <div class="wact">
-        <label class="act">Gambar<input type="file" accept="image/*" data-wimg="${esc(w.id)}" hidden></label>
+        <button class="act" data-wimg="${esc(w.id)}">Gambar</button>
+        <input type="file" accept="image/*" class="wfile" data-wup="${esc(w.id)}" hidden>
         <button class="act" data-wsave="${esc(w.id)}">Simpan</button>
         <button class="act" data-wdel="${esc(w.id)}" style="color:var(--bad)">Hapus</button>
       </div>
@@ -1430,7 +1431,11 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     return refresh(true);
   }
   const wimg = e.target.closest("[data-wimg]");
-  if(wimg){ const inp = wimg.querySelector("input[type=file]"); if(inp) inp.click(); return; }
+  if(wimg){
+    const inp = document.querySelector('[data-wup="' + wimg.dataset.wimg + '"]');
+    if(inp) inp.click(); else toast("input file-nya nggak ketemu");
+    return;
+  }
 
   const b = e.target.closest("[data-pact],[data-rate]"); if(!b) return;
   const act = b.dataset.pact, rate = b.dataset.rate;
@@ -1463,15 +1468,15 @@ $("#tab-photos").addEventListener("click", async (e)=>{
 });
 
 $("#tab-photos").addEventListener("change", async (e)=>{
-  const wimg = e.target.closest("[data-wimg]");
-  if(wimg && wimg.files?.[0]){
-    const file = wimg.files[0];
+  const wup = e.target.closest("[data-wup]");
+  if(wup && wup.files?.[0]){
+    const file = wup.files[0];
     if(file.size > 6*1024*1024) return toast("Gambarnya kegedhean (maks 6MB)");
     const ext = (file.name.split(".").pop()||"jpg").toLowerCase();
     const data = await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(",")[1]);fr.readAsDataURL(file);});
-    toast("Mengunggah…");
-    const r = await api("/api/photos",{ action:"wardrobe-image", id: wimg.dataset.wimg, data, ext });
-    toast(r.ok?"Gambar disimpan":("Gagal: "+(r.error||"")));
+    toast("Mengunggah + membaca bajunya…");
+    const r = await api("/api/photos",{ action:"wardrobe-image", id: wup.dataset.wup, data, ext });
+    toast(r.ok ? (r.auto?.ok ? ("Deskripsi otomatis: " + String(r.auto.description).slice(0,60)) : "Gambar disimpan") : ("Gagal: "+(r.error||"")));
     return refresh(true);
   }
 });
