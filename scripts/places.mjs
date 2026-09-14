@@ -16,6 +16,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DATA_DIR, log } from "../src/config.mjs";
+import { lifestyleBlock, bandOf } from "../src/lifestyle.mjs";
+import { loadPersona } from "../src/prompt.mjs";
 
 const UA = "understudy/1.2 (personal roleplay bot; contact: owner)";
 const OUT_DIR = path.join(DATA_DIR, "photos", "places");
@@ -34,6 +36,14 @@ export const PLACE_KINDS = {
   kelas: { q: ["kelas universitas Indonesia", "ruang kuliah Indonesia", "kampus Denpasar"], note: "class" },
   kantor: { q: ["kantor Bali meja", "office desk Indonesia", "ruang kerja Bali"], note: "at the office" },
   kucing: { q: ["kucing jalanan Indonesia", "cat Bali street", "anak kucing Indonesia"], note: "a cat, obviously" },
+  // kelas menengah ke atas: tempat yang harganya nggak dilihat
+  kafe: { q: ["cafe Denpasar Bali", "coffee shop interior Bali", "specialty coffee Indonesia"], note: "coffee, working", classFit: "menengah" },
+  brunch: { q: ["brunch cafe Bali", "breakfast plate cafe Indonesia", "sourdough toast cafe"], note: "weekend brunch", classFit: "menengah" },
+  mall: { q: ["mall Denpasar", "shopping mall interior Bali", "Sunset Road Denpasar"], note: "at the mall", classFit: "menengah" },
+  gym: { q: ["pilates studio", "gym interior modern", "yoga studio Bali"], note: "pilates", classFit: "menengah" },
+  apartemen: { q: ["apartment balcony Bali", "modern apartment interior Indonesia", "condominium Denpasar"], note: "at home", classFit: "menengah" },
+  mobil: { q: ["car interior dashboard Indonesia", "driving car Bali road", "car park Denpasar"], note: "in her own car", classFit: "menengah" },
+  restoran: { q: ["restaurant table Denpasar", "sushi plate restaurant Indonesia", "casual dining restaurant Bali"], note: "dinner out", classFit: "menengah" },
 };
 
 const BAD_TITLE = /(aircraft|airplane|airport|boeing|airbus|map|diagram|chart|logo|coat of arms|monument|museum|statue|plane|terminal|flag|banknote|stamp|poster|screenshot|satellite|aerial view|panorama of the world)/i;
@@ -115,7 +125,7 @@ function usable(c) {
 }
 
 /** Runs on the local disk: is this a photo she could plausibly have taken? */
-async function review(file, place) {
+async function review(file, place, persona) {
   const b64 = fs.readFileSync(file).toString("base64");
   const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -129,9 +139,9 @@ async function review(file, place) {
             { type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } },
             {
               type: "text",
-              text: `A 20-year-old woman in Denpasar, Bali sends casual photos on WhatsApp. This candidate is meant for: "${place}". Answer with JSON only:
+              text: `A 20-year-old woman in Denpasar, Bali sends casual photos on WhatsApp. This candidate is meant for: "${place}".\n${lifestyleBlock(persona)}\n` + `${place}". Answer with JSON only:
 {"ok":true|false,"what":"what is actually in the photo, one short line","why":"if not ok, why"}
-Reject when: the place is plainly not in Indonesia (New Zealand bush, a delegation in Bangladesh, a European street, an American interior), or it is a car, motorbike or signage by itself with no place in it, or it plainly does not match the note above; it is an aerial or drone shot, a brochure or professional landscape, a monument or tourist postcard, a diagram or map, focus is on a stranger's face, it is clearly not Indonesia, it is a plane or a building interior that nobody would photograph, or it is visibly a stock/studio photo. Accept when it looks like an ordinary photo a person took with a phone of something ordinary around them.`,
+Reject when: the place does not fit her class and lifestyle described below, or the place is plainly not in Indonesia (New Zealand bush, a delegation in Bangladesh, a European street, an American interior), or it is a car, motorbike or signage by itself with no place in it, or it plainly does not match the note above; it is an aerial or drone shot, a brochure or professional landscape, a monument or tourist postcard, a diagram or map, focus is on a stranger's face, it is clearly not Indonesia, it is a plane or a building interior that nobody would photograph, or it is visibly a stock/studio photo. Accept when it looks like an ordinary photo a person took with a phone of something ordinary around them.`,
             },
           ],
         },
@@ -150,6 +160,8 @@ Reject when: the place is plainly not in Indonesia (New Zealand bush, a delegati
 }
 
 async function main() {
+  const persona = loadPersona();
+  log(`places: class band = ${bandOf(persona) || "not set"}`);
   if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
   const index = fs.existsSync(INDEX) ? JSON.parse(fs.readFileSync(INDEX, "utf8")) : [];
   const have = new Set(index.map((i) => `${i.kind}|${i.title}`));
@@ -187,7 +199,7 @@ async function main() {
         taken++;
         continue;
       }
-      const v = await review(file, place);
+      const v = await review(file, place, persona);
       if (!v.ok) {
         console.log(`  ✗ ${kind}: ${String(v.why || "rejected").slice(0, 70)} — ${c.title.slice(0, 30)}`);
         fs.unlinkSync(file);

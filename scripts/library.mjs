@@ -11,7 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DATA_DIR, config, log } from "../src/config.mjs";
-import { addPhoto, removePhoto, librarySummary, loadLibrary, pickPhoto, partOfDay } from "../src/photo-library.mjs";
+import { addPhoto, removePhoto, librarySummary, loadLibrary, saveLibrary as saveLibraryFile, pickPhoto, partOfDay } from "../src/photo-library.mjs";
 import { checkPhoto } from "../src/photo-check.mjs";
 import { avatarPath } from "../src/face.mjs";
 
@@ -51,7 +51,11 @@ async function importPlaces() {
   } catch {
     /* fall back to the files themselves */
   }
-  const hourFor = { warung: 12, kopi: 10, pasar: 9, gang: 17, jalan: 18, pantai: 6, hujan: 15, kelas: 9, kantor: 13, kucing: 16 };
+  const hourFor = {
+    warung: 12, kopi: 10, pasar: 9, gang: 17, jalan: 18, pantai: 6, hujan: 15, kelas: 9, kantor: 13, kucing: 16,
+    // kelas menengah ke atas
+    kafe: 10, brunch: 11, mall: 16, gym: 7, apartemen: 21, mobil: 18, restoran: 20,
+  };
   let added = 0;
   const seen = new Set(loadLibrary(slug).photos.map((p) => p.scene));
   for (const p of index.photos) {
@@ -164,6 +168,27 @@ else if (cmd === "add") {
 } else if (cmd === "remove") {
   const r = removePhoto(slug, args[1]);
   console.log(r.ok ? "  removed" : `  gagal: ${r.error}`);
+} else if (cmd === "retag") {
+  const lib = loadLibrary(slug);
+  const hourForAll = {
+    warung: 12, kopi: 10, pasar: 9, gang: 17, jalan: 18, pantai: 6, hujan: 15, kelas: 9, kantor: 13, kucing: 16,
+    kafe: 10, brunch: 11, mall: 16, gym: 7, apartemen: 21, mobil: 18, restoran: 20,
+    "meja-pagi": 10, "pagi-kerja": 10, momo: 16, "selfie-siang": 14, "selfie-malam": 22, "jalan-pulang": 18,
+  };
+  let changed = 0;
+  for (const p of lib.photos) {
+    const kind = (p.scene.match(/^tempat-([a-z]+)-/) || [])[1];
+    const base = p.scene.replace(/-(h|raw)$/, "");
+    const hour = hourForAll[kind] ?? hourForAll[base];
+    const nextTime = ["meja-pagi", "pagi-kerja", "momo"].includes(base) ? "any" : hour !== undefined ? partOfDay(hour) : p.timeOfDay;
+    if (nextTime !== p.timeOfDay) {
+      p.timeOfDay = nextTime;
+      changed++;
+    }
+  }
+  saveLibraryFile(slug, lib);
+  console.log(`  retag: ${changed} entri diperbarui`);
+  list();
 } else if (cmd === "pick") pick();
 else
   console.log(

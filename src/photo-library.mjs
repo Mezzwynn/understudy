@@ -15,6 +15,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { DATA_DIR, config, log } from "./config.mjs";
 import { humanize } from "./humanize.mjs";
+import { classFitOf, fitsPersonaClass } from "./lifestyle.mjs";
+import { loadPersona } from "./prompt.mjs";
 
 const slugOf = (slug) => String(slug || config.persona || "character").replace(/[^\w.-]/g, "");
 
@@ -28,7 +30,12 @@ const indexFile = (slug) => path.join(libraryDir(slug), "index.json");
 export function loadLibrary(slug) {
   try {
     const j = JSON.parse(fs.readFileSync(indexFile(slug), "utf8"));
-    return { slug: slugOf(slug), photos: Array.isArray(j.photos) ? j.photos : [] };
+    const photos = (Array.isArray(j.photos) ? j.photos : []).map((p) => ({
+      ...p,
+      // photos added before class tagging existed get it on read
+      classFit: p.classFit || classFitOf(`${p.scene || ""} ${p.note || ""}`),
+    }));
+    return { slug: slugOf(slug), photos };
   } catch {
     return { slug: slugOf(slug), photos: [] };
   }
@@ -90,6 +97,8 @@ export function addPhoto(slug, file, meta = {}) {
   const entry = {
     id,
     file: path.basename(target),
+    // foto warung buat karakter berduit itu tel, sama kayak POV yang salah
+    classFit: classFitOf(`${scene} ${meta.note || ""}`),
     scene,
     note: String(meta.note || "").slice(0, 200),
     kind: meta.kind || (String(scene).startsWith("selfie") ? "self" : "view"),
@@ -122,16 +131,20 @@ export function removePhoto(slug, id) {
  * The weights say what matters: the time of day first (a night photo in the morning is impossible),
  * then whether it matches what she is doing, then whether this contact has already been sent it.
  */
-export function pickPhoto({ slug = config.persona, chat = null, moment = null, block = null, now = new Date() } = {}) {
+export function pickPhoto({ slug = config.persona, chat = null, moment = null, block = null, persona = null, now = new Date() } = {}) {
   const lib = loadLibrary(slug);
   if (!lib.photos.length) return null;
+  const who = persona || loadPersona(slug);
+  // a photo from the wrong class of place is a tell: filter before scoring
+  const eligible = lib.photos.filter((p) => fitsPersonaClass(`${p.scene} ${p.note || ""}`, who, { allowOneStep: true }));
+  if (!eligible.length) return null;
   const pod = partOfDay(now.getHours());
   const context = `${block?.what || ""} ${block?.place || ""} ${moment?.what || ""} ${moment?.kind || ""} ${chat?.summary || ""}`.toLowerCase();
   const wanted = topicTagsFor(context);
   const jid = String(chat?.jid || "");
   const mood = Number(chat?.mood?.valence ?? 0.5);
 
-  const scored = lib.photos
+  const scored = eligible
     .map((p) => {
       let score = 0;
       const why = [];

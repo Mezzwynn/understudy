@@ -19,6 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { chat as llmChat } from "./llm.mjs";
 import { ROOT, DATA_DIR, config, trackerProvider, log } from "./config.mjs";
+import { lifestyleBlock, hasClass, bandOf, BANDS } from "./lifestyle.mjs";
 import { languageDirective } from "./lang.mjs";
 
 // under DATA_DIR so a test run with a throwaway data dir cannot touch real routines
@@ -47,13 +48,58 @@ Return ONLY JSON, no prose:
 Rules:
 - Cover her WHOLE waking day, in order, 6-10 blocks, each 45-180 minutes, no overlaps.
   Stay inside her waking hours (see the card). Do not plan while she sleeps.
-- Blocks must fit HER life: her job, her city, her age, her habits, her personality. Ordinary days, no fantasy, no drama-movie events.
+- Blocks must fit HER life: her job, her city, her age, her habits, her personality, AND her class.
+  The CLASS AND LIFESTYLE block is not decoration: where she eats, how she travels, where she lives and
+  what she spends money on must match it. An upper-middle-class day does not include a warung, an angkot,
+  counting coins or a nasi bungkus, unless the card itself says so. Getting this wrong is worse than
+  being boring.
+- Ordinary days, no fantasy, no drama-movie events.
 - Vary it: different places, activities and errands than the recent days you are shown. Never reuse yesterday's theme.
 - moments: 2-5, at a specific time inside a block, each ONE concrete thing that happened. Not feelings in general ("merasa capek") but events ("klien revisi brief ke-4, aku nahan nangis di toilet kafe").
 - intensity 0.2-1.0. share=true if she would naturally bring it up in chat, false if private.
 - kind must be one of the listed values.
 - LANGUAGE: "theme", "what" and "place" must follow the LANGUAGE line in the user message exactly. Keep every string SHORT, max ~12 words.
 - Nothing sexual, nothing illegal, nothing about the people she chats with (this is HER day, they are not in it).`;
+
+/**
+ * The class check. After a plan comes back, one cheap pass asks whether anything in it contradicts
+ * her lifestyle: "nasi campur di warung" for a character with a car and a pilates subscription is the
+ * kind of detail that makes the whole character read as invented. If it finds something, the plan is
+ * made again with the findings attached as things to avoid.
+ */
+async function classProblems(plan, persona) {
+  if (!hasClass(persona)) return [];
+  const text = [
+    `theme: ${plan.theme}`,
+    ...(plan.blocks || []).map((b) => `${b.start}-${b.end} ${b.what}${b.place ? ` (${b.place})` : ""}`),
+    ...(plan.moments || []).map((m) => `${m.at} [${m.kind}] ${m.what}`),
+  ].join("\n");
+  const ask = `CHARACTER CLASS AND LIFESTYLE:
+${lifestyleBlock(persona)}
+
+HER PLAN FOR THE DAY:
+${text}
+
+List anything in this plan that does NOT fit her class and lifestyle. Be strict and concrete: a place she would not go, transport she would not use, food that costs the wrong amount of money, a purchase that contradicts her income. If everything fits, say so.
+Answer with JSON only: {"fits":true|false,"problems":["..."]}`;
+  try {
+    const out = await llmChat(
+      [
+        { role: "system", content: "You check one thing: does this day fit this character's social class and lifestyle. JSON only." },
+        { role: "user", content: ask },
+      ],
+      { json: true, temperature: 0, maxTokens: 400, provider: trackerProvider() },
+    );
+    const s2 = out.indexOf("{");
+    const e2 = out.lastIndexOf("}");
+    const j = JSON.parse(out.slice(s2, e2 + 1));
+    if (j.fits) return [];
+    return (j.problems || []).map((p) => String(p).slice(0, 120)).slice(0, 6);
+  } catch (err) {
+    log(`class check skipped: ${err.message}`);
+    return [];
+  }
+}
 
 /** Is it already partway through the day? (used to ask for a partial plan) */
 function isTodayMid() {
@@ -195,6 +241,7 @@ export async function ensureToday(persona, { force = false, mood = null } = {}) 
   const partial = isTodayMid() ? `- It is already ${nowClock} for her. Plan ONLY the rest of the day, from ${nowClock} until she sleeps. Do not plan anything before that.` : "";
   const user = [
     `CHARACTER CARD:\n${String(persona?.card || "").slice(0, 2600)}`,
+    lifestyleBlock(persona),
     `LANGUAGE: ${languageDirective(persona?.language) || "match the character card"} (card: "${persona?.language || "-"}")`,
     `TODAY: ${weekdayName()} ${key}`,
     persona?.work_hours ? `HER WORK HOURS: ${persona.work_hours}` : "",
@@ -234,6 +281,35 @@ export async function ensureToday(persona, { force = false, mood = null } = {}) 
   if (!clean) {
     log("routine generation incomplete — keeping the old one");
     return current || null;
+  }
+
+  // Class check: if the day does not fit her lifestyle, it is made once more with the findings named.
+  const wrong = await classProblems(clean, persona);
+  if (wrong.length) {
+    log(`routine fits her class badly (${wrong.length}): ${wrong.join(" | ").slice(0, 160)} — planning again`);
+    try {
+      const strict = await llmChat(
+        [
+          { role: "system", content: SYSTEM },
+          {
+            role: "user",
+            content: `${user}\n\nDO NOT REPEAT THESE MISTAKES FROM THE LAST ATTEMPT:\n- ${wrong.join("\n- ")}`,
+          },
+        ],
+        { json: true, temperature: 0.9, maxTokens: 1600, provider: trackerProvider() },
+      );
+      const s3 = strict.indexOf("{");
+      const e3 = strict.lastIndexOf("}");
+      const again = sanitize(JSON.parse(strict.slice(s3, e3 + 1)));
+      if (again && !(await classProblems(again, persona)).length) {
+        parsed = again;
+        log("routine: second attempt fits her class");
+      } else {
+        log("routine: second attempt still imperfect — keeping the first, it is her day either way");
+      }
+    } catch (err) {
+      log(`routine second attempt failed: ${err.message}`);
+    }
   }
 
   // Regenerating mid-day must NOT wipe what already happened: keep the blocks that
