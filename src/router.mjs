@@ -767,8 +767,11 @@ async function respond(sock, jid, p) {
   }
 
   // photo: when she's asked, or rarely on her own (daily cap per contact)
-  const wantsPhoto = /(foto|selfie|potret|pap|gambar).{0,24}(kamu|kmu|dirimu|dong|sini)|kirim foto|foto dong|selfie dong|liat foto|lihat foto/i.test(
-    incoming,
+  // Any mention of a photo counts. It used to need an Indonesian phrasing ("foto dong"), so an English
+  // request — "send me a pic", "ur pic's..." — never registered as asking, and she answered no because the
+  // system had never treated it as a request at all.
+  const wantsPhoto = /\b(foto|photo|photograph|pic|pics|picture|selfie|potret|pap|gambar|muka|wajah)\b/i.test(
+    String(incoming || ""),
   );
   const today = new Date().toISOString().slice(0, 10);
   if (chat.stats.photoDay !== today) {
