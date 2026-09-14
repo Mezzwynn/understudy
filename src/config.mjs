@@ -133,6 +133,10 @@ function buildConfig() {
   photoMaxSide: num(envGet("PHOTO_MAX_SIDE", "1280"), 1280),
   photoQuality: num(envGet("PHOTO_QUALITY", "74"), 74),
   photoLearn: envFlag("PHOTO_LEARN", true),
+  // selfie terjadwal: tempat tetap, baju/angle/cahaya/vibe selalu beda
+  selfieEnabled: envFlag("SELFIE_ENABLED", true),
+  selfieSchedule: envGet("SELFIE_SCHEDULE", "07:30,16:30"),
+  selfieSpot: envGet("SELFIE_SPOT", "the full-length mirror on the inside of her bedroom door"),
   objectModel: envGet("OBJECT_MODEL", "openai/gpt-image-1-mini/text-to-image"),
   photoCandidateCount: num(envGet("PHOTO_CANDIDATE_COUNT", "4"), 4),
   topicFatigue: envFlag("TOPIC_FATIGUE", true),

@@ -1,4 +1,6 @@
-import { config, log, ROOT, PERSONA_DIR, PROMPT_DIR } from "./config.mjs";
+import path from "node:path";
+import fs from "node:fs";
+import { config, DATA_DIR, log, ROOT, PERSONA_DIR, PROMPT_DIR } from "./config, DATA_DIR.mjs";
 import { listChats, saveChat, loadChat, loadState, saveState } from "./store.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { generateProactive, generateNudge, generateFollowup, generateCheckup } from "./engine.mjs";
@@ -11,6 +13,8 @@ import { dueForEval, isEvalRunning, runAndRecord } from "./evals.mjs";
 import { weekNotifyDue, markWeekNotified, weekText } from "./week.mjs";
 import { watchFiles } from "./changes.mjs";
 import { ensurePlan, dueStatus, markPosted, postStatus, inStatusWindow } from "./status.mjs";
+import { dueSelfie, makeSelfie, markSelfieSent } from "./selfie.mjs";
+import { markSent } from "./photo-library.mjs";
 
 /**
  * proactive.mjs — she has her own life.
@@ -151,6 +155,47 @@ async function maybePostStatus(sock) {
     if (key) markPosted(slug, due, key);
   } catch (err) {
     log(`status tick failed: ${err.message}`);
+  }
+}
+
+/**
+ * The scheduled mirror selfie: same corner of her room as every other time, outfit and angle different.
+ * It goes to the allowed contacts like any other photo, and is filed in the library so it can be rated.
+ */
+async function maybeSelfie(sock) {
+  if (!config.selfieEnabled || inQuietHours()) return;
+  const persona = loadPersona();
+  const slug = persona.slug || config.persona;
+  const due = dueSelfie(slug);
+  if (!due) return;
+  try {
+    const made = await makeSelfie(persona, { slug });
+    markSelfieSent(slug, due.key);
+    if (!made.ok) {
+      log(`selfie failed: ${made.error}`);
+      return;
+    }
+    const { listChats } = await import("./store.mjs");
+    const { sendImage } = await import("./whatsapp.mjs");
+    const { loadLibrary } = await import("./photo-library.mjs");
+    const lib = loadLibrary(slug);
+    const file = path.join(DATA_DIR, "photos", "library", slug, made.photo.file);
+    let sent = 0;
+    for (const c of listChats()) {
+      if (c.photoAllowed === false) continue;
+      if (c.photoAllowed !== true && c.trusted !== true) continue;
+      if (!fs.existsSync(file)) continue;
+      try {
+        await sendImage(sock, c.jid, fs.readFileSync(file), "image/jpeg");
+        markSent(slug, made.photo.id, c.jid, { why: `selfie terjadwal ${due.time}` });
+        sent++;
+      } catch (err) {
+        log(`selfie send to ${c.jid} failed: ${err.message}`);
+      }
+    }
+    log(`selfie terjadwal ${due.time}: dikirim ke ${sent} kontak`);
+  } catch (err) {
+    log(`selfie tick failed: ${err.message}`);
   }
 }
 
@@ -498,6 +543,7 @@ export function startProactive() {  if (!config.proactive) {
       await maybeWeekDigest();
       watchFiles({ personaDir: PERSONA_DIR, promptDir: PROMPT_DIR, slug: config.persona });
       await maybePostStatus(sock);
+      await maybeSelfie(sock);
     })().catch((err) => log(`proactive error: ${err.message}`));
   }, config.proactiveTickSec * 1000);
 
