@@ -1611,8 +1611,7 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     $$('#tab-photos [data-pk]').forEach(el=>{
       const k = el.dataset.pk;
       if(k==="PHOTO_CHANCE_PCT") values.PHOTO_CHANCE = String(Number(el.value)/100);
-      else if(k==="PHOTO_GRAIN" && Number(el.value)===0) values[k] = "";
-      else if(k==="PHOTO_BLOOM" && Number(el.value)<0) values[k] = "";
+      
       else values[k] = el.value;
     });
     const r = await api("/api/photos",{ action:"settings", values });

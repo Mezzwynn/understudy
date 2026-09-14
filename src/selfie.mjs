@@ -195,7 +195,14 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
   });
   if (!res.ok) return { ok: false, error: res.error };
   const tmp = writeImage(path.join(DATA_DIR, "photos", `selfie-tmp-${Date.now()}`), res.buf);
-  const small = humanize(fs.readFileSync(tmp), { profile: config.photoPhone, maxSide: config.photoMaxSide, quality: config.photoQuality });
+  const small = humanize(fs.readFileSync(tmp), {
+    profile: config.photoPhone,
+    maxSide: config.photoMaxSide,
+    quality: config.photoQuality,
+    // -1 means "whatever this phone profile does"
+    grain: Number(config.photoGrain) < 0 ? null : Number(config.photoGrain),
+    bloom: Number(config.photoBloom) < 0 ? null : Number(config.photoBloom),
+  });
   const final = path.join(DATA_DIR, "photos", `selfie-${Date.now()}.jpg`);
   fs.writeFileSync(final, small.buf);
   fs.rmSync(tmp, { force: true });
