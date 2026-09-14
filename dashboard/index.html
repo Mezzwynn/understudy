@@ -375,7 +375,8 @@ window.addEventListener("error", (e) => {
     if (!b) {
       b = document.createElement("div");
       b.id = "understudyErrorBar";
-      b.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#4d1a1a;color:#ffc9c9;font:12px/1.45 monospace;padding:8px 10px;white-space:pre-wrap;max-height:34vh;overflow:auto";
+      b.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#4d1a1a;color:#ffc9c9;font:12px/1.45 monospace;padding:8px 10px;white-space:pre-wrap;max-height:30vh;overflow:auto;pointer-events:auto";
+      b.onclick = () => b.remove();   // bisa ditutup, dan tidak menutupi tombol di bawahnya
       document.body.appendChild(b);
     }
     b.textContent = "PANEL ERROR: " + (e.message || e.type) + " @ " + String(e.filename || "").split("/").pop() + ":" + (e.lineno || "?");
@@ -385,7 +386,7 @@ window.addEventListener("error", (e) => {
 // no service worker: it only ever hid updates
 if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
 
-const BUILD_STAMP = "2026-09-14 18:05 baris-rapi"; // naikkan tiap kali UI berubah
+const BUILD_STAMP = "2026-09-14 19:25 switch-baju-baru"; // naikkan tiap kali UI berubah
 
 /* ═══════════════════════════════ helpers ═══════════════════════════════ */
 // surface any runtime error instead of leaving a half-dead page behind
