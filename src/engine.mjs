@@ -2,7 +2,7 @@ import { chat as llmChat } from "./llm.mjs";
 import { embed } from "./embed.mjs";
 import { buildMessages, buildProactiveMessages, buildNudgeMessages, buildDryMessages, buildFollowupMessages, buildCheckupMessages } from "./prompt.mjs";
 import { recallMemory, addMemory } from "./store.mjs";
-import { extractControl, clean, looksBroken, deflection, stripAudioTags, tameTics } from "./guard.mjs";
+import { extractControl, clean, looksBroken, deflection, stripAudioTags, stripVoiceOnlyMarkup, tameTics } from "./guard.mjs";
 import { drift, applyDeltas, heuristicNudge, normalize, baselineFor, isMoodLocked, lockValue } from "./mood.mjs";
 import { analyzeAffect } from "./affect.mjs";
 import { needsIntroduction, markIntroAsked } from "./stranger.mjs";
@@ -466,7 +466,7 @@ export async function generateReply(chat, incoming, persona, { displayName, voic
   sampleMood(chat);
   rememberAsks(chat, text);
   chat.history.push({ role: "user", content: incoming, ts: Date.now() });
-  chat.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
+  chat.history.push({ role: "assistant", content: stripVoiceOnlyMarkup(stripAudioTags(text)), ts: Date.now() });
   chat.stats.inbound = (chat.stats.inbound || 0) + 1;
   // long back-and-forth tires her out a little (she's not a machine)
   if (Date.now() - (chat.lastInteraction || 0) < 15 * 60000) {
@@ -573,7 +573,7 @@ export async function generateProactive(session, persona, { displayName } = {}) 
       continue;
     }
 
-    session.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
+    session.history.push({ role: "assistant", content: stripVoiceOnlyMarkup(stripAudioTags(text)), ts: Date.now() });
     session.lastInteraction = Date.now();
     bump(session, { affection: 0.02 });
     return text;
@@ -619,7 +619,7 @@ export async function generateCheckup(session, persona, instruction, { displayNa
     let { text } = extractControl(raw);
     text = clean(text, persona.name);
     if (!text || looksBroken(text)) continue;
-    session.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
+    session.history.push({ role: "assistant", content: stripVoiceOnlyMarkup(stripAudioTags(text)), ts: Date.now() });
     return text;
   }
   return null;
@@ -637,7 +637,7 @@ export async function generateFollowup(session, persona, commitment, { displayNa
     let { text } = extractControl(raw);
     text = clean(text, persona.name);
     if (!text || looksBroken(text)) continue;
-    session.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
+    session.history.push({ role: "assistant", content: stripVoiceOnlyMarkup(stripAudioTags(text)), ts: Date.now() });
     return text;
   }
   return null;
@@ -655,7 +655,7 @@ export async function generateNudge(session, persona, { displayName } = {}) {
     let { text } = extractControl(raw);
     text = clean(text, persona.name);
     if (!text || looksBroken(text)) continue;
-    session.history.push({ role: "assistant", content: stripAudioTags(text), ts: Date.now() });
+    session.history.push({ role: "assistant", content: stripVoiceOnlyMarkup(stripAudioTags(text)), ts: Date.now() });
     return text;
   }
   return null;

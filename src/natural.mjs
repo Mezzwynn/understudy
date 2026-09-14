@@ -164,7 +164,7 @@ export function oddHourNote(now = new Date()) {
 export const EDIT_AFTERMATH_PROMPT = `You just sent a message. You may add ONE short afterthought by editing it — the way a person types the
 thing they actually meant to say a second later.
 Rules:
-- In the language you are already using with him. Max 8 words. Start with "…".
+- In the language you are already using with him. Max 8 words. Plain text: no leading dots or ellipsis (those belong to voice notes, not typing).
 - It is about HIM: eat, sleep, water, rest, get home safe, be careful. Nothing else.
 - Never mention money, price, payment, or anything about yourself being busy.
 - If nothing fits what you two were talking about, answer exactly: NONE`;

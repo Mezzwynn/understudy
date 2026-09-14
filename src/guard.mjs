@@ -105,6 +105,18 @@ export function stripAudioTags(text) {
     .replace(/^ +| +$/gm, "");
 }
 
+/**
+ * Chat is typed, not spoken. The ellipsis-prefixed fragments and the [softly]/[pause] tags belong to the
+ * ElevenLabs voice notes; when a model slips them into a typed reply they read as stage directions.
+ */
+export function stripVoiceOnlyMarkup(text) {
+  return String(text || "")
+    .replace(/^[ \t]*(?:…|\.\.\.)[ \t]*/gm, "")   // a line that begins with an ellipsis
+    .replace(/[ \t]+(?:…|\.\.\.)[ \t]*$/gm, "")   // a trailing one (a leading-only "…" stays meaningful)
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/^ +| +$/gm, "");
+}
+
 const CTRL_RE = /^[ \t]*###CTRL###[ \t]*(\{[\s\S]*\})[ \t]*$/m;
 const CTRL_JSON_RE = /^[ \t]*###CTRL###[ \t]*\n+[ \t]*(\{[\s\S]*?\})[ \t]*$/m;
 
