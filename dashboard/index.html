@@ -97,6 +97,10 @@
 
   @media (max-width:430px){
     #chip-up{display:none}
+    .subline{flex-wrap:wrap;row-gap:6px}
+    #chip-now{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    #chip-now b{display:none}
+    #chip-next{display:none}
     .namerow h1{font-size:17.5px}
     .logobox{width:44px;height:44px;border-radius:14px}
   }
@@ -352,7 +356,7 @@
 // no service worker: it only ever hid updates
 if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
 
-const BUILD_STAMP = "2026-09-14 17:20 header-busy"; // naikkan tiap kali UI berubah
+const BUILD_STAMP = "2026-09-14 17:45 status-switch"; // naikkan tiap kali UI berubah
 
 /* ═══════════════════════════════ helpers ═══════════════════════════════ */
 // surface any runtime error instead of leaving a half-dead page behind
@@ -1553,7 +1557,7 @@ function renderStatus(){
   <div class="card tight fadein">
     <h2 style="margin:0 0 8px">Setelan</h2>
     <div class="rows">
-      <div class="mrow2"><span>Status aktif</span><label class="sw"><input type="checkbox" class="sn" data-k="WA_STATUS" ${st.enabled?"checked":""}><span></span></label></div>
+      <div class="mrow2"><span>Status aktif</span><button class="switch ${st.enabled?"on":""}" data-stsw="WA_STATUS"><span></span></button></div>
       <div class="mrow2"><span>Jumlah per hari</span><input class="nin" data-k="STATUS_PER_DAY" type="number" min="0" max="12" value="${st.perDay??3}"></div>
       <div class="mrow2"><span>Yang bisa lihat</span>
         <select class="sin" data-k="STATUS_AUDIENCE">
@@ -1563,7 +1567,7 @@ function renderStatus(){
       <div class="mrow2"><span>Jam dilarang posting (mulai–selesai)</span>
         <span class="row"><input class="nin" data-k="STATUS_QUIET_START" type="number" min="0" max="23" value="${w.start}"><span class="tiny">s/d</span><input class="nin" data-k="STATUS_QUIET_END" type="number" min="0" max="23" value="${w.end}"></span></div>
       <div class="mrow2"><span>Jarak minimal antar status (menit)</span><input class="nin" data-k="STATUS_MIN_GAP_MIN" type="number" min="0" max="1440" value="${st.minGapMin??150}"></div>
-      <div class="mrow2"><span>Boleh kirim foto/video</span><label class="sw"><input type="checkbox" class="sn" data-k="STATUS_MEDIA" ${st.mediaAllowed?"checked":""}><span></span></label></div>
+      <div class="mrow2"><span>Boleh kirim foto/video</span><button class="switch ${st.mediaAllowed?"on":""}" data-stsw="STATUS_MEDIA"><span></span></button></div>
     </div>
     <div class="btns"><button class="act" data-sact="save-settings">Simpan setelan</button>
       <span class="tiny">berlaku langsung, tanpa restart</span></div>
@@ -1586,6 +1590,14 @@ function renderStatus(){
 }
 
 $("#tab-status").addEventListener("click",async (e)=>{
+  const stsw = e.target.closest("[data-stsw]");
+  if(stsw){
+    stsw.classList.toggle("on");
+    const values = {}; values[stsw.dataset.stsw] = stsw.classList.contains("on");
+    const r = await api("/api/status",{ action:"settings", values });
+    toast(r.ok ? (stsw.classList.contains("on") ? "Dinyalakan" : "Dimatikan") : ("Gagal: " + (r.error||"")));
+    return;
+  }
   const tile=e.target.closest('[data-k="color"]');
   if(tile){ $$('.mrow[data-item]').forEach(r=>{}); const row=tile.closest(".mrow");
     row.querySelectorAll('[data-k="color"]').forEach(x=>x.classList.remove("sel")); tile.classList.add("sel"); return; }
@@ -1609,6 +1621,7 @@ $("#tab-status").addEventListener("click",async (e)=>{
     $$('#tab-status [data-k^="STATUS_"], #tab-status [data-k="WA_STATUS"]').forEach(el=>{
       values[el.dataset.k] = el.type==="checkbox" ? el.checked : el.value;
     });
+    $$('#tab-status [data-stsw]').forEach(el=>{ values[el.dataset.stsw] = el.classList.contains("on"); });
     const r=await api("/api/status",{slug,action:"settings",values});
     toast(r.ok?"Setelan disimpan (langsung berlaku)":("Gagal: "+(r.error||""))); return refresh(true); }
 
