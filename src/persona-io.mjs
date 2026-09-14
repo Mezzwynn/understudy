@@ -120,7 +120,12 @@ export function importPersona(obj, { overwrite = false, applySettings = false, s
   const lines = Object.entries(check.frontmatter)
     .filter(([k, v]) => /^[a-z_]+$/i.test(k) && v !== undefined && String(v).length < 1200)
     .map(([k, v]) => `${k}: ${String(v).replace(/\n/g, " ").trim()}`);
-  fs.writeFileSync(personaFile(slug), `---\n${lines.join("\n")}\n---\n\n${check.body}\n`);
+  // carry EVERY frontmatter key, not a fixed list: a rebuild silently dropped class/lifestyle/wardrobe
+  const known = new Set(lines.map((l) => l.split(":")[0].trim()));
+  const extra = Object.entries(meta || {})
+    .filter(([k]) => !known.has(k))
+    .map(([k, val]) => `${k}: ${val}`);
+  fs.writeFileSync(personaFile(slug), `---\n${[...lines, ...extra].join("\n")}\n---\n\n${check.body}\n`);
 
   let worldSaved = false;
   if (obj.world && (obj.world.backstory || (obj.world.cast || []).length)) {

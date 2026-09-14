@@ -71,6 +71,11 @@ export function loadPersona(name = config.persona) {  const file = path.join(PER
     work_hours: meta.work_hours || "",
     chat_schedule: meta.chat_schedule || "",
     appearance: meta.appearance || "",
+    // any other frontmatter the card carries is readable too (class, lifestyle, wardrobe, ...):
+    // the class system silently did nothing until this line existed, because persona.class was undefined
+    ...Object.fromEntries(
+      Object.entries(meta).filter(([k]) => !["name", "emoji", "vibe", "language"].includes(k) && k !== "slug"),
+    ),
   };
 }
 

@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { config, log, DATA_DIR } from "./config.mjs";
 import { loadChat, saveChat, loadState, saveState, listChats } from "./store.mjs";
 import { isPaused, pausedFor } from "./pause.mjs";
