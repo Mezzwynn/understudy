@@ -40,7 +40,7 @@ import { listChats, loadChat, saveChat, loadState } from "./store.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
 import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent, photoHistory, rateSent, sceneScores } from "./photo-library.mjs";
 import { PHONE_PROFILES } from "./humanize.mjs";
-import { wardrobeFor, loadWardrobe, addWardrobeItem, removeWardrobeItem, setWardrobeImage, TIMES, STYLES } from "./photos.mjs";
+import { wardrobeFor, loadWardrobe, addWardrobeItem, updateWardrobeItem, removeWardrobeItem, setWardrobeImage, TIMES, STYLES } from "./photos.mjs";
 import {
   loadFace,
   saveFace,
@@ -849,6 +849,10 @@ export function startDashboard() {
           }
           if (act === "wardrobe-add") {
             const r = addWardrobeItem(slug, { name: body.name, times: body.times || [], styles: body.styles || [] });
+            return json(res, r.ok ? 200 : 400, { ...r, wardrobe: loadWardrobe(slug).items });
+          }
+          if (act === "wardrobe-update") {
+            const r = updateWardrobeItem(slug, String(body.id || ""), { name: body.name, description: body.description, times: body.times, styles: body.styles });
             return json(res, r.ok ? 200 : 400, { ...r, wardrobe: loadWardrobe(slug).items });
           }
           if (act === "wardrobe-remove") {

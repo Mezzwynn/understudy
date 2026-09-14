@@ -121,18 +121,32 @@ export function saveWardrobe(slug, wardrobe) {
   return wardrobe;
 }
 
-export function addWardrobeItem(slug, { name, times = [], styles = [] } = {}) {
+export function addWardrobeItem(slug, { name, description = "", times = [], styles = [] } = {}) {
   const w = loadWardrobe(slug);
   const clean = String(name || "").trim().slice(0, 120);
   if (!clean) return { ok: false, error: "namanya belum diisi" };
   const item = {
     id: `w${Date.now().toString(36)}`,
     name: clean,
+    description: String(description || "").trim().slice(0, 200),
     times: times.filter((t) => TIMES.includes(t)),
     styles: styles.filter((t) => STYLES.includes(t)),
     image: "",
   };
   w.items.push(item);
+  saveWardrobe(slug, w);
+  return { ok: true, item, wardrobe: w };
+}
+
+/** Edit one outfit in place: name, description, categories. */
+export function updateWardrobeItem(slug, id, patch = {}) {
+  const w = loadWardrobe(slug);
+  const item = w.items.find((i) => i.id === id);
+  if (!item) return { ok: false, error: "not found" };
+  if (patch.name !== undefined) item.name = String(patch.name).trim().slice(0, 120) || item.name;
+  if (patch.description !== undefined) item.description = String(patch.description).trim().slice(0, 200);
+  if (Array.isArray(patch.times)) item.times = patch.times.filter((t) => TIMES.includes(t));
+  if (Array.isArray(patch.styles)) item.styles = patch.styles.filter((t) => STYLES.includes(t));
   saveWardrobe(slug, w);
   return { ok: true, item, wardrobe: w };
 }

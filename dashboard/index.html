@@ -1241,135 +1241,101 @@ const AGENT_IDEAS = [
   "Add a note that she is moving house this month",
 ];
 /* ═══════════════════════════ photos tab ═══════════════════════════ */
+const SW = (on, attrs, label) => `<button class="switch ${on ? "on" : ""}" ${attrs}><span></span></button>${label ? `<em>${label}</em>` : ""}`;
+
 function renderPhotos(){
   const root=$("#tab-photos"); if(!root) return;
-  const ph = DATA.photos || { history: [], settings: {}, profiles: {}, wardrobe: [], scores: {} };
+  const ph = DATA.photos || { history: [], settings: {}, profiles: {}, wardrobe: [], scores: {}, contacts: [] };
   const st = ph.settings || {};
-  const opt = (k, v, list) => list.map(([val, label]) => `<option value="${val}" ${String(v)===String(val)?"selected":""}>${esc(label)}</option>`).join("");
-  const profOptions = Object.entries(ph.profiles||{}).map(([k,v])=>[k,v]);
-  const hist = ph.history || [];
-  const scores = ph.scores || {};
-  const best = Object.entries(scores).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  const worst = Object.entries(scores).sort((a,b)=>a[1]-b[1]).slice(0,3);
+  const gowns = ph.wardrobe || [];
+  const times = ph.wardrobeTimes || ["pagi","siang","malam"];
+  const styles = ph.wardrobeStyles || ["casual","kerja","formal","fitness","santai","tidur"];
+  const numRow = (label, key, val, min, max, step) => `<div class="mrow2"><span>${label}</span><input class="nin" data-pk="${key}" type="number" ${step?`step="${step}"`:""} min="${min}" max="${max}" value="${val}"></div>`;
+  const swRow = (label, key, on) => `<div class="mrow2"><span>${label}</span><span class="swline">${SW(on, `data-swk="${key}"`)}</span></div>`;
 
   root.innerHTML = `
   <div class="card tight fadein">
-    <div class="row"><h2 style="margin:0">Foto — setelan</h2><span class="grow"></span>
-      <span class="badge">${ph.count||0} foto di perpustakaan</span></div>
-    <div class="hint" style="margin-top:6px">Dia <b>nggak generate tiap kali</b> — dia pilih dari perpustakaan, dan yang dipilih disesuaikan sama jam + rutinitasnya.
-      Yang diatur di sini: HP-nya (gaya foto), knob tampilan, batas kirim, model, dan baju.</div>
-
-    <h3 style="margin:16px 0 6px;font-size:14px">Kirim — batas</h3>
+    <h2 style="margin:0 0 4px">Batas kirim</h2>
+    <div class="hint" style="margin-bottom:10px">Dia <b>nggak generate tiap kali</b> — dia pilih dari perpustakaan, dan yang dipilih disesuaikan sama jam + rutinitasnya.</div>
     <div class="rows">
-      <div class="mrow2"><span>Maksimal per orang per hari</span><input class="nin" data-pk="PHOTO_DAILY_MAX" type="number" min="0" max="10" value="${st.PHOTO_DAILY_MAX ?? 1}"></div>
-      <div class="mrow2"><span>Jeda minimal (menit)</span><input class="nin" data-pk="PHOTO_MIN_GAP_MIN" type="number" min="0" max="2880" value="${st.PHOTO_MIN_GAP_MIN ?? 720}"></div>
-      <div class="mrow2"><span>Peluang per balasan (%)</span><input class="nin" data-pk="PHOTO_CHANCE_PCT" type="number" min="0" max="100" value="${Math.round((st.PHOTO_CHANCE ?? 0.05)*100)}"></div>
-      <div class="mrow2"><span>Maksimal per percakapan</span><input class="nin" data-pk="PHOTO_MAX_PER_CONV" type="number" min="1" max="5" value="${st.PHOTO_MAX_PER_CONV ?? 1}"></div>
-      <div class="mrow2"><span>Jam boleh kirim foto (dari–sampai)</span><span class="row"><input class="nin" data-pk="PHOTO_WINDOW_START" type="number" min="0" max="23" value="${st.PHOTO_WINDOW_START ?? 8}"><span class="tiny">s/d</span><input class="nin" data-pk="PHOTO_WINDOW_END" type="number" min="0" max="24" value="${st.PHOTO_WINDOW_END ?? 22}"></span></div>
-      <div class="mrow2"><span>Jenis yang boleh dikirim</span><span class="row">
-        <label class="tiny" style="display:flex;gap:5px;align-items:center"><input type="checkbox" data-kind="view" ${String(st.PHOTO_KINDS||"view,self").includes("view")?"checked":""}> foto tempat/benda</label>
-        <label class="tiny" style="display:flex;gap:5px;align-items:center"><input type="checkbox" data-kind="self" ${String(st.PHOTO_KINDS||"").includes("self")?"checked":""}> selfie</label></span></div>
-      <div class="mrow2"><span>Foto duluan, baru kalimatnya</span><label class="sw"><input type="checkbox" class="sn" data-pk="PHOTO_FIRST" ${st.PHOTO_FIRST?"checked":""}><span></span></label></div>
-      <div class="mrow2"><span>Dia boleh generate foto baru kalau diminta</span><label class="sw"><input type="checkbox" class="sn" data-pk="PHOTO_GENERATE_ON_DEMAND" ${st.PHOTO_GENERATE_ON_DEMAND?"checked":""}><span></span></label></div>
+      ${numRow("Maksimal per orang per hari","PHOTO_DAILY_MAX", st.PHOTO_DAILY_MAX ?? 1, 0, 10)}
+      ${numRow("Jeda minimal (menit)","PHOTO_MIN_GAP_MIN", st.PHOTO_MIN_GAP_MIN ?? 720, 0, 2880)}
+      ${numRow("Peluang tiap balasan (%)","PHOTO_CHANCE_PCT", Math.round((st.PHOTO_CHANCE ?? 0.05)*100), 0, 100)}
+      ${numRow("Maksimal per percakapan","PHOTO_MAX_PER_CONV", st.PHOTO_MAX_PER_CONV ?? 1, 1, 5)}
+      <div class="mrow2"><span>Jam boleh kirim foto</span><span class="row"><input class="nin" data-pk="PHOTO_WINDOW_START" type="number" min="0" max="23" value="${st.PHOTO_WINDOW_START ?? 8}"><span class="tiny">s/d</span><input class="nin" data-pk="PHOTO_WINDOW_END" type="number" min="0" max="24" value="${st.PHOTO_WINDOW_END ?? 22}"></span></div>
+      ${swRow("Foto duluan, baru kalimatnya","PHOTO_FIRST", st.PHOTO_FIRST)}
+      ${swRow("Dia boleh generate kalau diminta","PHOTO_GENERATE_ON_DEMAND", st.PHOTO_GENERATE_ON_DEMAND)}
+      ${swRow("Belajar dari rating foto","PHOTO_LEARN", st.PHOTO_LEARN)}
     </div>
-
-    <h3 style="margin:18px 0 6px;font-size:14px">Siapa yang boleh menerima foto</h3>
-    <div class="cg">
-      ${(ph.contacts||[]).map(c=>`<div class="ci"><label class="sw"><input type="checkbox" class="sn" data-contact="${esc(c.jid)}" ${c.allowed?"checked":""}><span></span></label><span>${esc(c.name)}${c.trusted?" · trusted":""}</span><span class="tiny">${c.sentCount||0} foto</span></div>`).join("") || '<div class="empty">Belum ada kontak.</div>'}
-    </div>
-    <div class="hint" style="margin-top:6px">Centang = dia boleh kirim foto ke orang itu. Yang tidak dicentang nggak akan pernah dapat foto.</div>
-
-    <h3 style="margin:18px 0 6px;font-size:14px">Tampilan — "HP"-nya</h3>
-    <div class="rows">
-      <div class="mrow2"><span>Gaya kamera</span><select class="sin" data-pk="PHOTO_PHONE">${profOptions.map(([k,v])=>`<option value="${k}" ${st.PHOTO_PHONE===k?"selected":""}>${esc(v)}</option>`).join("")}</select></div>
-      <div class="mrow2"><span>Grain (0 = ikut gaya HP)</span><input class="nin" data-pk="PHOTO_GRAIN" type="number" min="0" max="40" value="${st.PHOTO_GRAIN ?? 0}"></div>
-      <div class="mrow2"><span>Bloom highlight (-1 = ikut gaya HP)</span><input class="nin" data-pk="PHOTO_BLOOM" type="number" step="0.01" min="-1" max="0.4" value="${st.PHOTO_BLOOM ?? -1}"></div>
-      <div class="mrow2"><span>Sisi terpanjang (px)</span><input class="nin" data-pk="PHOTO_MAX_SIDE" type="number" min="640" max="2048" value="${st.PHOTO_MAX_SIDE ?? 1280}"></div>
-      <div class="mrow2"><span>Kualitas JPEG</span><input class="nin" data-pk="PHOTO_QUALITY" type="number" min="40" max="95" value="${st.PHOTO_QUALITY ?? 74}"></div>
-      <div class="mrow2"><span>Belajar dari rating</span><label class="sw"><input type="checkbox" class="sn" data-pk="PHOTO_LEARN" ${st.PHOTO_LEARN?"checked":""}><span></span></label></div>
-    </div>
-
-    <h3 style="margin:18px 0 6px;font-size:14px">Model</h3>
-    <div class="rows">
-      <div class="mrow2"><span>Mesin</span><select class="sin" data-pk="IMAGE_ENGINE">${opt("IMAGE_ENGINE", st.IMAGE_ENGINE, [["atlas","Atlas Cloud"],["openrouter","OpenRouter"]])}</select></div>
-      <div class="mrow2"><span>Wajah</span><input class="sin" data-pk="FACE_MODEL" value="${esc(st.FACE_MODEL||"")}" style="min-width:230px"></div>
-      <div class="mrow2"><span>Tempat &amp; benda</span><input class="sin" data-pk="SCENE_MODEL" value="${esc(st.SCENE_MODEL||"")}" style="min-width:230px"></div>
-      <div class="mrow2"><span>Pakai foto referensi</span><input class="sin" data-pk="EDIT_MODEL" value="${esc(st.EDIT_MODEL||"")}" style="min-width:230px"></div>
-      <div class="mrow2"><span>Kandidat wajah per run</span><input class="nin" data-pk="PHOTO_CANDIDATE_COUNT" type="number" min="1" max="8" value="${st.PHOTO_CANDIDATE_COUNT ?? 4}"></div>
-    </div>
-    <div class="btns"><button class="act" data-pact="save-settings">Simpan setelan</button>
-      <span class="tiny">berlaku langsung, tanpa restart</span></div>
-
-    <h3 style="margin:18px 0 6px;font-size:14px">Baju — tambah manual, pakai kategori</h3>
-    <div class="hint" style="margin-bottom:8px">Kategori bikin bajunya <b>nggak asal random</b>: foto pilates nggak akan keluar pakai blazer.</div>
-    <div class="wadd">
-      <input class="sin" id="w-name" placeholder="mis. setelan olahraga hitam" style="flex:1;min-width:170px">
-      <div class="wchips">${(ph.wardrobeTimes||["pagi","siang","malam"]).map(t=>`<div class="swline"><label class="sw"><input type="checkbox" class="sn w-time" value="${t}"><span></span></label><em>${t}</em></div>`).join("")}</div>
-      <div class="wchips">${(ph.wardrobeStyles||["casual","kerja","formal","fitness","santai","tidur"]).map(t=>`<div class="swline"><label class="sw"><input type="checkbox" class="sn w-style" value="${t}"><span></span></label><em>${t}</em></div>`).join("")}</div>
-      <button class="act" data-pact="wardrobe-add">+ Tambah baju</button>
-    </div>
-    <div class="wlist">
-      ${(ph.wardrobe||[]).map(w=>`<div class="wrow" data-w="${esc(w.id)}">
-        ${w.image?`<img src="/wardrobe?id=${esc(w.id)}" alt="">`:'<div class="wno">—</div>'}
-        <div style="flex:1">
-          <div style="font-size:13px">${esc(w.name)}</div>
-          <div class="wchips" style="margin-top:4px">
-            ${(w.times||[]).map(t=>`<span class="wtag">${esc(t)}</span>`).join("")}
-            ${(w.styles||[]).map(t=>`<span class="wtag s">${esc(t)}</span>`).join("")}
-            ${(!(w.times||[]).length && !(w.styles||[]).length)?'<span class="wtag" style="opacity:.5">tanpa kategori</span>':""}
-          </div>
-        </div>
-        <label class="act" style="cursor:pointer;font-size:11px">Gambar<input type="file" accept="image/*" data-wimg="${esc(w.id)}" hidden></label>
-        <button class="act" data-wdel="${esc(w.id)}" style="color:var(--bad);font-size:11px">Hapus</button>
-      </div>`).join("") || '<div class="empty">Belum ada baju.</div>'}
-    </div>
-    <h3 style="margin:18px 0 6px;font-size:14px">Siapa yang boleh menerima foto</h3>
-    <div class="cg">
-      ${(ph.contacts||[]).map(c=>`<div class="ci"><label class="sw"><input type="checkbox" class="sn" data-contact="${esc(c.jid)}" ${c.allowed?"checked":""}><span></span></label><span>${esc(c.name)}${c.trusted?" · trusted":""}</span><span class="tiny">${c.sentCount||0} foto</span></div>`).join("") || '<div class="empty">Belum ada kontak.</div>'}
-    </div>
-    <div class="hint" style="margin-top:6px">Centang = dia boleh kirim foto ke orang itu. Yang tidak dicentang nggak akan pernah dapat foto.</div>
-
-    <h3 style="margin:18px 0 6px;font-size:14px">Tampilan — "HP"-nya</h3>
-    <div class="rows">
-      <div class="mrow2"><span>Gaya kamera</span><select class="sin" data-pk="PHOTO_PHONE">${profOptions.map(([k,v])=>`<option value="${k}" ${st.PHOTO_PHONE===k?"selected":""}>${esc(v)}</option>`).join("")}</select></div>
-      <div class="mrow2"><span>Grain (0 = ikut gaya HP)</span><input class="nin" data-pk="PHOTO_GRAIN" type="number" min="0" max="40" value="${st.PHOTO_GRAIN ?? 0}"></div>
-      <div class="mrow2"><span>Bloom highlight (-1 = ikut gaya HP)</span><input class="nin" data-pk="PHOTO_BLOOM" type="number" step="0.01" min="-1" max="0.4" value="${st.PHOTO_BLOOM ?? -1}"></div>
-      <div class="mrow2"><span>Sisi terpanjang (px)</span><input class="nin" data-pk="PHOTO_MAX_SIDE" type="number" min="640" max="2048" value="${st.PHOTO_MAX_SIDE ?? 1280}"></div>
-      <div class="mrow2"><span>Kualitas JPEG</span><input class="nin" data-pk="PHOTO_QUALITY" type="number" min="40" max="95" value="${st.PHOTO_QUALITY ?? 74}"></div>
-      <div class="mrow2"><span>Belajar dari rating</span><label class="sw"><input type="checkbox" class="sn" data-pk="PHOTO_LEARN" ${st.PHOTO_LEARN?"checked":""}><span></span></label></div>
-    </div>
-
-    <h3 style="margin:18px 0 6px;font-size:14px">Model</h3>
-    <div class="rows">
-      <div class="mrow2"><span>Mesin</span><select class="sin" data-pk="IMAGE_ENGINE">${opt("IMAGE_ENGINE", st.IMAGE_ENGINE, [["atlas","Atlas Cloud"],["openrouter","OpenRouter"]])}</select></div>
-      <div class="mrow2"><span>Wajah</span><input class="sin" data-pk="FACE_MODEL" value="${esc(st.FACE_MODEL||"")}" style="min-width:230px"></div>
-      <div class="mrow2"><span>Tempat &amp; benda</span><input class="sin" data-pk="SCENE_MODEL" value="${esc(st.SCENE_MODEL||"")}" style="min-width:230px"></div>
-      <div class="mrow2"><span>Pakai foto referensi</span><input class="sin" data-pk="EDIT_MODEL" value="${esc(st.EDIT_MODEL||"")}" style="min-width:230px"></div>
-      <div class="mrow2"><span>Kandidat wajah per run</span><input class="nin" data-pk="PHOTO_CANDIDATE_COUNT" type="number" min="1" max="8" value="${st.PHOTO_CANDIDATE_COUNT ?? 4}"></div>
-    </div>
-    <div class="btns"><button class="act" data-pact="save-settings">Simpan setelan</button>
-      <span class="tiny">berlaku langsung, tanpa restart</span></div>
-
-    <h3 style="margin:18px 0 6px;font-size:14px">Baju — teks &amp; gambar</h3>
-    <div class="wg">
-      ${(ph.wardrobe||[]).map((w,i)=>`<div class="wi">
-        ${w.image?`<img src="/wardrobe?i=${i}&t=${Date.now()}" alt="">`:'<div class="noimg">tanpa gambar</div>'}
-        <div class="wn">${esc(w.name)}</div>
-        <label class="act" style="cursor:pointer;font-size:11px">Gambar<input type="file" accept="image/*" data-wup="${i}" hidden></label>
-      </div>`).join("")}
-    </div>
-    <textarea class="sin" data-pk="WARDROBE" rows="3" style="width:100%;resize:vertical;margin-top:10px">${esc((ph.wardrobe||[]).map(w=>w.name).join(" | "))}</textarea>
-    <div class="btns"><button class="act" data-pact="save-wardrobe">Simpan baju</button>
-      <span class="tiny">pisahkan dengan <b>|</b> — dipakai di prompt foto &amp; dirotasi</span></div>
+    <div class="btns"><button class="act" data-pact="save-settings">Simpan</button><span class="tiny">berlaku langsung</span></div>
   </div>
 
   <div class="card tight fadein">
-    <div class="row"><h2 style="margin:0">History — foto yang sudah dikirim</h2><span class="grow"></span>
-      <span class="badge">${hist.length}</span></div>
-    <div class="hint" style="margin-top:6px">Nilainya <b>dari sini</b> — dan nilainya dipakai buat memilih foto berikutnya.
-      ${best.length?`<br>Paling bagus: ${best.map(([k,v])=>`<b>${esc(k)}</b> (${Math.round(v*100)}%)`).join(" · ")}`:""}
-      ${worst.length?`<br>Paling jelek: ${worst.map(([k,v])=>`${esc(k)} (${Math.round(v*100)}%)`).join(" · ")}`:""}</div>
-    ${hist.length? `<div class="histgrid">${hist.map(h=>`
+    <h2 style="margin:0 0 4px">Siapa yang boleh menerima foto</h2>
+    <div class="hint" style="margin-bottom:10px">Yang nggak dinyalakan nggak akan pernah dapat foto.</div>
+    <div class="cg">
+      ${(ph.contacts||[]).map(c=>`<div class="ci">${SW(c.allowed, `data-contact="${esc(c.jid)}"`)}<span>${esc(c.name)}${c.trusted?" · trusted":""}</span><span class="tiny">${c.sentCount||0} foto</span></div>`).join("") || '<div class="empty">Belum ada kontak.</div>'}
+    </div>
+  </div>
+
+  <div class="card tight fadein">
+    <h2 style="margin:0 0 4px">Tampilan — "HP"-nya</h2>
+    <div class="hint" style="margin-bottom:10px">Semua foto dia keluar dari satu HP yang sama, dengan gaya kamera itu.</div>
+    <div class="rows">
+      <div class="mrow2"><span>Gaya kamera</span><select class="sin" data-pk="PHOTO_PHONE">${Object.entries(ph.profiles||{}).map(([k,v])=>`<option value="${k}" ${st.PHOTO_PHONE===k?"selected":""}>${esc(v)}</option>`).join("")}</select></div>
+      ${numRow("Grain (0 = ikut gaya HP)","PHOTO_GRAIN", st.PHOTO_GRAIN ?? 0, 0, 40)}
+      ${numRow("Bloom highlight (-1 = ikut gaya HP)","PHOTO_BLOOM", st.PHOTO_BLOOM ?? -1, -1, 0.4, 0.01)}
+      ${numRow("Sisi terpanjang (px)","PHOTO_MAX_SIDE", st.PHOTO_MAX_SIDE ?? 1280, 640, 2048)}
+      ${numRow("Kualitas JPEG","PHOTO_QUALITY", st.PHOTO_QUALITY ?? 74, 40, 95)}
+    </div>
+  </div>
+
+  <div class="card tight fadein">
+    <h2 style="margin:0 0 4px">Model</h2>
+    <div class="hint" style="margin-bottom:10px">Generate pakai API key kamu sendiri.</div>
+    <div class="rows">
+      <div class="mrow2"><span>Mesin</span><select class="sin" data-pk="IMAGE_ENGINE">${[["atlas","Atlas Cloud"],["openrouter","OpenRouter"]].map(([v,l])=>`<option value="${v}" ${st.IMAGE_ENGINE===v?"selected":""}>${l}</option>`).join("")}</select></div>
+      <div class="mrow2"><span>Wajah</span><input class="sin" data-pk="FACE_MODEL" value="${esc(st.FACE_MODEL||"")}"></div>
+      <div class="mrow2"><span>Tempat &amp; benda</span><input class="sin" data-pk="SCENE_MODEL" value="${esc(st.SCENE_MODEL||"")}"></div>
+      <div class="mrow2"><span>Pakai foto referensi</span><input class="sin" data-pk="EDIT_MODEL" value="${esc(st.EDIT_MODEL||"")}"></div>
+      ${numRow("Kandidat wajah per run","PHOTO_CANDIDATE_COUNT", st.PHOTO_CANDIDATE_COUNT ?? 4, 1, 8)}
+    </div>
+    <div class="btns"><button class="act" data-pact="save-settings">Simpan</button></div>
+  </div>
+
+  <h2 style="margin:20px 0 8px;font-size:17px">Baju (${gowns.length})</h2>
+  <div class="card tight fadein" style="border-style:dashed">
+    <div class="wadd">
+      <input class="sin" id="w-name" placeholder="nama baju — mis. setelan olahraga hitam">
+      <input class="sin" id="w-desc" placeholder="deskripsi (opsional) — mis. bahan dryfit, celana jogger hitam">
+      <button class="act" data-pact="wardrobe-add">+ Tambah baju</button>
+    </div>
+    <div class="hint">Kategori diatur setelah ditambahkan, di card masing-masing.</div>
+  </div>
+  ${gowns.map(w=>`<div class="card tight fadein" data-w="${esc(w.id)}">
+    <div class="whead">
+      ${w.image?`<img class="wthumb" src="/wardrobe?id=${esc(w.id)}&t=${Date.now()}" alt="">`:'<div class="wthumb wno">tanpa gambar</div>'}
+      <div style="flex:1;min-width:180px">
+        <input class="sin wname" data-wf="name" value="${esc(w.name)}" placeholder="nama baju">
+        <input class="sin wdesc" data-wf="description" value="${esc(w.description||"")}" placeholder="deskripsi — bahan, warna, potongan">
+      </div>
+      <div class="wact">
+        <label class="act">Gambar<input type="file" accept="image/*" data-wimg="${esc(w.id)}" hidden></label>
+        <button class="act" data-wsave="${esc(w.id)}">Simpan</button>
+        <button class="act" data-wdel="${esc(w.id)}" style="color:var(--bad)">Hapus</button>
+      </div>
+    </div>
+    <div class="wcat">
+      <div class="wcatrow"><span class="tiny">waktu</span>${times.map(t=>`<span class="swline">${SW((w.times||[]).includes(t), `data-wcat="${esc(w.id)}|times|${t}"`)}<em>${t}</em></span>`).join("")}</div>
+      <div class="wcatrow"><span class="tiny">gaya</span>${styles.map(t=>`<span class="swline">${SW((w.styles||[]).includes(t), `data-wcat="${esc(w.id)}|styles|${t}"`)}<em>${t}</em></span>`).join("")}</div>
+    </div>
+  </div>`).join("")}
+
+  <h2 style="margin:20px 0 8px;font-size:17px">History (${(ph.history||[]).length})</h2>
+  <div class="card tight fadein">
+    <div class="hint" style="margin-bottom:8px">Nilainya dipakai buat memilih foto berikutnya.
+      ${Object.keys(ph.scores||{}).length?Object.entries(ph.scores).map(([k,v])=>`<br>${esc(k)}: ${Math.round(v*100)}%`).join(""):""}</div>
+    ${(ph.history||[]).length? `<div class="histgrid">${ph.history.map(h=>`
       <div class="hist" data-h="${h.id}">
         ${h.url?`<img src="${h.url}" loading="lazy" alt="">`:'<div class="noimg">—</div>'}
         <div class="body">
@@ -1380,38 +1346,52 @@ function renderPhotos(){
             <button class="act hb ${h.rating==="lumayan"?"sel":""}" data-rate="lumayan">Lumayan</button>
             <button class="act hb ${h.rating==="kurang"?"sel":""}" data-rate="kurang">Kurang</button>
           </div>
-          <label class="tiny" style="display:flex;gap:6px;margin-top:6px"><input type="checkbox" class="hw" ${h.weird?"checked":""}> kelihatan aneh</label>
+          <div class="swline" style="margin-top:6px">${SW(!!h.weird, `data-wd="${h.id}"`)}<em>kelihatan aneh</em></div>
         </div>
       </div>`).join("")}</div>` : '<div class="empty">Belum ada foto yang dikirim.</div>'}
   </div>`;
 }
 
+/* switches: klik tombolnya, bukan checkbox */
 $("#tab-photos").addEventListener("click", async (e)=>{
-  const b = e.target.closest("[data-pact],[data-rate]"); if(!b) return;
-  const act = b.dataset.pact, rate = b.dataset.rate;
-  if(act==="save-settings"){
-    const values = {};
-    $$('#tab-photos [data-pk]').forEach(el=>{
-      const k = el.dataset.pk;
-      if(k==="WARDROBE") return;
-      if(el.type==="checkbox") values[k] = el.checked;
-      else if(k==="PHOTO_CHANCE_PCT") values.PHOTO_CHANCE = String(Number(el.value)/100);
-      else if(k==="PHOTO_GRAIN" && Number(el.value)===0) values[k] = "";
-      else if(k==="PHOTO_BLOOM" && Number(el.value)<0) values[k] = "";
-      else values[k] = el.value;
-    });
-    values.PHOTO_KINDS = $$('#tab-photos [data-kind]').filter(x=>x.checked).map(x=>x.dataset.kind).join(",");
-    const r = await api("/api/photos",{ action:"settings", values });
-    toast(r.ok?"Setelan foto disimpan (langsung berlaku)":("Gagal: "+(r.error||"")));
-    return refresh(true);
+  const sw = e.target.closest(".switch");
+  if(sw){
+    const swk = sw.dataset.swk, contact = sw.dataset.contact, cat = sw.dataset.wcat, wd = sw.dataset.wd;
+    sw.classList.toggle("on");
+    const on = sw.classList.contains("on");
+    if(swk){
+      const values = {}; values[swk] = on;
+      const r = await api("/api/photos",{ action:"settings", values });
+      if(!r.ok) toast("Gagal: "+(r.error||""));
+      return;
+    }
+    if(contact){
+      await api("/api/photos",{ action:"contact", jid: contact, allowed: on });
+      toast(on?"Boleh kirim foto ke dia":"Nggak akan kirim foto ke dia");
+      return;
+    }
+    if(cat){
+      const [id, kind, tag] = cat.split("|");
+      const card = sw.closest("[data-w]");
+      const picked = $$("#tab-photos [data-w=\""+id+"\"] .switch.on[data-wcat]").filter(x=>x.dataset.wcat.split("|")[1]===kind).map(x=>x.dataset.wcat.split("|")[2]);
+      await api("/api/photos",{ action:"wardrobe-update", id, [kind]: picked });
+      return;
+    }
+    if(wd){
+      await api("/api/photos",{ action:"rate", id: wd, weird: on });
+      toast(on?"Ditandai aneh":"Tanda aneh dihapus");
+      return;
+    }
   }
-  if(act==="wardrobe-add"){
-    const name = $("#w-name").value.trim();
-    if(!name) return toast("Nama bajunya belum diisi");
-    const times = $$("#tab-photos .w-time").filter(x=>x.checked).map(x=>x.value);
-    const styles = $$("#tab-photos .w-style").filter(x=>x.checked).map(x=>x.value);
-    const r = await api("/api/photos",{ action:"wardrobe-add", name, times, styles });
-    toast(r.ok?"Baju ditambahkan":("Gagal: "+(r.error||"")));
+
+  const wsave = e.target.closest("[data-wsave]");
+  if(wsave){
+    const id = wsave.dataset.wsave;
+    const card = wsave.closest("[data-w]");
+    const name = card.querySelector('[data-wf="name"]').value;
+    const description = card.querySelector('[data-wf="description"]').value;
+    const r = await api("/api/photos",{ action:"wardrobe-update", id, name, description });
+    toast(r.ok?"Baju disimpan":("Gagal: "+(r.error||"")));
     return refresh(true);
   }
   const wdel = e.target.closest("[data-wdel]");
@@ -1420,23 +1400,35 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     toast(r.ok?"Baju dihapus":("Gagal: "+(r.error||"")));
     return refresh(true);
   }
-  const wimgbtn = e.target.closest("[data-wimg]");
-  if(wimgbtn){ const inp = wimgbtn.querySelector("input[type=file]"); if(inp) inp.click(); return; }
-  if(act==="wardrobe-upload"){
-    const inp = b.querySelector("input[type=file]");
-    if(inp) inp.click();
-    return;
+  const wimg = e.target.closest("[data-wimg]");
+  if(wimg){ const inp = wimg.querySelector("input[type=file]"); if(inp) inp.click(); return; }
+
+  const b = e.target.closest("[data-pact],[data-rate]"); if(!b) return;
+  const act = b.dataset.pact, rate = b.dataset.rate;
+  if(act==="save-settings"){
+    const values = {};
+    $$('#tab-photos [data-pk]').forEach(el=>{
+      const k = el.dataset.pk;
+      if(k==="PHOTO_CHANCE_PCT") values.PHOTO_CHANCE = String(Number(el.value)/100);
+      else if(k==="PHOTO_GRAIN" && Number(el.value)===0) values[k] = "";
+      else if(k==="PHOTO_BLOOM" && Number(el.value)<0) values[k] = "";
+      else values[k] = el.value;
+    });
+    const r = await api("/api/photos",{ action:"settings", values });
+    toast(r.ok?"Disimpan (langsung berlaku)":("Gagal: "+(r.error||"")));
+    return refresh(true);
   }
-  if(act==="save-wardrobe"){
-    const r = await api("/api/photos",{ action:"wardrobe", wardrobe: $("#tab-photos [data-pk=WARDROBE]").value });
-    toast(r.ok?"Baju disimpan":("Gagal: "+(r.error||"")));
+  if(act==="wardrobe-add"){
+    const name = $("#w-name").value.trim();
+    if(!name) return toast("Nama bajunya belum diisi");
+    const r = await api("/api/photos",{ action:"wardrobe-add", name, description: $("#w-desc").value.trim(), times: [], styles: [] });
+    toast(r.ok?"Baju ditambahkan — atur kategorinya di card-nya":("Gagal: "+(r.error||"")));
     return refresh(true);
   }
   if(rate){
     const card = b.closest("[data-h]");
-    const weird = card.querySelector(".hw")?.checked || false;
-    const r = await api("/api/photos",{ action:"rate", id: card.dataset.h, rating: rate, weird });
-    toast(r.ok?"Dinilai — dipakai buat pilih foto berikutnya":("Gagal: "+(r.error||"")));
+    const r = await api("/api/photos",{ action:"rate", id: card.dataset.h, rating: rate });
+    toast(r.ok?"Dinilai":("Gagal: "+(r.error||"")));
     return refresh(true);
   }
 });
@@ -1448,33 +1440,11 @@ $("#tab-photos").addEventListener("change", async (e)=>{
     if(file.size > 6*1024*1024) return toast("Gambarnya kegedhean (maks 6MB)");
     const ext = (file.name.split(".").pop()||"jpg").toLowerCase();
     const data = await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(",")[1]);fr.readAsDataURL(file);});
-    toast("Mengunggah gambar baju…");
+    toast("Mengunggah…");
     const r = await api("/api/photos",{ action:"wardrobe-image", id: wimg.dataset.wimg, data, ext });
-    toast(r.ok?"Gambar baju disimpan":("Gagal: "+(r.error||"")));
+    toast(r.ok?"Gambar disimpan":("Gagal: "+(r.error||"")));
     return refresh(true);
   }
-  const up = e.target.closest("[data-wup]");
-  if(up && up.files?.[0]){
-    const file = up.files[0];
-    if(file.size > 6*1024*1024) return toast("Gambarnya kegedhean (maks 6MB)");
-    const ext = (file.name.split(".").pop()||"jpg").toLowerCase();
-    const data = await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(",")[1]);fr.readAsDataURL(file);});
-    toast("Mengunggah gambar baju…");
-    const r = await api("/api/photos",{ action:"wardrobe-upload", index: Number(up.dataset.wup), data, ext });
-    toast(r.ok?"Gambar baju disimpan":("Gagal: "+(r.error||"")));
-    return refresh(true);
-  }
-  const cb = e.target.closest("[data-contact]");
-  if(cb){
-    await api("/api/photos",{ action:"contact", jid: cb.dataset.contact, allowed: cb.checked });
-    toast(cb.checked?"Boleh kirim foto ke dia":"Nggak akan kirim foto ke dia");
-    return;
-  }
-  const box = e.target.closest(".hw"); if(!box) return;
-  const card = box.closest("[data-h]");
-  await api("/api/photos",{ action:"rate", id: card.dataset.h, weird: box.checked });
-  toast(box.checked?"Ditandai aneh — nggak akan dipakai lagi":"Tanda aneh dihapus");
-  refresh(true);
 });
 
 /* ═══════════════════════════ status tab ═══════════════════════════ */
