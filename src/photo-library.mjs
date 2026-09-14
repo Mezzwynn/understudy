@@ -144,6 +144,7 @@ export function pickPhoto({ slug = config.persona, chat = null, moment = null, b
   const jid = String(chat?.jid || "");
   const mood = Number(chat?.mood?.valence ?? 0.5);
 
+  const scores = config.photoLearn ? sceneScores(slug) : {};
   const scored = eligible
     .map((p) => {
       let score = 0;
@@ -178,6 +179,11 @@ export function pickPhoto({ slug = config.persona, chat = null, moment = null, b
       } else {
         score += mood < 0.35 ? 1 : 0;
       }
+      // what Hik rated well comes back; what he rated badly sinks (PHOTO_LEARN)
+      if (config.photoLearn) {
+        const sc = scores[p.scene];
+        if (sc !== undefined) score += (sc - 0.5) * 6;
+      }
       score += Math.random() * 0.9; // a little spontaneity
       return { photo: p, score, why };
     })
@@ -188,7 +194,32 @@ export function pickPhoto({ slug = config.persona, chat = null, moment = null, b
   return { ...best.photo, score: best.score, why: best.why.join(" · ") };
 }
 
-export function markSent(slug, id, jid) {
+/** Every photo she sends is recorded, because the ratings are what the picking learns from. */
+export function photoHistory(slug) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(libraryDir(slug), "history.json"), "utf8"));
+  } catch {
+    return [];
+  }
+}
+function saveHistory(slug, list) {
+  fs.writeFileSync(path.join(libraryDir(slug), "history.json"), JSON.stringify(list.slice(-300), null, 2));
+}
+
+/** Average rating per scene, so a photo that scored badly stops coming up. */
+export function sceneScores(slug) {
+  const out = {};
+  for (const h of photoHistory(slug)) {
+    if (!h.rating) continue;
+    const v = h.rating === "bagus" ? 1 : h.rating === "lumayan" ? 0.5 : 0;
+    out[h.scene] = out[h.scene] || { sum: 0, n: 0 };
+    out[h.scene].sum += v;
+    out[h.scene].n++;
+  }
+  return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, v.sum / v.n]));
+}
+
+export function markSent(slug, id, jid, extra = {}) {
   const lib = loadLibrary(slug);
   const p = lib.photos.find((x) => x.id === id);
   if (!p) return;
@@ -196,6 +227,52 @@ export function markSent(slug, id, jid) {
   p.lastUsedAt = Date.now();
   p.sentTo = { ...(p.sentTo || {}), [String(jid)]: Date.now() };
   saveLibrary(slug, lib);
+  const hist = photoHistory(slug);
+  hist.push({
+    id: `h${Date.now().toString(36)}`,
+    photoId: id,
+    scene: p.scene,
+    kind: p.kind,
+    timeOfDay: p.timeOfDay,
+    topics: p.topics || [],
+    jid: String(jid),
+    at: Date.now(),
+    caption: String(extra.caption || "").slice(0, 120),
+    why: String(extra.why || "").slice(0, 120),
+    rating: "",
+    weird: false,
+    note: "",
+  });
+  saveHistory(slug, hist);
+}
+
+/** Rate one sent photo: this is the only signal that says whether the whole pipeline is working. */
+export function rateSent(slug, historyId, { rating = "", weird = null, note = "" } = {}) {
+  const hist = photoHistory(slug);
+  const hit = hist.find((h) => h.id === historyId);
+  if (!hit) return { ok: false, error: "not found" };
+  if (rating) hit.rating = String(rating).slice(0, 20);
+  if (typeof weird === "boolean") hit.weird = weird;
+  if (note !== "") hit.note = String(note).slice(0, 200);
+  saveHistory(slug, hist);
+  // a photo rated badly is retired from the library; a weird one never goes out again
+  const scores = sceneScores(slug);
+  const lib = loadLibrary(slug);
+  const known = Object.values(scores);
+  const avg = known.length ? known.reduce((a, b) => a + b, 0) / known.length : 1;
+  const worst = Object.entries(scores).filter(([, s]) => s === 0).map(([k]) => k);
+  const retired = [];
+  if (retired.length === 0 && avg < 1) {
+    for (const scene of worst) {
+      const p = lib.photos.find((x) => x.scene === scene);
+      if (p && (p.badStreak || 0) >= 1) retired.push(scene);
+      if (p) {
+        p.badStreak = (p.badStreak || 0) + 1;
+      }
+    }
+    if (retired.length) saveLibrary(slug, lib);
+  }
+  return { ok: true, scores };
 }
 
 /**

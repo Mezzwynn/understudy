@@ -128,6 +128,13 @@ function buildConfig() {
   photoMinGapMin: num(envGet("PHOTO_MIN_GAP_MIN", "600"), 600),
   photoTrustStrangers: envFlag("PHOTO_TRUST_STRANGERS", false),
   photoGenerateOnDemand: envFlag("PHOTO_GENERATE_ON_DEMAND", false),
+  // tampilan foto: "HP"-nya, dan knob olah gambarnya
+  photoPhone: envGet("PHOTO_PHONE", "pixel"),
+  photoGrain: num(envGet("PHOTO_GRAIN", ""), 0),
+  photoBloom: num(envGet("PHOTO_BLOOM", ""), -1),
+  photoMaxSide: num(envGet("PHOTO_MAX_SIDE", "1280"), 1280),
+  photoQuality: num(envGet("PHOTO_QUALITY", "74"), 74),
+  photoLearn: envFlag("PHOTO_LEARN", true),
   objectModel: envGet("OBJECT_MODEL", "openai/gpt-image-1-mini/text-to-image"),
   photoCandidateCount: num(envGet("PHOTO_CANDIDATE_COUNT", "4"), 4),
   topicFatigue: envFlag("TOPIC_FATIGUE", true),

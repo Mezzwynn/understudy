@@ -38,7 +38,9 @@ function writeRating(entry) {
 
 import { listChats, loadChat, saveChat, loadState } from "./store.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
-import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent } from "./photo-library.mjs";
+import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent, photoHistory, rateSent, sceneScores } from "./photo-library.mjs";
+import { PHONE_PROFILES } from "./humanize.mjs";
+import { wardrobeFor } from "./photos.mjs";
 import {
   loadFace,
   saveFace,
@@ -330,6 +332,41 @@ async function summary() {
     status: { ...statusState(activeSlug), audienceCount: statusAudience().length },
     statusAudienceCount: statusAudience().length,
     statusColors: STATUS_COLORS,
+    photos: (() => {
+      const slug = loadPersona().slug;
+      const lib = librarySummary(slug);
+      return {
+        ...lib,
+        history: photoHistory(slug)
+          .slice(-40)
+          .reverse()
+          .map((h) => {
+            const p = lib.photos.find((x) => x.id === h.photoId);
+            return { ...h, url: p ? `/photo?d=library/${slug}&f=${encodeURIComponent(p.file)}` : "" };
+          }),
+        scores: sceneScores(slug),
+        profiles: Object.fromEntries(Object.entries(PHONE_PROFILES).map(([k, v]) => [k, v.label])),
+        wardrobe: wardrobeFor(loadPersona(slug)),
+        settings: {
+          IMAGE_ENGINE: config.imageEngine,
+          FACE_MODEL: config.faceModel,
+          SCENE_MODEL: config.sceneModel,
+          EDIT_MODEL: config.editModel,
+          PHOTO_CANDIDATE_COUNT: config.photoCandidateCount,
+          PHOTO_DAILY_MAX: config.photoDailyMax,
+          PHOTO_MIN_GAP_MIN: config.photoMinGapMin,
+          PHOTO_CHANCE: config.photoChance,
+          PHOTO_TRUST_STRANGERS: config.photoTrustStrangers,
+          PHOTO_GENERATE_ON_DEMAND: config.photoGenerateOnDemand,
+          PHOTO_PHONE: config.photoPhone,
+          PHOTO_GRAIN: config.photoGrain,
+          PHOTO_BLOOM: config.photoBloom,
+          PHOTO_MAX_SIDE: config.photoMaxSide,
+          PHOTO_QUALITY: config.photoQuality,
+          PHOTO_LEARN: config.photoLearn,
+        },
+      };
+    })(),
     face: (() => {
       const slug = loadPersona().slug;
       const face = loadFace(slug);
@@ -505,7 +542,37 @@ export function startDashboard() {
       }
       if (req.method === "GET" && url.pathname === "/api/photos") {
         const slug = loadPersona().slug;
-        return json(res, 200, { ...librarySummary(slug), rule: photoRule() });
+        const persona = loadPersona(slug);
+        const lib = librarySummary(slug);
+        const history = photoHistory(slug)
+          .slice(-40)
+          .reverse()
+          .map((h) => ({ ...h, url: (() => { const p = loadLibrary(slug).photos.find((x) => x.id === h.photoId); return p ? `/photo?d=library/${slug}&f=${encodeURIComponent(p.file)}` : ""; })() }));
+        return json(res, 200, {
+          ...lib,
+          history,
+          scores: sceneScores(slug),
+          profiles: Object.fromEntries(Object.entries(PHONE_PROFILES).map(([k, v]) => [k, v.label])),
+          wardrobe: wardrobeFor(persona),
+          settings: {
+            IMAGE_ENGINE: config.imageEngine,
+            FACE_MODEL: config.faceModel,
+            SCENE_MODEL: config.sceneModel,
+            EDIT_MODEL: config.editModel,
+            PHOTO_CANDIDATE_COUNT: config.photoCandidateCount,
+            PHOTO_DAILY_MAX: config.photoDailyMax,
+            PHOTO_MIN_GAP_MIN: config.photoMinGapMin,
+            PHOTO_CHANCE: config.photoChance,
+            PHOTO_TRUST_STRANGERS: config.photoTrustStrangers,
+            PHOTO_GENERATE_ON_DEMAND: config.photoGenerateOnDemand,
+            PHOTO_PHONE: config.photoPhone,
+            PHOTO_GRAIN: config.photoGrain,
+            PHOTO_BLOOM: config.photoBloom,
+            PHOTO_MAX_SIDE: config.photoMaxSide,
+            PHOTO_QUALITY: config.photoQuality,
+            PHOTO_LEARN: config.photoLearn,
+          },
+        });
       }
 
       if (req.method === "GET" && url.pathname === "/api/face") {
@@ -728,6 +795,21 @@ export function startDashboard() {
         if (url.pathname === "/api/photos") {
           const slug = loadPersona().slug;
           const act = String(body.action || "");
+          if (act === "rate") {
+            const r = rateSent(slug, String(body.id || ""), { rating: body.rating, weird: body.weird, note: body.note });
+            return json(res, r.ok ? 200 : 400, { ...r, scores: sceneScores(slug) });
+          }
+          if (act === "settings") {
+            applyValues(body.values || {});
+            reloadConfig();
+            log("dashboard: photo settings updated (applied live)");
+            return json(res, 200, { ok: true });
+          }
+          if (act === "wardrobe") {
+            setPersonaField(slug, "wardrobe", String(body.wardrobe || "").slice(0, 800));
+            log("dashboard: wardrobe updated");
+            return json(res, 200, { ok: true, wardrobe: wardrobeFor(loadPersona(slug)) });
+          }
           const { getSock } = await import("./whatsapp.mjs");
           if (act === "remove") {
             const r = removePhoto(slug, String(body.id || ""));

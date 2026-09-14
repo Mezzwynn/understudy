@@ -1237,25 +1237,120 @@ const AGENT_IDEAS = [
 /* ═══════════════════════════ photos tab ═══════════════════════════ */
 function renderPhotos(){
   const root=$("#tab-photos"); if(!root) return;
-  const f = DATA.face || {};
-  if(!$("#photos-frame", root)){
-    root.innerHTML = `
-    <div class="card tight fadein">
-      <div class="row"><h2 style="margin:0">Hasil tes foto</h2><span class="grow"></span>
-        <button class="act" data-pgo="scenario-test/index.html">5 skenario</button>
-        <button class="act" data-pgo="face-test/index.html">Foto wajah baru</button>
-        <button class="act" data-pgo="model-test/index-selfie.html">12 model selfie</button>
-        <button class="act" data-pgo="model-test/index-warung.html">12 model meja</button>
-      </div>
-      <div class="hint" style="margin-top:6px">Gallery-nya ada di <b>/sdcard/Download/Understudy/</b> — tombol di atas buka halamannya.
-        Di bawah ini tempat kamu <b>nilai</b> tiap foto: avatar Fio dipin di atas sebagai pembanding, jadi pertanyaan selfie cuma satu — <i>orangnya sama atau bukan?</i></div>
+  const ph = DATA.photos || { history: [], settings: {}, profiles: {}, wardrobe: [], scores: {} };
+  const st = ph.settings || {};
+  const opt = (k, v, list) => list.map(([val, label]) => `<option value="${val}" ${String(v)===String(val)?"selected":""}>${esc(label)}</option>`).join("");
+  const profOptions = Object.entries(ph.profiles||{}).map(([k,v])=>[k,v]);
+  const hist = ph.history || [];
+  const scores = ph.scores || {};
+  const best = Object.entries(scores).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const worst = Object.entries(scores).sort((a,b)=>a[1]-b[1]).slice(0,3);
+
+  root.innerHTML = `
+  <div class="card tight fadein">
+    <div class="row"><h2 style="margin:0">Foto — setelan</h2><span class="grow"></span>
+      <span class="badge">${ph.count||0} foto di perpustakaan</span></div>
+    <div class="hint" style="margin-top:6px">Dia <b>nggak generate tiap kali</b> — dia pilih dari perpustakaan, dan yang dipilih disesuaikan sama jam + rutinitasnya.
+      Yang diatur di sini: HP-nya (gaya foto), knob tampilan, batas kirim, model, dan baju.</div>
+
+    <h3 style="margin:16px 0 6px;font-size:14px">Kirim — batas</h3>
+    <div class="rows">
+      <div class="mrow2"><span>Maksimal per orang per hari</span><input class="nin" data-pk="PHOTO_DAILY_MAX" type="number" min="0" max="10" value="${st.PHOTO_DAILY_MAX ?? 1}"></div>
+      <div class="mrow2"><span>Jeda minimal (menit)</span><input class="nin" data-pk="PHOTO_MIN_GAP_MIN" type="number" min="0" max="2880" value="${st.PHOTO_MIN_GAP_MIN ?? 720}"></div>
+      <div class="mrow2"><span>Peluang per balasan (%)</span><input class="nin" data-pk="PHOTO_CHANCE_PCT" type="number" min="0" max="100" value="${Math.round((st.PHOTO_CHANCE ?? 0.05)*100)}"></div>
+      <div class="mrow2"><span>Orang asing boleh dapat foto</span><label class="sw"><input type="checkbox" class="sn" data-pk="PHOTO_TRUST_STRANGERS" ${st.PHOTO_TRUST_STRANGERS?"checked":""}><span></span></label></div>
+      <div class="mrow2"><span>Generate foto baru kalau diminta (bayar)</span><label class="sw"><input type="checkbox" class="sn" data-pk="PHOTO_GENERATE_ON_DEMAND" ${st.PHOTO_GENERATE_ON_DEMAND?"checked":""}><span></span></label></div>
     </div>
-    <iframe id="photos-frame" src="/rate" style="width:100%;height:78vh;border:1px solid var(--line);border-radius:16px;background:#131109;margin-top:12px"></iframe>`;
-  }
-  root.querySelectorAll("[data-pgo]").forEach(b=>{ if(!b._wired){ b._wired=true; b.onclick=()=>window.open("/gallery?p="+encodeURIComponent(b.dataset.pgo), "_blank"); } });
-  const first=root.querySelector("#photos-frame");
-  if(first) first.style.height = Math.max(520, window.innerHeight-190)+"px";
+
+    <h3 style="margin:18px 0 6px;font-size:14px">Tampilan — "HP"-nya</h3>
+    <div class="rows">
+      <div class="mrow2"><span>Gaya kamera</span><select class="sin" data-pk="PHOTO_PHONE">${profOptions.map(([k,v])=>`<option value="${k}" ${st.PHOTO_PHONE===k?"selected":""}>${esc(v)}</option>`).join("")}</select></div>
+      <div class="mrow2"><span>Grain (0 = ikut gaya HP)</span><input class="nin" data-pk="PHOTO_GRAIN" type="number" min="0" max="40" value="${st.PHOTO_GRAIN ?? 0}"></div>
+      <div class="mrow2"><span>Bloom highlight (-1 = ikut gaya HP)</span><input class="nin" data-pk="PHOTO_BLOOM" type="number" step="0.01" min="-1" max="0.4" value="${st.PHOTO_BLOOM ?? -1}"></div>
+      <div class="mrow2"><span>Sisi terpanjang (px)</span><input class="nin" data-pk="PHOTO_MAX_SIDE" type="number" min="640" max="2048" value="${st.PHOTO_MAX_SIDE ?? 1280}"></div>
+      <div class="mrow2"><span>Kualitas JPEG</span><input class="nin" data-pk="PHOTO_QUALITY" type="number" min="40" max="95" value="${st.PHOTO_QUALITY ?? 74}"></div>
+      <div class="mrow2"><span>Belajar dari rating</span><label class="sw"><input type="checkbox" class="sn" data-pk="PHOTO_LEARN" ${st.PHOTO_LEARN?"checked":""}><span></span></label></div>
+    </div>
+
+    <h3 style="margin:18px 0 6px;font-size:14px">Model</h3>
+    <div class="rows">
+      <div class="mrow2"><span>Mesin</span><select class="sin" data-pk="IMAGE_ENGINE">${opt("IMAGE_ENGINE", st.IMAGE_ENGINE, [["atlas","Atlas Cloud"],["openrouter","OpenRouter"]])}</select></div>
+      <div class="mrow2"><span>Wajah</span><input class="sin" data-pk="FACE_MODEL" value="${esc(st.FACE_MODEL||"")}" style="min-width:230px"></div>
+      <div class="mrow2"><span>Tempat &amp; benda</span><input class="sin" data-pk="SCENE_MODEL" value="${esc(st.SCENE_MODEL||"")}" style="min-width:230px"></div>
+      <div class="mrow2"><span>Pakai foto referensi</span><input class="sin" data-pk="EDIT_MODEL" value="${esc(st.EDIT_MODEL||"")}" style="min-width:230px"></div>
+      <div class="mrow2"><span>Kandidat wajah per run</span><input class="nin" data-pk="PHOTO_CANDIDATE_COUNT" type="number" min="1" max="8" value="${st.PHOTO_CANDIDATE_COUNT ?? 4}"></div>
+    </div>
+    <div class="btns"><button class="act" data-pact="save-settings">Simpan setelan</button>
+      <span class="tiny">berlaku langsung, tanpa restart</span></div>
+
+    <h3 style="margin:18px 0 6px;font-size:14px">Baju (diputar per hari)</h3>
+    <textarea class="sin" data-pk="WARDROBE" rows="3" style="width:100%;resize:vertical">${esc((ph.wardrobe||[]).join(" | "))}</textarea>
+    <div class="btns"><button class="act" data-pact="save-wardrobe">Simpan baju</button>
+      <span class="tiny">pisahkan dengan <b>|</b> — dipakai di prompt foto &amp; dirotasi</span></div>
+  </div>
+
+  <div class="card tight fadein">
+    <div class="row"><h2 style="margin:0">History — foto yang sudah dikirim</h2><span class="grow"></span>
+      <span class="badge">${hist.length}</span></div>
+    <div class="hint" style="margin-top:6px">Nilainya <b>dari sini</b> — dan nilainya dipakai buat memilih foto berikutnya.
+      ${best.length?`<br>Paling bagus: ${best.map(([k,v])=>`<b>${esc(k)}</b> (${Math.round(v*100)}%)`).join(" · ")}`:""}
+      ${worst.length?`<br>Paling jelek: ${worst.map(([k,v])=>`${esc(k)} (${Math.round(v*100)}%)`).join(" · ")}`:""}</div>
+    ${hist.length? `<div class="histgrid">${hist.map(h=>`
+      <div class="hist" data-h="${h.id}">
+        ${h.url?`<img src="${h.url}" loading="lazy" alt="">`:'<div class="noimg">—</div>'}
+        <div class="body">
+          <div class="tiny">${new Date(h.at).toLocaleString("id-ID",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
+          <div style="font-size:12.5px;margin:3px 0">${esc(h.scene)}</div>
+          <div class="btns" style="margin:6px 0 0">
+            <button class="act hb ${h.rating==="bagus"?"sel":""}" data-rate="bagus">Bagus</button>
+            <button class="act hb ${h.rating==="lumayan"?"sel":""}" data-rate="lumayan">Lumayan</button>
+            <button class="act hb ${h.rating==="kurang"?"sel":""}" data-rate="kurang">Kurang</button>
+          </div>
+          <label class="tiny" style="display:flex;gap:6px;margin-top:6px"><input type="checkbox" class="hw" ${h.weird?"checked":""}> kelihatan aneh</label>
+        </div>
+      </div>`).join("")}</div>` : '<div class="empty">Belum ada foto yang dikirim.</div>'}
+  </div>`;
 }
+
+$("#tab-photos").addEventListener("click", async (e)=>{
+  const b = e.target.closest("[data-pact],[data-rate]"); if(!b) return;
+  const act = b.dataset.pact, rate = b.dataset.rate;
+  if(act==="save-settings"){
+    const values = {};
+    $$('#tab-photos [data-pk]').forEach(el=>{
+      const k = el.dataset.pk;
+      if(k==="WARDROBE") return;
+      if(el.type==="checkbox") values[k] = el.checked;
+      else if(k==="PHOTO_CHANCE_PCT") values.PHOTO_CHANCE = String(Number(el.value)/100);
+      else if(k==="PHOTO_GRAIN" && Number(el.value)===0) values[k] = "";
+      else if(k==="PHOTO_BLOOM" && Number(el.value)<0) values[k] = "";
+      else values[k] = el.value;
+    });
+    const r = await api("/api/photos",{ action:"settings", values });
+    toast(r.ok?"Setelan foto disimpan (langsung berlaku)":("Gagal: "+(r.error||"")));
+    return refresh(true);
+  }
+  if(act==="save-wardrobe"){
+    const r = await api("/api/photos",{ action:"wardrobe", wardrobe: $("#tab-photos [data-pk=WARDROBE]").value });
+    toast(r.ok?"Baju disimpan":("Gagal: "+(r.error||"")));
+    return refresh(true);
+  }
+  if(rate){
+    const card = b.closest("[data-h]");
+    const weird = card.querySelector(".hw")?.checked || false;
+    const r = await api("/api/photos",{ action:"rate", id: card.dataset.h, rating: rate, weird });
+    toast(r.ok?"Dinilai — dipakai buat pilih foto berikutnya":("Gagal: "+(r.error||"")));
+    return refresh(true);
+  }
+});
+
+$("#tab-photos").addEventListener("change", async (e)=>{
+  const box = e.target.closest(".hw"); if(!box) return;
+  const card = box.closest("[data-h]");
+  await api("/api/photos",{ action:"rate", id: card.dataset.h, weird: box.checked });
+  toast(box.checked?"Ditandai aneh — nggak akan dipakai lagi":"Tanda aneh dihapus");
+  refresh(true);
+});
 
 /* ═══════════════════════════ status tab ═══════════════════════════ */
 function statusMediaRow(it){
@@ -1345,11 +1440,6 @@ function renderStatus(){
       </div>`).join("")}</div>` : '<div class="empty">Belum ada yang diposting.</div>'}
   </div>`;
 }
-
-$("#tab-photos").addEventListener("click",(e)=>{
-  const b=e.target.closest("[data-pscene]"); if(!b) return;
-  const r=$("#photos-frame"); if(r) r.src="/rate?t="+Date.now();
-});
 
 $("#tab-status").addEventListener("click",async (e)=>{
   const tile=e.target.closest('[data-k="color"]');

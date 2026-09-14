@@ -83,12 +83,41 @@ function downscale(img, maxSide) {
  * contrast is the one the eye reads as "clean and shiny", so it is pulled towards the real number
  * rather than guessed at with a filter.
  */
+/**
+ * Camera profiles. "which phone is she using" is not cosmetic: a Pixel and an Oppo do not produce the
+ * same photo, and a character's photos should all come from one phone she owns.
+ *   grain     — sensor noise amplitude
+ *   bloom     — how much bright highlights glow into their surroundings (cheap lenses glow)
+ *   contrast / saturation — pulled towards these instead of the generic target
+ *   warmth    — red up, blue down
+ */
+export const PHONE_PROFILES = {
+  pixel: { label: "Pixel (seimbang, sedikit berbutir)", grain: 10, bloom: 0.06, contrast: 46, saturation: 27, warmth: 3 },
+  iphone: { label: "iPhone (kontras, dingin, tajam)", grain: 7, bloom: 0.04, contrast: 52, saturation: 25, warmth: 0 },
+  samsung: { label: "Samsung (terang, saturasi tinggi)", grain: 8, bloom: 0.09, contrast: 50, saturation: 33, warmth: 2 },
+  oppo: { label: "Oppo (hangat, highlight glowing)", grain: 11, bloom: 0.14, contrast: 44, saturation: 30, warmth: 6 },
+  vivo: { label: "Vivo (hangat, kulit halus)", grain: 12, bloom: 0.13, contrast: 45, saturation: 31, warmth: 7 },
+  xiaomi: { label: "Xiaomi (kontras, hangat)", grain: 9, bloom: 0.08, contrast: 49, saturation: 29, warmth: 4 },
+  biasa: { label: "HP biasa (berbutir, apa adanya)", grain: 14, bloom: 0.10, contrast: 43, saturation: 26, warmth: 4 },
+};
+
+export const profileFor = (name) => PHONE_PROFILES[String(name || "").toLowerCase()] || null;
+
 export const REAL_PHOTO_TARGET = { contrast: 46, saturation: 27, noise: 2.2 };
 
-export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warmth = 3, lift = 2, seed = 7, calibrate = true } = {}) {
+export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warmth = null, lift = 2, seed = 7, calibrate = true, bloom = null, profile = null } = {}) {
+  const prof = profileFor(profile);
+  if (prof) {
+    grain = grain ?? prof.grain;
+    warmth = warmth ?? prof.warmth;
+    bloom = bloom ?? prof.bloom;
+  }
+  warmth = warmth ?? 3;
+  bloom = bloom ?? 0.06;
   const small = downscale(decode(buf), maxSide);
   const { width: w, height: h, data } = small;
   const grainAmount = grain === null ? 10 : grain; // enough noise to land near a real photo
+  const target = { contrast: prof?.contrast ?? REAL_PHOTO_TARGET.contrast, saturation: prof?.saturation ?? REAL_PHOTO_TARGET.saturation };
   const rand = rng(seed);
   const out = Buffer.alloc(w * h * 4);
   for (let y = 0; y < h; y++) {
@@ -101,6 +130,37 @@ export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warm
       out[i + 3] = 255;
     }
   }
+  // bloom: bright areas bleed into their surroundings, the way a small phone lens does
+  if (bloom > 0) {
+    const src = Buffer.from(out);
+    const blur = new Float32Array(w * h);
+    const radius = 3;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let sum = 0;
+        let n = 0;
+        for (let dy = -radius; dy <= radius; dy++) {
+          const yy = y + dy;
+          if (yy < 0 || yy >= h) continue;
+          for (let dx = -radius; dx <= radius; dx++) {
+            const xx = x + dx;
+            if (xx < 0 || xx >= w) continue;
+            const i = (yy * w + xx) * 4;
+            sum += 0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2];
+            n++;
+          }
+        }
+        blur[y * w + x] = sum / Math.max(1, n);
+      }
+    }
+    for (let i = 0, p = 0; i < out.length; i += 4, p++) {
+      const y0 = 0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2];
+      if (y0 < 150) continue; // only highlights bloom
+      const amount = ((y0 - 150) / 105) * bloom * 255;
+      for (let c = 0; c < 3; c++) out[i + c] = Math.max(0, Math.min(255, out[i + c] + amount * (blur[p] / 255)));
+    }
+  }
+
   // pull contrast and saturation towards what a real phone photo measures
   if (calibrate) {
     const grab = (src) => {
@@ -119,8 +179,8 @@ export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warm
       return { mean: sum / n, contrast: Math.sqrt(Math.max(0, sumSq / n - (sum / n) ** 2)), saturation: (satSum / n) * 100 };
     };
     const now = grab(out);
-    const cScale = Math.min(1.2, Math.max(0.4, REAL_PHOTO_TARGET.contrast / Math.max(1, now.contrast)));
-    const sScale = Math.min(1.8, Math.max(0.6, REAL_PHOTO_TARGET.saturation / Math.max(1, now.saturation)));
+    const cScale = Math.min(1.2, Math.max(0.4, target.contrast / Math.max(1, now.contrast)));
+    const sScale = Math.min(1.8, Math.max(0.6, target.saturation / Math.max(1, now.saturation)));
     // contrast first, saturation second — the other order drops saturation twice
     for (let i = 0; i < out.length; i += 4) {
       for (let c = 0; c < 3; c++) {
@@ -128,7 +188,7 @@ export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warm
       }
     }
     const after = grab(out);
-    const s2 = Math.min(1.8, Math.max(0.5, REAL_PHOTO_TARGET.saturation / Math.max(1, after.saturation)));
+    const s2 = Math.min(1.8, Math.max(0.5, target.saturation / Math.max(1, after.saturation)));
     for (let i = 0; i < out.length; i += 4) {
       const grey = 0.299 * out[i] + 0.587 * out[i + 1] + 0.114 * out[i + 2];
       for (let c = 0; c < 3; c++) {
@@ -158,8 +218,8 @@ export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warm
       }
       return { mean: sum / n, contrast: Math.sqrt(Math.max(0, sumSq / n - (sum / n) ** 2)), saturation: (satSum / n) * 100 };
     })();
-    const cFix = Math.min(1.8, Math.max(0.6, REAL_PHOTO_TARGET.contrast / Math.max(1, fin.contrast)));
-    const sFix = Math.min(2.4, Math.max(0.7, REAL_PHOTO_TARGET.saturation / Math.max(1, fin.saturation)));
+    const cFix = Math.min(1.8, Math.max(0.6, target.contrast / Math.max(1, fin.contrast)));
+    const sFix = Math.min(2.4, Math.max(0.7, target.saturation / Math.max(1, fin.saturation)));
     if (Math.abs(1 - cFix) > 0.05 || Math.abs(1 - sFix) > 0.05) {
       const fixed = Buffer.alloc(back.data.length);
       for (let i = 0; i < back.data.length; i += 4) {
