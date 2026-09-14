@@ -57,12 +57,16 @@ const LIGHT = [
   "dim, as if she did not bother turning anything on",
 ];
 const MOOD = [
-  "flat, unimpressed, no expression",
+  "flat and unimpressed, no expression at all",
   "tired eyes, half a sigh",
   "in a hurry, mid-movement, slightly blurred",
   "a small dry half-smile, the closest she gets",
   "annoyed at something she is looking at on the screen",
   "caught between two thoughts, eyes on the mirror not the lens",
+  "the corner of her mouth pulled up just barely, almost a smirk",
+  "soft for a second, not fully hiding that she is pleased",
+  "a short real laugh, caught before she could stop it",
+  "one eyebrow raised, amused at her own reflection",
 ];
 const FRAMING = [
   "waist up, the outfit readable",
@@ -97,7 +101,9 @@ function lastOutfit(slug) {
 export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, style = "casual", why = "", slug: slugIn = null } = {}) {
   const slug = slugIn || persona?.slug || config.persona;
   const d = day || new Date();
-  const seed = d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate();
+  // Vary per shot, not per day: with a day-only seed every selfie on the same day shared the same
+  // expression, angle, framing and light, which is the opposite of how mirror selfies actually look.
+  const seed = d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate() + Math.floor(Math.random() * 100000);
   // the card carries it as mirror_spot (snake_case, like every other frontmatter key)
   const spot = String(persona?.mirror_spot || persona?.mirrorSpot || config.selfieSpot || "the full-length mirror on the inside of her bedroom door");
   const item = outfitItem || null;
