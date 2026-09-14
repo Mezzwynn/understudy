@@ -112,13 +112,13 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   const who = `${persona?.name || "a young woman"}, ${String(persona?.appearance || "slim, 20, shoulder-length black hair, minimal monochrome clothes").slice(0, 160)}`;
   return [
     refs.length > 1 ? refs.join(" ") : `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
-    `New photo: a mirror selfie she took with her phone${why ? `, ${why}` : ""}.`,
+    `New photo: a mirror selfie she took with her phone${why ? `, ${why}` : ""}. One arm is bent up and her hand is clearly holding the phone in front of her — the hand and the phone are both visible in the mirror, fingers wrapped around the phone.`,
     spotRef
       ? `PLACE: exactly the place in the reference image — the same room, the same mirror, wall and objects, the same corner; it never changes between photos.`
       : `PLACE (always exactly this, it never changes): ${spot}, a plain wall behind her, the edge of her room visible — same corner of the same room as every other mirror photo she has taken.`,
     `She is wearing ${wear}.${garment}`,
     `${pickR(FRAMING, seed + 1)}, ${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}.`,
-    `Her face: ${pickR(MOOD, seed + 4)} — and the phone partly covers her face or her eyes are on the screen, the way a mirror selfie actually looks.`,
+    `Her face is HALF HIDDEN by the phone: it covers one half of her face, so only one eye, half her nose and half her mouth are visible and the other side is behind the phone. Her expression on the visible half: ${pickR(MOOD, seed + 4)}. She is looking at the phone or past it, not posing for the mirror.`,
     `Ordinary and unpolished: the mirror has a smudge, the room behind is lived in, the framing is not quite straight. Not a photoshoot, not a studio, no filter. No text, no watermark.`,
   ].join(" ");
 }
