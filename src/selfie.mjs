@@ -296,12 +296,20 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
   const spotRef = !isPapShot && spotFile && images.length && fs.existsSync(spotFile);
   if (spotRef) images.push(dataUrl(spotFile));
   const prompt = selfiePrompt(persona, { day, style, why, outfit: wear, outfitItem: item, outfitRef: !!outfitRef, spotRef: !!spotRef, slug: s });
-  const res = await generateImage({
+  let res = await generateImage({
     model: config.editModel,
     prompt,
     aspect: "3:4",
     images,
   });
+  // some garment references trip the model's safety filter (e.g. sleepwear + her face). The outfit
+  // is still described in words, so retry with just her face instead of failing the whole selfie.
+  if (!res.ok && /no image|content filter|content_filter/i.test(String(res.error || "")) && images.length > 1) {
+    log(`selfie: ${res.error} with ${images.length} references — retrying with face only`);
+    const faceOnly = images.slice(0, 1);
+    const prompt2 = selfiePrompt(persona, { day, style, why, outfit: wear, outfitItem: item, outfitRef: false, spotRef: false, slug: s });
+    res = await generateImage({ model: config.editModel, prompt: prompt2, aspect: "3:4", images: faceOnly });
+  }
   if (!res.ok) return { ok: false, error: res.error };
   const tmp = writeImage(path.join(DATA_DIR, "photos", `selfie-tmp-${Date.now()}`), res.buf);
   const small = humanize(fs.readFileSync(tmp), {

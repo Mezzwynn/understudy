@@ -51,7 +51,10 @@ async function viaOpenRouter({ model, prompt, aspect, images, timeoutSec }) {
     if (j.error) return { ok: false, error: String(j.error.message || j.error).slice(0, 200), seconds: (Date.now() - t0) / 1000 };
     const msg = j.choices?.[0]?.message || {};
     const url = msg.images?.[0]?.image_url?.url || msg.images?.[0]?.imageUrl?.url || "";
-    if (!url) return { ok: false, error: "no image in the reply", seconds: (Date.now() - t0) / 1000 };
+    if (!url) {
+      const finish = j.choices?.[0]?.finish_reason || "";
+      return { ok: false, error: finish === "content_filter" ? "model content filter" : "no image in the reply", seconds: (Date.now() - t0) / 1000 };
+    }
     const b64 = url.split(",")[1] || url;
     const buf = Buffer.from(b64, "base64");
     const seconds = Number(((Date.now() - t0) / 1000).toFixed(1));
