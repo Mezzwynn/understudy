@@ -161,7 +161,14 @@ export function makeTypo(input, { heavy = Math.random() < 0.35 } = {}) {
   } else if (mode === 3) {
     m = w.replace(/[aiueo]/, (c) => c + c); // double a vowel
   } else {
-    m = w.slice(0, 2) + w.slice(2, -1).split("").sort(() => Math.random() - 0.5).join("") + w.slice(-1); // scramble the middle
+    // a wrong key, the way a finger actually slips: the neighbour on the keyboard
+    const NB = { a: "s", s: "a", d: "f", f: "g", g: "h", h: "j", j: "k", k: "l", l: "k", e: "r", r: "t", t: "y", y: "t", u: "i", i: "o", o: "p", p: "o", n: "m", m: "n", c: "v", v: "b", b: "v", w: "e", q: "w", z: "x", x: "z" };
+    const idx = [...w].findIndex((c) => NB[c.toLowerCase()]);
+    if (idx >= 0) {
+      const c = w[idx];
+      const rep = c === c.toUpperCase() ? NB[c.toLowerCase()].toUpperCase() : NB[c.toLowerCase()];
+      m = w.slice(0, idx) + rep + w.slice(idx + 1);
+    }
   }
   if (m === w) return { text: input, typo: null, original: null, severity: null };
 
