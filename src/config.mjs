@@ -124,8 +124,6 @@ function buildConfig() {
   // ── perpustakaan foto (dia kirim dari sini, bukan generate tiap kali)
   photoLibrary: envFlag("PHOTO_LIBRARY", true),
   photoSend: envFlag("PHOTO_SEND", true),
-  photoDailyMax: num(envGet("PHOTO_DAILY_MAX", "1"), 1),
-  photoMinGapMin: num(envGet("PHOTO_MIN_GAP_MIN", "600"), 600),
   photoWindowStart: num(envGet("PHOTO_WINDOW_START", "8"), 8),
   photoWindowEnd: num(envGet("PHOTO_WINDOW_END", "22"), 22),
   photoKinds: envGet("PHOTO_KINDS", "view,self"),

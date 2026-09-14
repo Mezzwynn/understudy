@@ -776,11 +776,8 @@ async function respond(sock, jid, p) {
   }
   let sentMedia = false;
   const textKeys = [];
-  if (
-    !sleepy &&
-    (wantsPhoto || config.photoSend) &&
-    (chat.stats.photoCount || 0) < Math.max(1, config.photoDailyMax) + (wantsPhoto ? 1 : 0)
-  ) {
+  // no daily cap and no minimum gap any more: she sends because something fits, or because he asked
+  if (!sleepy && (wantsPhoto || config.photoSend)) {
     // From the library, matched to what she is doing right now — not generated on the spot.
     // Generation is off by default: it costs money every time and the face does not hold.
     const moment = (() => {
@@ -808,7 +805,7 @@ async function respond(sock, jid, p) {
           chat.stats.lastPhotoAt = Date.now();
           sentMedia = true;
           markSent(persona.slug || config.persona, photo.id, jid);
-          log(`photo → ${jid} "${photo.scene}" (${chat.stats.photoCount}/${config.photoDailyMax} today) · ${photo.why}`);
+          log(`photo → ${jid} "${photo.scene}" (${chat.stats.photoCount} today) · ${photo.why}`);
         }
       } catch (err) {
         log(`photo send failed: ${err.message}`);

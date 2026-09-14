@@ -90,8 +90,6 @@ export const FEATURES = [
   { key: "PHOTO_CANDIDATE_COUNT", label: "Face candidates made per run", kind: "int", def: 4 },
   { key: "PHOTO_LIBRARY", label: "She sends photos from a library", kind: "bool", def: 1 },
   { key: "PHOTO_SEND", label: "Photos may be sent in chat at all", kind: "bool", def: 1 },
-  { key: "PHOTO_DAILY_MAX", label: "Most photos per contact per day", kind: "int", def: 1 },
-  { key: "PHOTO_MIN_GAP_MIN", label: "Minutes between two photos to one person", kind: "int", def: 600 },
   { key: "PHOTO_GENERATE_ON_DEMAND", label: "Generate a new photo when asked (costs money)", kind: "bool", def: 0 },
   { key: "PHOTO_PHONE", label: "Foto-nya gaya HP apa (pixel/iphone/samsung/oppo/vivo/xiaomi/biasa)", kind: "text", def: "pixel" },
   { key: "PHOTO_GRAIN", label: "Grain (0 = ikut profil HP)", kind: "int", def: 0 },

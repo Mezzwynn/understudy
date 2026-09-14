@@ -8,7 +8,7 @@ import { ROOT, PERSONA_DIR, DATA_DIR, config, envGet, STARTED_AT, log, reloadCon
 /** Where the model-comparison photos live — the rating page reads and serves them. */
 /** The photo rules in one line, for the panel to show. */
 function photoRule() {
-  return `max ${config.photoDailyMax}/day · gap ${config.photoMinGapMin}m · chance ${Math.round((config.photoChance || 0) * 100)}% · strangers ${config.photoTrustStrangers ? "yes" : "no"} · library ${config.photoLibrary ? "on" : "off"}`;
+  return `chance ${Math.round((config.photoChance || 0) * 100)}% · strangers ${config.photoTrustStrangers ? "yes" : "no"} · library ${config.photoLibrary ? "on" : "off"}`;
 }
 
 const PHOTO_TEST_DIR = envGet("PHOTO_TEST_DIR", "/sdcard/Download/Understudy/model-test");
@@ -357,8 +357,6 @@ async function summary() {
           SCENE_MODEL: config.sceneModel,
           EDIT_MODEL: config.editModel,
           PHOTO_CANDIDATE_COUNT: config.photoCandidateCount,
-          PHOTO_DAILY_MAX: config.photoDailyMax,
-          PHOTO_MIN_GAP_MIN: config.photoMinGapMin,
           PHOTO_CHANCE: config.photoChance,
           PHOTO_TRUST_STRANGERS: config.photoTrustStrangers,
           PHOTO_GENERATE_ON_DEMAND: config.photoGenerateOnDemand,
@@ -600,8 +598,6 @@ export function startDashboard() {
             SCENE_MODEL: config.sceneModel,
             EDIT_MODEL: config.editModel,
             PHOTO_CANDIDATE_COUNT: config.photoCandidateCount,
-            PHOTO_DAILY_MAX: config.photoDailyMax,
-            PHOTO_MIN_GAP_MIN: config.photoMinGapMin,
             PHOTO_CHANCE: config.photoChance,
             PHOTO_GENERATE_ON_DEMAND: config.photoGenerateOnDemand,
             PHOTO_WINDOW_START: config.photoWindowStart,
