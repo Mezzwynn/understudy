@@ -169,7 +169,7 @@ async function maybeSelfie(sock) {
   const due = dueSelfie(slug);
   if (!due) return;
   try {
-    const made = await makeSelfie(persona, { slug });
+    const made = await makeSelfie(persona, { slug, style: due.style, why: due.why });
     markSelfieSent(slug, due.key);
     if (!made.ok) {
       log(`selfie failed: ${made.error}`);
@@ -193,7 +193,7 @@ async function maybeSelfie(sock) {
         log(`selfie send to ${c.jid} failed: ${err.message}`);
       }
     }
-    log(`selfie terjadwal ${due.time}: dikirim ke ${sent} kontak`);
+    log(`selfie ${due.time} (${due.why || "outfit check"}): dikirim ke ${sent} kontak`);
   } catch (err) {
     log(`selfie tick failed: ${err.message}`);
   }

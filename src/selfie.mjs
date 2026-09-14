@@ -16,6 +16,9 @@ import { DATA_DIR, config, log } from "./config.mjs";
 import { generateImage, writeImage, imageEngineReady } from "./image-engine.mjs";
 import { humanize } from "./humanize.mjs";
 import { loadWardrobe, timeBucket, pickOutfit } from "./photos.mjs";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 import { avatarPath } from "./face.mjs";
 import { addPhoto, markSent, photoHistory } from "./photo-library.mjs";
 
@@ -75,16 +78,16 @@ const pickR = (list, seed) => list[Math.abs(seed) % list.length];
  * The prompt. The spot comes from the character (bedroom mirror by the door by default) and is the same
  * every time; everything else is drawn from the lists above by day, so two selfies never look alike.
  */
-export function selfiePrompt(persona, { day = null, outfit = null } = {}) {
+export function selfiePrompt(persona, { day = null, outfit = null, style = "casual", why = "" } = {}) {
   const slug = persona?.slug || config.persona;
   const d = day || new Date();
   const seed = d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate();
   const spot = String(persona?.mirrorSpot || config.selfieSpot || "the full-length mirror on the inside of her bedroom door");
-  const wear = outfit || pickOutfit(persona, { hour: d.getHours(), style: "casual" });
+  const wear = outfit || pickOutfit(persona, { hour: d.getHours(), style: style || "casual" });
   const who = `${persona?.name || "a young woman"}, ${String(persona?.appearance || "slim, 20, shoulder-length black hair, minimal monochrome clothes").slice(0, 160)}`;
   return [
     `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
-    `New photo: a mirror selfie she took with her phone.`,
+    `New photo: a mirror selfie she took with her phone${why ? `, ${why}` : ""}.`,
     `PLACE (always exactly this, it never changes): ${spot}, a plain wall behind her, the edge of her room visible — same corner of the same room as every other mirror photo she has taken.`,
     `She is wearing ${wear}.`,
     `${pickR(FRAMING, seed + 1)}, ${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}.`,
@@ -93,21 +96,66 @@ export function selfiePrompt(persona, { day = null, outfit = null } = {}) {
   ].join(" ");
 }
 
-/** Has one of the scheduled times come round, and not sent yet today? */
+/**
+ * When a mirror selfie makes sense today, taken from her own routine rather than a fixed clock.
+ * A person photographs themselves before going out, after training, or when they have just put something
+ * on — not at 07:30 because a config says so. Each routine moment that suggests it carries the style she
+ * would be wearing for it, so the outfit follows the day.
+ */
+const SELFIE_MOMENT = [
+  { re: /(keluar|berangkat|pergi|leave|heading out|off to|ke kantor|ke kampus)/i, style: "kerja", why: "before heading out" },
+  { re: /(pilates|gym|olahraga|lari|run|workout|training)/i, style: "fitness", why: "after training" },
+  { re: /(mandi|shower|ganti|beres-beres|dandan|get ready)/i, style: "casual", why: "just got changed" },
+  { re: /(brunch|kafe|cafe|makan malam|dinner|nongkrong|ketemu|meet)/i, style: "casual", why: "before going out to eat" },
+];
+
+export function selfieMoments(slug = config.persona, now = new Date()) {
+  try {
+    const { loadRoutine } = require("./routine.mjs");
+    const routine = loadRoutine(slug);
+    if (!routine || routine.date !== now.toISOString().slice(0, 10)) return [];
+    const found = [];
+    for (const b of routine.blocks || []) {
+      for (const m of SELFIE_MOMENT) {
+        if (m.re.test(String(b.what || ""))) found.push({ at: b.start, style: m.style, why: m.why, from: b.what });
+      }
+    }
+    for (const mo of routine.moments || []) {
+      for (const m of SELFIE_MOMENT) {
+        if (m.re.test(String(mo.what || ""))) found.push({ at: mo.at, style: m.style, why: m.why, from: mo.what });
+      }
+    }
+    return found.sort((a, b) => String(a.at).localeCompare(String(b.at))).slice(0, 3);
+  } catch {
+    return [];
+  }
+}
+
+/** A scheduled moment that has come round and not been photographed yet. */
 export function dueSelfie(slug = config.persona, now = new Date()) {
   if (!config.selfieEnabled) return null;
-  const times = String(config.selfieSchedule || "").split(",").map((t) => t.trim()).filter(Boolean);
-  if (!times.length) return null;
   const today = now.toISOString().slice(0, 10);
   const st = loadState(slug);
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  for (const t of times) {
-    const [h, m] = t.split(":").map(Number);
+  // a cap, because her routine mentions food three times a day and three mirror selfies a day is a habit
+  const sentToday = Object.keys(st.sent || {}).filter((k) => k.startsWith(today)).length;
+  if (sentToday >= Number(config.selfieMaxPerDay || 2)) return null;
+  for (const m of selfieMoments(slug, now)) {
+    const [h, mi] = String(m.at).split(":").map(Number);
     if (Number.isNaN(h)) continue;
-    const at = h * 60 + (m || 0);
+    const at = h * 60 + (mi || 0);
+    const key = `${today} ${m.at}`;
+    // within a 90 minute window, so a restart still catches up
+    if (nowMin >= at && nowMin - at <= 90 && !st.sent[key]) return { time: m.at, key, style: m.style, why: m.why, from: m.from };
+  }
+  // a fallback so a day with no matching moment still gets one selfie, not none
+  const fallback = String(config.selfieSchedule || "").split(",").map((t) => t.trim()).filter(Boolean);
+  for (const t of fallback) {
+    const [h, mi] = t.split(":").map(Number);
+    if (Number.isNaN(h)) continue;
+    const at = h * 60 + (mi || 0);
     const key = `${today} ${t}`;
-    // within a 90 minute window, so a restarted bot still catches up
-    if (nowMin >= at && nowMin - at <= 90 && !st.sent[key]) return { time: t, key };
+    if (nowMin >= at && nowMin - at <= 90 && !st.sent[key]) return { time: t, key, style: "casual", why: "outfit check" };
   }
   return null;
 }
@@ -124,11 +172,11 @@ export function markSelfieSent(slug, key) {
  * Make one and file it in the library. The photo is generated fresh, then humanised like everything else
  * and added with the mirror spot as its scene, so it can be sent again later and rated like the rest.
  */
-export async function makeSelfie(persona, { slug = null, day = null } = {}) {
+export async function makeSelfie(persona, { slug = null, day = null, style = "casual", why = "" } = {}) {
   const s = slug || persona?.slug || config.persona;
   if (!imageEngineReady()) return { ok: false, error: "no image engine configured" };
   const ref = avatarPath(s);
-  const prompt = selfiePrompt(persona, { day });
+  const prompt = selfiePrompt(persona, { day, style, why });
   const res = await generateImage({
     model: config.editModel,
     prompt,
