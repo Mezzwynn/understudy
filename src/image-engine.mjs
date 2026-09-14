@@ -20,10 +20,13 @@ const HEADERS = () => ({
 
 export const imageEngineReady = () => (config.imageEngine === "openrouter" ? !!config.openrouterApiKey : !!config.atlasApiKey);
 
-/** Ids differ between the two services, so the engine translates: flux/seedream exist on Atlas only. */
+/** Ids differ between the two services. Atlas ids carry a task suffix ("/text-to-image", "/edit");
+ *  OpenRouter slugs do not — so anything without the suffix is taken as an OpenRouter id as-is. */
 const OPENROUTER_FALLBACK = { text: "google/gemini-3.1-flash-image", edit: "google/gemini-3.1-flash-image" };
 function openRouterModel(model, images = []) {
-  if (/^google\//.test(model) || /^openai\//.test(model)) return model; // already an OpenRouter id
+  const id = String(model || "");
+  if (!/\/(text-to-image|edit)(-developer)?$/i.test(id)) return id;
+  if (/^(google|openai)\//.test(id)) return id;
   return (images || []).length ? OPENROUTER_FALLBACK.edit : OPENROUTER_FALLBACK.text;
 }
 
@@ -34,14 +37,17 @@ function openRouterModel(model, images = []) {
 async function viaOpenRouter({ model, prompt, aspect, images, timeoutSec }) {
   const parts = [...(images || []).map((url) => ({ type: "image_url", image_url: { url } })), { type: "text", text: prompt }];
   const t0 = Date.now();
-  try {
-    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const post = (modalities) =>
+    fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${config.openrouterApiKey}` },
       signal: AbortSignal.timeout(Math.min(timeoutSec, 180) * 1000),
-      body: JSON.stringify({ model, modalities: ["image", "text"], messages: [{ role: "user", content: parts }] }),
-    });
-    const j = await r.json();
+      body: JSON.stringify({ model, modalities, messages: [{ role: "user", content: parts }] }),
+    }).then((r) => r.json());
+  try {
+    let j = await post(["image", "text"]);
+    // image-only models (e.g. black-forest-labs/flux.2-pro) reject "image, text" and want just "image"
+    if (j.error && /modalities/i.test(String(j.error.message || ""))) j = await post(["image"]);
     if (j.error) return { ok: false, error: String(j.error.message || j.error).slice(0, 200), seconds: (Date.now() - t0) / 1000 };
     const msg = j.choices?.[0]?.message || {};
     const url = msg.images?.[0]?.image_url?.url || msg.images?.[0]?.imageUrl?.url || "";
@@ -63,7 +69,15 @@ async function viaOpenRouter({ model, prompt, aspect, images, timeoutSec }) {
 export async function generateImage({ model, prompt, aspect = "1:1", images = [], resolution = "1k", timeoutSec = 180 }) {
   if (!imageEngineReady()) return { ok: false, error: `image engine not configured (${config.imageEngine})` };
   if (config.imageEngine === "openrouter") {
-    return viaOpenRouter({ model: openRouterModel(model, images), prompt, aspect, images, timeoutSec });
+    const primary = openRouterModel(model, images);
+    const fallback = images.length ? OPENROUTER_FALLBACK.edit : OPENROUTER_FALLBACK.text;
+    const first = await viaOpenRouter({ model: primary, prompt, aspect, images, timeoutSec });
+    if (first.ok || primary === fallback) return first;
+    // the chosen model can be rejected upstream (e.g. flux.2-pro moderates a face+dress request);
+    // fall back to the known-good model so a selfie still comes out, and say so in the log
+    log(`image (openrouter): ${primary} failed (${first.error}) — retrying with ${fallback}`);
+    const second = await viaOpenRouter({ model: fallback, prompt, aspect, images, timeoutSec });
+    return second.ok ? second : first;
   }
   if (!/\/[a-z-]+$/i.test(String(model || ""))) return { ok: false, error: `model id needs a task suffix: ${model}` };
   const body = { model, prompt };
