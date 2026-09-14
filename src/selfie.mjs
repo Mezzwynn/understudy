@@ -92,6 +92,9 @@ const PAP_FACE = (mood) => ({
   half: `Only half of her face is in the frame — the edge of the photo cuts across her face, so one eye and half her mouth are visible. Her expression on the visible half: ${mood}.`,
   hide: `Her face is NOT in the frame at all — the photo is taken from the neck down, showing her outfit, or she is turned away, so no eyes, no nose and no mouth are visible.`,
 });
+
+/** A front-camera selfie must look like SHE is holding the lens, never like a third person took it. */
+const PAP_RULES = `She took this photo HERSELF, one arm stretched toward the lens — it must NOT look like someone else photographed her: she is seen from the FRONT and CLOSE, the background directly behind her, a slight foreshortening on the arm holding the phone. NOT a full-body shot from a distance, NOT from across the room, NOT posed for a photographer, no second person, no free hand doing something for the camera unless the pose says so. The phone, the screen and the lens are NEVER visible (the phone is the camera), and there is no mirror reflection. Slightly crooked framing, mild sensor noise, caught mid-movement, not a produced or staged photo. No text, no watermark.`;
 const FRAMING = [
   "waist up, the outfit readable",
   "shoulders down, the whole shirt visible",
@@ -118,26 +121,27 @@ function lastOutfit(slug) {
   }
 }
 
-/** How she stands/holds herself in a mirror selfie — the panel exposes a pose dropdown. */
-const POSES = {
-  natural: "standing relaxed with her weight on one leg, a normal quick mirror check, not posing at all",
-  peace: "holding up a small deadpan peace sign with her free hand, like she is half-mocking the gesture",
-  hip: "one hand on her hip, elbow out, looking a little impatient",
-  hair: "her free hand touching her hair or tucking a strand behind her ear, caught mid-motion",
-  sit: "sitting on the edge of her bed in front of the mirror, phone held up",
-  shoulder: "turned a little to the side, looking back over her shoulder at the mirror",
-  lean: "leaning her shoulder against the wall beside the mirror, phone held up, relaxed",
-  back: "her back turned to the mirror, head turned a little so only her profile shows, showing the outfit from behind",
-  crouch: "crouching low in front of the mirror, phone held up, like she is fixing her shoe or checking the hem",
-  coffee: "holding a mug of iced coffee in her free hand, phone up in the other",
-  stretch: "one arm stretched up overhead, caught mid-stretch, eyes half closed",
-  scroll: "eyes down on the screen, her thumb scrolling, not paying attention to the mirror at all",
-  tongue: "sticking the tip of her tongue out a little, teasing, almost a smirk",
-  laugh: "caught mid-laugh, eyes squeezed, the phone slightly tilted",
-  wink: "one eye closed in a small wink, deadpan otherwise",
-  bag: "a small bag hanging on her arm, about to leave, one last quick check",
-  hem: "bent forward a little, checking the hem or her shoes, phone held low",
-  floor: "sitting cross-legged on the floor in front of the mirror, phone held up",
+/** How she stands/holds herself — each pose belongs to one shot type, or to both.
+ *  `type` mirrors the SELFIE_TYPE: mirror poses need the reflection, pap poses are face gestures. */
+const POSE_DEFS = {
+  natural: { type: "both", label: "natural — santai", text: "standing relaxed with her weight on one leg, a normal quick check, not posing at all" },
+  peace: { type: "pap", label: "peace — dua jari", text: "holding up a small deadpan peace sign with her free hand, like she is half-mocking the gesture" },
+  hip: { type: "both", label: "tangan di pinggang", text: "one hand on her hip, elbow out, looking a little impatient" },
+  hair: { type: "both", label: "rapiin rambut", text: "her free hand touching her hair or tucking a strand behind her ear, caught mid-motion" },
+  sit: { type: "both", label: "duduk", text: "sitting on the edge of her bed, phone held up" },
+  shoulder: { type: "mirror", label: "noleh ke belakang (cermin)", text: "turned a little to the side, looking back over her shoulder at the mirror" },
+  lean: { type: "both", label: "bersandar tembok", text: "leaning her shoulder against the wall, phone held up, relaxed" },
+  back: { type: "mirror", label: "dari belakang (cermin)", text: "her back turned to the mirror, head turned a little so only her profile shows, showing the outfit from behind" },
+  crouch: { type: "mirror", label: "jongkok (cermin)", text: "crouching low in front of the mirror, phone held up, like she is fixing her shoe or checking the hem" },
+  coffee: { type: "both", label: "pegang kopi", text: "holding a mug of iced coffee in her free hand, phone up in the other" },
+  stretch: { type: "both", label: "stretching", text: "one arm stretched up overhead, caught mid-stretch, eyes half closed" },
+  scroll: { type: "pap", label: "main hp (scroll)", text: "eyes down on the screen, her thumb scrolling, not paying attention to the camera at all" },
+  tongue: { type: "pap", label: "melet", text: "sticking the tip of her tongue out a little, teasing, almost a smirk" },
+  laugh: { type: "both", label: "ketawa", text: "caught mid-laugh, eyes squeezed, the phone slightly tilted" },
+  wink: { type: "pap", label: "kedip", text: "one eye closed in a small wink, deadpan otherwise" },
+  bag: { type: "both", label: "bawa tas", text: "a small bag hanging on her arm, about to leave, one last quick check" },
+  hem: { type: "mirror", label: "cek hem (cermin)", text: "bent forward a little, checking the hem or her shoes in the mirror, phone held low" },
+  floor: { type: "both", label: "duduk lesehan", text: "sitting cross-legged on the floor, phone held up" },
 };
 
 /**
@@ -165,18 +169,20 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   const mood = pickR(MOOD, seed + 4);
   const mode = String(faceMode || config.selfieFace || "half").toLowerCase();
   const fm = FACE_LINES(mood)[mode] || FACE_LINES(mood).half;
-  const pose = POSES[String(poseMode || config.selfiePose || "auto").toLowerCase()] || null;
   const isPap = String(typeMode || config.selfieType || "mirror").toLowerCase() === "pap";
+  const poseKey = String(poseMode || config.selfiePose || "auto").toLowerCase();
+  const poseDef = POSE_DEFS[poseKey];
+  const pose = poseDef && (poseDef.type === "both" || poseDef.type === (isPap ? "pap" : "mirror")) ? poseDef.text : null;
   if (isPap) {
     const pf = PAP_FACE(mood)[mode] || PAP_FACE(mood).half;
     return [
       refs.length > 1 ? refs.join(" ") : `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
-      `New photo: a front-camera selfie she took at arm's length with her phone${why ? `, ${why}` : ""}. One arm is stretched toward the lens to hold the camera, but the phone itself is NEVER visible — the camera is where the photo comes from.`,
-      `PLACE: an ordinary lived-in room behind her — a plain wall, a bit of her bed or a desk visible, not tidy, not staged.`,
+      `New photo: a front-camera selfie she took HERSELF at arm's length with her phone${why ? `, ${why}` : ""}.`,
+      `PLACE: an ordinary lived-in room directly behind her — a plain wall, a bit of her bed or a desk, not tidy, not staged.`,
       `She is wearing ${wear}.${garment}`,
       pose ? `Pose: ${pose}.` : `${pickR(FRAMING, seed + 1)}, ${pickR(LIGHT, seed + 3)}.`,
       pf,
-      `Ordinary and unpolished: the framing is not quite straight, mild phone sensor noise, not a photoshoot, no filter. No text, no watermark.`,
+      PAP_RULES,
     ].join(" ");
   }
   return [
@@ -335,6 +341,7 @@ export const selfieSettings = (persona = null) => ({
   face: String(config.selfieFace || "half"),
   pose: String(config.selfiePose || "auto"),
   type: String(config.selfieType || "mirror"),
+  poses: [{ value: "auto", label: "auto (rotasi)", type: "both" }, ...Object.entries(POSE_DEFS).map(([value, d]) => ({ value, label: d.label, type: d.type }))],
   spotImage: persona?.mirror_spot_image ? "/spot" : "",
   sent: loadState(persona?.slug || config.persona).sent,
 });

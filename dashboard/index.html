@@ -1352,6 +1352,7 @@ const AGENT_IDEAS = [
  */
 function selfieCard(ph, gowns, styles) {
   const sf = ph.selfie || {};
+  window.SF_POSES = sf.poses || [];
   const on = (v) => (v ? "on" : "");
   const times = (sf.moments || []).map((m) => `${m.at} (${m.why})`).join(" · ") || "belum ada momen hari ini";
   return `<div class="card tight fadein" id="selfie-card">
@@ -1365,7 +1366,7 @@ function selfieCard(ph, gowns, styles) {
         <button class="switch ${on(sf.enabled)}" id="sf-enable" onclick="uwSelfieToggle(this,'SELFIE_ENABLED')"><span></span></button></div>
 
       <div class="mrow2"><span>Tipe</span>
-        <select class="sin" id="sf-type">
+        <select class="sin" id="sf-type" onchange="uwTypeChange()">
           <option value="mirror" ${(!sf.type || sf.type === "mirror") ? "selected" : ""}>mirror — lewat cermin</option>
           <option value="pap" ${sf.type === "pap" ? "selected" : ""}>pap — selfie biasa (front cam)</option>
         </select></div>
@@ -1379,25 +1380,7 @@ function selfieCard(ph, gowns, styles) {
 
       <div class="mrow2"><span>Pose</span>
         <select class="sin" id="sf-pose">
-          <option value="auto" ${(!sf.pose || sf.pose === "auto") ? "selected" : ""}>auto (rotasi)</option>
-          <option value="natural" ${sf.pose === "natural" ? "selected" : ""}>natural — santai</option>
-          <option value="peace" ${sf.pose === "peace" ? "selected" : ""}>peace — dua jari</option>
-          <option value="hip" ${sf.pose === "hip" ? "selected" : ""}>tangan di pinggang</option>
-          <option value="hair" ${sf.pose === "hair" ? "selected" : ""}>rapiin rambut</option>
-          <option value="sit" ${sf.pose === "sit" ? "selected" : ""}>duduk</option>
-          <option value="shoulder" ${sf.pose === "shoulder" ? "selected" : ""}>noleh ke belakang</option>
-          <option value="lean" ${sf.pose === "lean" ? "selected" : ""}>bersandar tembok</option>
-          <option value="back" ${sf.pose === "back" ? "selected" : ""}>dari belakang (outfit)</option>
-          <option value="crouch" ${sf.pose === "crouch" ? "selected" : ""}>jongkok</option>
-          <option value="coffee" ${sf.pose === "coffee" ? "selected" : ""}>pegang kopi</option>
-          <option value="stretch" ${sf.pose === "stretch" ? "selected" : ""}>stretching</option>
-          <option value="scroll" ${sf.pose === "scroll" ? "selected" : ""}>main hp (scroll)</option>
-          <option value="tongue" ${sf.pose === "tongue" ? "selected" : ""}>melet</option>
-          <option value="laugh" ${sf.pose === "laugh" ? "selected" : ""}>ketawa</option>
-          <option value="wink" ${sf.pose === "wink" ? "selected" : ""}>kedip</option>
-          <option value="bag" ${sf.pose === "bag" ? "selected" : ""}>bawa tas</option>
-          <option value="hem" ${sf.pose === "hem" ? "selected" : ""}>cek hem/sepatu</option>
-          <option value="floor" ${sf.pose === "floor" ? "selected" : ""}>duduk lesehan</option>
+          ${(sf.poses || []).filter((p) => p.type === "both" || p.type === (sf.type || "mirror")).map((p) => `<option value="${esc(p.value)}" ${(sf.pose || "auto") === p.value ? "selected" : ""}>${esc(p.label)}</option>`).join("")}
         </select></div>
 
       <div class="mrow2"><span>Tempat (jangan diubah-ubah)</span>
@@ -1512,6 +1495,17 @@ window.uwSpotDelete = async () => {
   const res = await api("/api/photos", { action: "spot-image-remove" });
   toast(res.ok ? "Foto tempat dihapus" : "Gagal: " + (res.error || ""));
   if (res.ok) { photosDirty = false; await refresh(true); }
+};
+
+/* pose yang tersedia ikut tipenya: mirror cuma pose cermin, pap cuma pose muka */
+window.uwTypeChange = () => {
+  const poseSel = document.getElementById("sf-pose");
+  if (!poseSel) return;
+  const type = document.getElementById("sf-type").value;
+  const prev = poseSel.value;
+  const opts = (window.SF_POSES || []).filter((p) => p.type === "both" || p.type === type);
+  poseSel.innerHTML = opts.map((p) => `<option value="${esc(p.value)}" ${p.value === prev ? "selected" : ""}>${esc(p.label)}</option>`).join("");
+  if (![...poseSel.options].some((o) => o.value === prev)) poseSel.value = "auto";
 };
 
 /* ═══════════════════════════ photos tab ═══════════════════════════ */
