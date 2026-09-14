@@ -119,8 +119,8 @@ export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warm
       return { mean: sum / n, contrast: Math.sqrt(Math.max(0, sumSq / n - (sum / n) ** 2)), saturation: (satSum / n) * 100 };
     };
     const now = grab(out);
-    const cScale = Math.min(1.15, Math.max(0.45, REAL_PHOTO_TARGET.contrast / Math.max(1, now.contrast)));
-    const sScale = Math.min(1.2, Math.max(0.6, REAL_PHOTO_TARGET.saturation / Math.max(1, now.saturation)));
+    const cScale = Math.min(1.2, Math.max(0.4, REAL_PHOTO_TARGET.contrast / Math.max(1, now.contrast)));
+    const sScale = Math.min(1.8, Math.max(0.6, REAL_PHOTO_TARGET.saturation / Math.max(1, now.saturation)));
     // contrast first, saturation second — the other order drops saturation twice
     for (let i = 0; i < out.length; i += 4) {
       for (let c = 0; c < 3; c++) {
@@ -128,7 +128,7 @@ export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warm
       }
     }
     const after = grab(out);
-    const s2 = Math.min(1.4, Math.max(0.5, REAL_PHOTO_TARGET.saturation / Math.max(1, after.saturation)));
+    const s2 = Math.min(1.8, Math.max(0.5, REAL_PHOTO_TARGET.saturation / Math.max(1, after.saturation)));
     for (let i = 0; i < out.length; i += 4) {
       const grey = 0.299 * out[i] + 0.587 * out[i + 1] + 0.114 * out[i + 2];
       for (let c = 0; c < 3; c++) {
@@ -158,8 +158,8 @@ export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warm
       }
       return { mean: sum / n, contrast: Math.sqrt(Math.max(0, sumSq / n - (sum / n) ** 2)), saturation: (satSum / n) * 100 };
     })();
-    const cFix = Math.min(1.3, Math.max(0.7, REAL_PHOTO_TARGET.contrast / Math.max(1, fin.contrast)));
-    const sFix = Math.min(1.5, Math.max(0.7, REAL_PHOTO_TARGET.saturation / Math.max(1, fin.saturation)));
+    const cFix = Math.min(1.8, Math.max(0.6, REAL_PHOTO_TARGET.contrast / Math.max(1, fin.contrast)));
+    const sFix = Math.min(2.4, Math.max(0.7, REAL_PHOTO_TARGET.saturation / Math.max(1, fin.saturation)));
     if (Math.abs(1 - cFix) > 0.05 || Math.abs(1 - sFix) > 0.05) {
       const fixed = Buffer.alloc(back.data.length);
       for (let i = 0; i < back.data.length; i += 4) {

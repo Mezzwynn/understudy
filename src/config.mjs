@@ -113,6 +113,8 @@ function buildConfig() {
   statusMinGapMin: num(envGet("STATUS_MIN_GAP_MIN", "150"), 150),
   statusMedia: envFlag("STATUS_MEDIA", true),
   // ── gambar: Atlas Cloud (pilihan Hik: nano-banana-pro buat wajah, seedream-v5 buat scene)
+  imageEngine: envGet("IMAGE_ENGINE", "atlas"),
+  openrouterApiKey: envGet("OPENROUTER_API_KEY", ""),
   atlasApiKey: envGet("ATLAS_API_KEY", ""),
   atlasBaseUrl: envGet("ATLAS_BASE_URL", "https://api.atlascloud.ai"),
   faceModel: envGet("FACE_MODEL", "black-forest-labs/flux-2-pro/text-to-image"),

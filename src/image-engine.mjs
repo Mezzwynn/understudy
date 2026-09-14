@@ -18,14 +18,53 @@ const HEADERS = () => ({
   "X-Atlas-Client": "understudy",
 });
 
-export const imageEngineReady = () => !!config.atlasApiKey;
+export const imageEngineReady = () => (config.imageEngine === "openrouter" ? !!config.openrouterApiKey : !!config.atlasApiKey);
+
+/** Ids differ between the two services, so the engine translates: flux/seedream exist on Atlas only. */
+const OPENROUTER_FALLBACK = { text: "google/gemini-3.1-flash-image", edit: "google/gemini-3.1-flash-image" };
+function openRouterModel(model, images = []) {
+  if (/^google\//.test(model) || /^openai\//.test(model)) return model; // already an OpenRouter id
+  return (images || []).length ? OPENROUTER_FALLBACK.edit : OPENROUTER_FALLBACK.text;
+}
+
+/**
+ * OpenRouter path: chat/completions with modalities ["image","text"], input images as data URLs.
+ * Same return shape as the Atlas path so callers do not care which engine is on.
+ */
+async function viaOpenRouter({ model, prompt, aspect, images, timeoutSec }) {
+  const parts = [...(images || []).map((url) => ({ type: "image_url", image_url: { url } })), { type: "text", text: prompt }];
+  const t0 = Date.now();
+  try {
+    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${config.openrouterApiKey}` },
+      signal: AbortSignal.timeout(Math.min(timeoutSec, 180) * 1000),
+      body: JSON.stringify({ model, modalities: ["image", "text"], messages: [{ role: "user", content: parts }] }),
+    });
+    const j = await r.json();
+    if (j.error) return { ok: false, error: String(j.error.message || j.error).slice(0, 200), seconds: (Date.now() - t0) / 1000 };
+    const msg = j.choices?.[0]?.message || {};
+    const url = msg.images?.[0]?.image_url?.url || msg.images?.[0]?.imageUrl?.url || "";
+    if (!url) return { ok: false, error: "no image in the reply", seconds: (Date.now() - t0) / 1000 };
+    const b64 = url.split(",")[1] || url;
+    const buf = Buffer.from(b64, "base64");
+    const seconds = Number(((Date.now() - t0) / 1000).toFixed(1));
+    log(`image (openrouter): ${model} → ${(buf.length / 1024).toFixed(0)} kb in ${seconds}s ($${Number(j.usage?.cost || 0).toFixed(3)})`);
+    return { ok: true, buf, url: "", seconds, price: Number(j.usage?.cost || 0) };
+  } catch (err) {
+    return { ok: false, error: err.message.slice(0, 200), seconds: (Date.now() - t0) / 1000 };
+  }
+}
 
 /**
  * Generate one image. Returns { ok, buf, url, seconds, price } — or { ok: false, error }.
  * `images` (public URLs) turns a text-to-image model call into an edit against a reference.
  */
 export async function generateImage({ model, prompt, aspect = "1:1", images = [], resolution = "1k", timeoutSec = 180 }) {
-  if (!imageEngineReady()) return { ok: false, error: "ATLAS_API_KEY is not set" };
+  if (!imageEngineReady()) return { ok: false, error: `image engine not configured (${config.imageEngine})` };
+  if (config.imageEngine === "openrouter") {
+    return viaOpenRouter({ model: openRouterModel(model, images), prompt, aspect, images, timeoutSec });
+  }
   if (!/\/[a-z-]+$/i.test(String(model || ""))) return { ok: false, error: `model id needs a task suffix: ${model}` };
   const body = { model, prompt };
   if (aspect) body.aspect_ratio = aspect;
