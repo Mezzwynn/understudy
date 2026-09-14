@@ -1385,7 +1385,7 @@ function renderPhotos(){
         <select class="sin" id="selfie-style">${(ph.wardrobeStyles||[]).map(t=>`<option value="${t}">${esc(t)}</option>`).join("")}</select></div>
       <div class="mrow2"><span>atau tulis sendiri</span>
         <input class="sin" id="selfie-outfit-text" placeholder="mis. dress hitam lengan panjang, atau kaos putih + celana denim"></div>
-      <div class="mrow2"><span>Simpan tulisannya ke wardrobe</span><span class="swline">${SW(false, "data-wto="1"")}</span></div>
+      <div class="mrow2"><span>Simpan tulisannya ke wardrobe</span><span class="swline">${SW(false, 'data-wto="1"')}</span></div>
     </div>
     <div class="btns">
       <button class="act" data-pact="selfie-save">Simpan</button>
