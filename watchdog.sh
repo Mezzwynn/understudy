@@ -21,7 +21,10 @@ echo "[$(date '+%F %T')] watchdog start (interval ${INTERVAL}s, pid $$)" >> watc
 
 last_dup=0
 while true; do
-  count="$(pgrep -cf '^node src/index\.mjs' 2>/dev/null || echo 0)"
+  # pgrep -c prints "0" AND exits 1 when nothing matches, so `|| echo 0` used to
+  # append a second 0 → count became "0\n0", which broke the restart branch.
+  count="$(pgrep -cf '^node src/index\.mjs' 2>/dev/null)"
+  count="${count:-0}"
   if [ "$count" = "0" ]; then
     echo "[$(date '+%F %T')] bot is down — restarting" >> watchdog.log
     ./start.sh >> watchdog.log 2>&1
