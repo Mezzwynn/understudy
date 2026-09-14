@@ -429,7 +429,7 @@ const MOODKEYS = ["valence","energy","arousal","affection","patience","playfulne
 const MOODCOLOR = { valence:"#cfe08a", energy:"#ffc773", arousal:"#ff9a6b", affection:"#ffb0c4", patience:"#a8dcd0", playfulness:"#ffe08a" };
 let PHOTO_PICK={outfit:"",style:"casual"};
 let DATA=null, tab="contacts", SETTINGS_LOADED=false, CHAR_SLUG=null, charDirty=false;
-let contactsDirty=false, dragging=false, AGENT_LOG=[], AGENT_LOADED=false;
+let contactsDirty=false, photosDirty=false, dragging=false, AGENT_LOG=[], AGENT_LOADED=false;
 const draft={}, openCards=new Set();
 
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2600); }
@@ -2173,7 +2173,7 @@ function renderAll(){
   if(tab==="contacts" && !dragging && !contactsDirty) renderContacts();
   if(tab==="chat") renderChat();
   if(tab==="status") renderStatus();
-  try { if(tab==="photos") renderPhotos(); } catch (err) { const el=$("#tab-photos"); if(el) el.innerHTML = `<div class="card tight"><b style="color:var(--bad)">Photos tab error</b><pre style="white-space:pre-wrap;margin-top:8px">${String(err && err.message || err)}</pre></div>`; }
+  if(tab==="photos" && !photosDirty) try { renderPhotos(); } catch (err) { const el=$("#tab-photos"); if(el) el.innerHTML = `<div class="card tight"><b style="color:var(--bad)">Photos tab error</b><pre style="white-space:pre-wrap;margin-top:8px">${String(err && err.message || err)}</pre></div>`; }
   if(tab==="character") renderCharacter();
   if(tab==="agent") renderAgent();
   if(tab==="schedule") renderSchedule();
@@ -2183,7 +2183,7 @@ function renderAll(){
 }
 async function refresh(force){
   DATA=await api("/api/summary");
-  if(force){ SETTINGS_LOADED=false; DATA.personaCard=null; charDirty=false; }
+  if(force){ SETTINGS_LOADED=false; DATA.personaCard=null; charDirty=false; photosDirty=false; }
   renderAll();
 }
 
@@ -2194,6 +2194,8 @@ document.addEventListener("input",(e)=>{
     contactsDirty=true;
     const h=$("#contacts-hint"); if(h) h.innerHTML='<span style="color:var(--warn)">● unsaved changes — press Save on that contact</span>';
   }
+  // the selfie/photo card has live text fields: an 8s re-render used to wipe whatever was being typed
+  if(t.closest&&t.closest("#tab-photos")) photosDirty=true;
   if(t.closest&&t.closest("#tab-character")){
     charDirty=true;
     const h=$("#char-hint"); if(h) h.innerHTML='<span style="color:var(--warn)">● unsaved changes</span>';
@@ -2321,6 +2323,7 @@ setInterval(()=>{
   if(document.hidden) return;
   if(["settings","character","agent"].includes(tab)) return;
   if(tab==="contacts" && (contactsDirty||dragging)) return;
+  if(tab==="photos" && photosDirty) return;
   refresh();
 },8000);
 setInterval(()=>{ if(tab==="contacts"&&!contactsDirty&&!dragging&&DATA) renderContacts(); }, 30000);
