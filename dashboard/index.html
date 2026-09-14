@@ -1269,7 +1269,7 @@ function renderPhotos(){
 
     <h3 style="margin:18px 0 6px;font-size:14px">Siapa yang boleh menerima foto</h3>
     <div class="cg">
-      ${(ph.contacts||[]).map(c=>`<label class="ci"><input type="checkbox" class="sn" data-contact="${esc(c.jid)}" ${c.allowed?"checked":""}><span>${esc(c.name)}${c.trusted?" · trusted":""}</span><span class="tiny">${c.sentCount||0} foto</span></label>`).join("") || '<div class="empty">Belum ada kontak.</div>'}
+      ${(ph.contacts||[]).map(c=>`<div class="ci"><label class="sw"><input type="checkbox" class="sn" data-contact="${esc(c.jid)}" ${c.allowed?"checked":""}><span></span></label><span>${esc(c.name)}${c.trusted?" · trusted":""}</span><span class="tiny">${c.sentCount||0} foto</span></div>`).join("") || '<div class="empty">Belum ada kontak.</div>'}
     </div>
     <div class="hint" style="margin-top:6px">Centang = dia boleh kirim foto ke orang itu. Yang tidak dicentang nggak akan pernah dapat foto.</div>
 
@@ -1298,8 +1298,8 @@ function renderPhotos(){
     <div class="hint" style="margin-bottom:8px">Kategori bikin bajunya <b>nggak asal random</b>: foto pilates nggak akan keluar pakai blazer.</div>
     <div class="wadd">
       <input class="sin" id="w-name" placeholder="mis. setelan olahraga hitam" style="flex:1;min-width:170px">
-      <div class="wchips">${(ph.wardrobeTimes||["pagi","siang","malam"]).map(t=>`<label class="wc"><input type="checkbox" class="w-time" value="${t}"><span>${t}</span></label>`).join("")}</div>
-      <div class="wchips">${(ph.wardrobeStyles||["casual","kerja","formal","fitness","santai","tidur"]).map(t=>`<label class="wc"><input type="checkbox" class="w-style" value="${t}"><span>${t}</span></label>`).join("")}</div>
+      <div class="wchips">${(ph.wardrobeTimes||["pagi","siang","malam"]).map(t=>`<div class="swline"><label class="sw"><input type="checkbox" class="sn w-time" value="${t}"><span></span></label><em>${t}</em></div>`).join("")}</div>
+      <div class="wchips">${(ph.wardrobeStyles||["casual","kerja","formal","fitness","santai","tidur"]).map(t=>`<div class="swline"><label class="sw"><input type="checkbox" class="sn w-style" value="${t}"><span></span></label><em>${t}</em></div>`).join("")}</div>
       <button class="act" data-pact="wardrobe-add">+ Tambah baju</button>
     </div>
     <div class="wlist">
@@ -1319,7 +1319,7 @@ function renderPhotos(){
     </div>
     <h3 style="margin:18px 0 6px;font-size:14px">Siapa yang boleh menerima foto</h3>
     <div class="cg">
-      ${(ph.contacts||[]).map(c=>`<label class="ci"><input type="checkbox" class="sn" data-contact="${esc(c.jid)}" ${c.allowed?"checked":""}><span>${esc(c.name)}${c.trusted?" · trusted":""}</span><span class="tiny">${c.sentCount||0} foto</span></label>`).join("") || '<div class="empty">Belum ada kontak.</div>'}
+      ${(ph.contacts||[]).map(c=>`<div class="ci"><label class="sw"><input type="checkbox" class="sn" data-contact="${esc(c.jid)}" ${c.allowed?"checked":""}><span></span></label><span>${esc(c.name)}${c.trusted?" · trusted":""}</span><span class="tiny">${c.sentCount||0} foto</span></div>`).join("") || '<div class="empty">Belum ada kontak.</div>'}
     </div>
     <div class="hint" style="margin-top:6px">Centang = dia boleh kirim foto ke orang itu. Yang tidak dicentang nggak akan pernah dapat foto.</div>
 
