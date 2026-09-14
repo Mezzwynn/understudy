@@ -363,7 +363,6 @@ function buildConfig() {
   // Photos & stickers out
   imageModel: envGet("IMAGE_MODEL", "gemini-2.5-flash-image"),
   photoChance: num(envGet("PHOTO_CHANCE", "0.05"), 0.05),
-  photoDailyMax: num(envGet("PHOTO_DAILY_MAX", "6"), 6),
   photoGlobalDailyMax: num(envGet("PHOTO_GLOBAL_DAILY_MAX", "30"), 30),
   stickerChance: num(envGet("STICKER_CHANCE", "0.08"), 0.08),
   // chance the sticker is the whole reply instead of an addition to text/voice
