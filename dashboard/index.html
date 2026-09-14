@@ -1488,6 +1488,14 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     return;
   }
 
+  const ssw = e.target.closest("[data-ssw]");
+  if(ssw){
+    ssw.classList.toggle("on");
+    await api("/api/photos",{ action:"selfie-settings", values:{ [ssw.dataset.ssw]: ssw.classList.contains("on") } });
+    toast(ssw.classList.contains("on") ? "Selfie terjadwal nyala" : "Selfie terjadwal mati");
+    return;
+  }
+
   const b = e.target.closest("[data-pact],[data-rate]"); if(!b) return;
   const act = b.dataset.pact, rate = b.dataset.rate;
   if(act==="save-settings"){
@@ -1517,13 +1525,6 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     const r = await api("/api/photos",{ action:"selfie-now" });
     toast(r.ok ? ("Selfie jadi & dikirim ke " + r.sent + " kontak") : ("Gagal: " + (r.error||"")));
     return refresh(true);
-  }
-  const ssw = e.target.closest("[data-ssw]");
-  if(ssw){
-    ssw.classList.toggle("on");
-    await api("/api/photos",{ action:"selfie-settings", values:{ [ssw.dataset.ssw]: ssw.classList.contains("on") } });
-    toast(ssw.classList.contains("on") ? "Selfie terjadwal nyala" : "Selfie terjadwal mati");
-    return;
   }
   if(act==="wardrobe-add"){
     const name = $("#w-name").value.trim();
