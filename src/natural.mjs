@@ -159,11 +159,14 @@ export function oddHourNote(now = new Date()) {
 /* ------------------------------ message edits ----------------------------- */
 
 /** A little afterthought she adds by editing the message she just sent. */
-export const EDIT_AFTERMATH = [
-  "…oh and drink water.",
-  "…and eat something.",
-  "…jangan lupa tidur.",
-  "…also: no.",
-  "…don't reply to that.",
-  "…kamu tau maksudku.",
-];
+/** Prompt for the afterthought. The words come from her, not from a list of six phrases — a canned line
+ *  is recognisable within a week, and the older version appended the same sentences in a fixed order. */
+export const EDIT_AFTERMATH_PROMPT = `You just sent a message. You may add ONE short afterthought by editing it — the way a person types the
+thing they actually meant to say a second later.
+Rules:
+- In the language you are already using with him. Max 8 words. Start with "…".
+- It is about HIM: eat, sleep, water, rest, get home safe, be careful. Nothing else.
+- Never mention money, price, payment, or anything about yourself being busy.
+- If nothing fits what you two were talking about, answer exactly: NONE`;
+
+

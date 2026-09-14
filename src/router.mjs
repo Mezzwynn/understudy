@@ -1,13 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { config, log, DATA_DIR } from "./config.mjs";
+import { chat as llmChat } from "./llm.mjs";
 import { loadChat, saveChat, loadState, saveState, listChats } from "./store.mjs";
 import { isPaused, pausedFor } from "./pause.mjs";
 import { recordEvent } from "./events.mjs";
 import { isSleeping, shouldIgnore, sleepiness } from "./sleep.mjs";
 import { detectCrisis, alertOwner } from "./crisis.mjs";
 import { worthReplying } from "./worth.mjs";
-import { dailyVariance, busyNow, EDIT_AFTERMATH } from "./natural.mjs";
+import { dailyVariance, busyNow, EDIT_AFTERMATH_PROMPT } from "./natural.mjs";
 import { generateReply, generateDryReply } from "./engine.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst } from "./texting.mjs";
@@ -1017,7 +1018,28 @@ async function respond(sock, jid, p) {
   if (textKeys.length && config.editChance > 0 && Math.random() < config.editChance) {
     try {
       const lastOne = textKeys[textKeys.length - 1];
-      const extra = pick(EDIT_AFTERMATH);
+      // she writes it herself, in the language of the conversation
+      const recent = chat.history
+        .slice(-6)
+        .map((m) => `${m.role === "assistant" ? "her" : "him"}: ${String(m.content || "").slice(0, 120)}`)
+        .join("\n");
+      let extra = "";
+      try {
+        const out = await llmChat(
+          [
+            { role: "system", content: EDIT_AFTERMATH_PROMPT },
+            { role: "user", content: `${recent}\n\nHer last message was: ${String(lastOne.text).slice(0, 200)}` },
+          ],
+          { temperature: 0.9, maxTokens: 30 },
+        );
+        extra = String(out || "").trim().split("\n")[0].slice(0, 60);
+      } catch (err) {
+        log(`afterthought skipped: ${err.message}`);
+      }
+      if (!extra || /^none$/i.test(extra) || extra.length < 3) {
+        log("afterthought: nothing worth adding");
+        return;
+      }
       const edited = `${lastOne.text.replace(/\s+$/, "")}\n${extra}`;
       await sleep(1500 + Math.random() * 4000);
       await sock.sendMessage(jid, { text: edited, edit: lastOne.key });
