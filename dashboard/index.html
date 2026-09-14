@@ -1294,6 +1294,56 @@ function renderPhotos(){
     <div class="btns"><button class="act" data-pact="save-settings">Simpan setelan</button>
       <span class="tiny">berlaku langsung, tanpa restart</span></div>
 
+    <h3 style="margin:18px 0 6px;font-size:14px">Baju — tambah manual, pakai kategori</h3>
+    <div class="hint" style="margin-bottom:8px">Kategori bikin bajunya <b>nggak asal random</b>: foto pilates nggak akan keluar pakai blazer.</div>
+    <div class="wadd">
+      <input class="sin" id="w-name" placeholder="mis. setelan olahraga hitam" style="flex:1;min-width:170px">
+      <div class="wchips">${(ph.wardrobeTimes||["pagi","siang","malam"]).map(t=>`<label class="wc"><input type="checkbox" class="w-time" value="${t}"><span>${t}</span></label>`).join("")}</div>
+      <div class="wchips">${(ph.wardrobeStyles||["casual","kerja","formal","fitness","santai","tidur"]).map(t=>`<label class="wc"><input type="checkbox" class="w-style" value="${t}"><span>${t}</span></label>`).join("")}</div>
+      <button class="act" data-pact="wardrobe-add">+ Tambah baju</button>
+    </div>
+    <div class="wlist">
+      ${(ph.wardrobe||[]).map(w=>`<div class="wrow" data-w="${esc(w.id)}">
+        ${w.image?`<img src="/wardrobe?id=${esc(w.id)}" alt="">`:'<div class="wno">—</div>'}
+        <div style="flex:1">
+          <div style="font-size:13px">${esc(w.name)}</div>
+          <div class="wchips" style="margin-top:4px">
+            ${(w.times||[]).map(t=>`<span class="wtag">${esc(t)}</span>`).join("")}
+            ${(w.styles||[]).map(t=>`<span class="wtag s">${esc(t)}</span>`).join("")}
+            ${(!(w.times||[]).length && !(w.styles||[]).length)?'<span class="wtag" style="opacity:.5">tanpa kategori</span>':""}
+          </div>
+        </div>
+        <label class="act" style="cursor:pointer;font-size:11px">Gambar<input type="file" accept="image/*" data-wimg="${esc(w.id)}" hidden></label>
+        <button class="act" data-wdel="${esc(w.id)}" style="color:var(--bad);font-size:11px">Hapus</button>
+      </div>`).join("") || '<div class="empty">Belum ada baju.</div>'}
+    </div>
+    <h3 style="margin:18px 0 6px;font-size:14px">Siapa yang boleh menerima foto</h3>
+    <div class="cg">
+      ${(ph.contacts||[]).map(c=>`<label class="ci"><input type="checkbox" class="sn" data-contact="${esc(c.jid)}" ${c.allowed?"checked":""}><span>${esc(c.name)}${c.trusted?" · trusted":""}</span><span class="tiny">${c.sentCount||0} foto</span></label>`).join("") || '<div class="empty">Belum ada kontak.</div>'}
+    </div>
+    <div class="hint" style="margin-top:6px">Centang = dia boleh kirim foto ke orang itu. Yang tidak dicentang nggak akan pernah dapat foto.</div>
+
+    <h3 style="margin:18px 0 6px;font-size:14px">Tampilan — "HP"-nya</h3>
+    <div class="rows">
+      <div class="mrow2"><span>Gaya kamera</span><select class="sin" data-pk="PHOTO_PHONE">${profOptions.map(([k,v])=>`<option value="${k}" ${st.PHOTO_PHONE===k?"selected":""}>${esc(v)}</option>`).join("")}</select></div>
+      <div class="mrow2"><span>Grain (0 = ikut gaya HP)</span><input class="nin" data-pk="PHOTO_GRAIN" type="number" min="0" max="40" value="${st.PHOTO_GRAIN ?? 0}"></div>
+      <div class="mrow2"><span>Bloom highlight (-1 = ikut gaya HP)</span><input class="nin" data-pk="PHOTO_BLOOM" type="number" step="0.01" min="-1" max="0.4" value="${st.PHOTO_BLOOM ?? -1}"></div>
+      <div class="mrow2"><span>Sisi terpanjang (px)</span><input class="nin" data-pk="PHOTO_MAX_SIDE" type="number" min="640" max="2048" value="${st.PHOTO_MAX_SIDE ?? 1280}"></div>
+      <div class="mrow2"><span>Kualitas JPEG</span><input class="nin" data-pk="PHOTO_QUALITY" type="number" min="40" max="95" value="${st.PHOTO_QUALITY ?? 74}"></div>
+      <div class="mrow2"><span>Belajar dari rating</span><label class="sw"><input type="checkbox" class="sn" data-pk="PHOTO_LEARN" ${st.PHOTO_LEARN?"checked":""}><span></span></label></div>
+    </div>
+
+    <h3 style="margin:18px 0 6px;font-size:14px">Model</h3>
+    <div class="rows">
+      <div class="mrow2"><span>Mesin</span><select class="sin" data-pk="IMAGE_ENGINE">${opt("IMAGE_ENGINE", st.IMAGE_ENGINE, [["atlas","Atlas Cloud"],["openrouter","OpenRouter"]])}</select></div>
+      <div class="mrow2"><span>Wajah</span><input class="sin" data-pk="FACE_MODEL" value="${esc(st.FACE_MODEL||"")}" style="min-width:230px"></div>
+      <div class="mrow2"><span>Tempat &amp; benda</span><input class="sin" data-pk="SCENE_MODEL" value="${esc(st.SCENE_MODEL||"")}" style="min-width:230px"></div>
+      <div class="mrow2"><span>Pakai foto referensi</span><input class="sin" data-pk="EDIT_MODEL" value="${esc(st.EDIT_MODEL||"")}" style="min-width:230px"></div>
+      <div class="mrow2"><span>Kandidat wajah per run</span><input class="nin" data-pk="PHOTO_CANDIDATE_COUNT" type="number" min="1" max="8" value="${st.PHOTO_CANDIDATE_COUNT ?? 4}"></div>
+    </div>
+    <div class="btns"><button class="act" data-pact="save-settings">Simpan setelan</button>
+      <span class="tiny">berlaku langsung, tanpa restart</span></div>
+
     <h3 style="margin:18px 0 6px;font-size:14px">Baju — teks &amp; gambar</h3>
     <div class="wg">
       ${(ph.wardrobe||[]).map((w,i)=>`<div class="wi">
@@ -1349,6 +1399,23 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     toast(r.ok?"Setelan foto disimpan (langsung berlaku)":("Gagal: "+(r.error||"")));
     return refresh(true);
   }
+  if(act==="wardrobe-add"){
+    const name = $("#w-name").value.trim();
+    if(!name) return toast("Nama bajunya belum diisi");
+    const times = $$("#tab-photos .w-time").filter(x=>x.checked).map(x=>x.value);
+    const styles = $$("#tab-photos .w-style").filter(x=>x.checked).map(x=>x.value);
+    const r = await api("/api/photos",{ action:"wardrobe-add", name, times, styles });
+    toast(r.ok?"Baju ditambahkan":("Gagal: "+(r.error||"")));
+    return refresh(true);
+  }
+  const wdel = e.target.closest("[data-wdel]");
+  if(wdel){
+    const r = await api("/api/photos",{ action:"wardrobe-remove", id: wdel.dataset.wdel });
+    toast(r.ok?"Baju dihapus":("Gagal: "+(r.error||"")));
+    return refresh(true);
+  }
+  const wimgbtn = e.target.closest("[data-wimg]");
+  if(wimgbtn){ const inp = wimgbtn.querySelector("input[type=file]"); if(inp) inp.click(); return; }
   if(act==="wardrobe-upload"){
     const inp = b.querySelector("input[type=file]");
     if(inp) inp.click();
@@ -1369,6 +1436,17 @@ $("#tab-photos").addEventListener("click", async (e)=>{
 });
 
 $("#tab-photos").addEventListener("change", async (e)=>{
+  const wimg = e.target.closest("[data-wimg]");
+  if(wimg && wimg.files?.[0]){
+    const file = wimg.files[0];
+    if(file.size > 6*1024*1024) return toast("Gambarnya kegedhean (maks 6MB)");
+    const ext = (file.name.split(".").pop()||"jpg").toLowerCase();
+    const data = await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(",")[1]);fr.readAsDataURL(file);});
+    toast("Mengunggah gambar baju…");
+    const r = await api("/api/photos",{ action:"wardrobe-image", id: wimg.dataset.wimg, data, ext });
+    toast(r.ok?"Gambar baju disimpan":("Gagal: "+(r.error||"")));
+    return refresh(true);
+  }
   const up = e.target.closest("[data-wup]");
   if(up && up.files?.[0]){
     const file = up.files[0];
