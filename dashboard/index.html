@@ -1364,6 +1364,12 @@ function selfieCard(ph, gowns, styles) {
       <div class="mrow2"><span>Aktif</span>
         <button class="switch ${on(sf.enabled)}" id="sf-enable" onclick="uwSelfieToggle(this,'SELFIE_ENABLED')"><span></span></button></div>
 
+      <div class="mrow2"><span>Tipe</span>
+        <select class="sin" id="sf-type">
+          <option value="mirror" ${(!sf.type || sf.type === "mirror") ? "selected" : ""}>mirror — lewat cermin</option>
+          <option value="pap" ${sf.type === "pap" ? "selected" : ""}>pap — selfie biasa (front cam)</option>
+        </select></div>
+
       <div class="mrow2"><span>Wajah</span>
         <select class="sin" id="sf-face">
           <option value="full" ${sf.face === "full" ? "selected" : ""}>full — kelihatan semua</option>
@@ -1455,6 +1461,7 @@ window.uwSelfieSave = async () => {
     SELFIE_OUTFIT: document.getElementById("sf-outfit").value,
     SELFIE_FACE: document.getElementById("sf-face").value,
     SELFIE_POSE: document.getElementById("sf-pose").value,
+    SELFIE_TYPE: document.getElementById("sf-type").value,
   };
   const spot = document.getElementById("sf-spot").value.trim();
   const typed = document.getElementById("sf-outfit-text").value.trim();
@@ -1471,7 +1478,7 @@ window.uwSelfieSave = async () => {
   const now = read && read.selfie ? read.selfie : null;
   if (st) {
     st.textContent = now
-      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · baju: ${now.outfit || "rotasi"} · wajah: ${now.face || "half"} · pose: ${now.pose || "auto"} · maks: ${now.maxPerDay}${extra}`
+      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · tipe: ${now.type || "mirror"} · baju: ${now.outfit || "rotasi"} · wajah: ${now.face || "half"} · pose: ${now.pose || "auto"} · maks: ${now.maxPerDay}${extra}`
       : "tersimpan ✓";
   }
   PHOTO_PICK = { outfit: document.getElementById("sf-outfit").value, style: document.getElementById("sf-style").value, typed };

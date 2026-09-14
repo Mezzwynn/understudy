@@ -84,6 +84,14 @@ const FACE_LINES = (mood) => ({
     face: `Her face is FULLY HIDDEN behind the phone: the phone covers her whole face in the mirror, so no eyes, no nose and no mouth are visible — at most a little hair or her forehead above the top edge. Her hand gripping the phone is clearly visible.`,
   },
 });
+
+/** Front-camera "pap" selfie (no mirror): the face rules read differently when she is the one
+ *  holding the lens at arm's length and there is no reflection. */
+const PAP_FACE = (mood) => ({
+  full: `Her whole face is visible and clear, close to the camera. Her expression: ${mood}. She is looking into the lens or at the screen.`,
+  half: `Her face is HALF HIDDEN by the phone: it covers one half of her face, so only one eye and half her mouth are visible and the other side is behind the phone. Her expression on the visible half: ${mood}.`,
+  hide: `Her face is FULLY HIDDEN behind the phone: the phone covers her whole face, so no eyes, no nose and no mouth are visible — at most a little hair or her forehead above the top edge.`,
+});
 const FRAMING = [
   "waist up, the outfit readable",
   "shoulders down, the whole shirt visible",
@@ -136,7 +144,7 @@ const POSES = {
  * The prompt. The spot comes from the character (bedroom mirror by the door by default) and is the same
  * every time; everything else is drawn from the lists above by day, so two selfies never look alike.
  */
-export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, style = "casual", why = "", slug: slugIn = null } = {}) {
+export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, typeMode = null, style = "casual", why = "", slug: slugIn = null } = {}) {
   const slug = slugIn || persona?.slug || config.persona;
   const d = day || new Date();
   // Vary per shot, not per day: with a day-only seed every selfie on the same day shared the same
@@ -158,6 +166,19 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   const mode = String(faceMode || config.selfieFace || "half").toLowerCase();
   const fm = FACE_LINES(mood)[mode] || FACE_LINES(mood).half;
   const pose = POSES[String(poseMode || config.selfiePose || "auto").toLowerCase()] || null;
+  const isPap = String(typeMode || config.selfieType || "mirror").toLowerCase() === "pap";
+  if (isPap) {
+    const pf = PAP_FACE(mood)[mode] || PAP_FACE(mood).half;
+    return [
+      refs.length > 1 ? refs.join(" ") : `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
+      `New photo: a front-camera selfie she took at arm's length with her phone${why ? `, ${why}` : ""}. One arm is stretched toward the lens and her hand is clearly holding the phone, fingers wrapped around it.`,
+      `PLACE: an ordinary lived-in room behind her — a plain wall, a bit of her bed or a desk visible, not tidy, not staged.`,
+      `She is wearing ${wear}.${garment}`,
+      pose ? `Pose: ${pose}.` : `${pickR(FRAMING, seed + 1)}, ${pickR(LIGHT, seed + 3)}.`,
+      pf,
+      `Ordinary and unpolished: the framing is not quite straight, mild phone sensor noise, not a photoshoot, no filter. No text, no watermark.`,
+    ].join(" ");
+  }
   return [
     refs.length > 1 ? refs.join(" ") : `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
     `New photo: a mirror selfie she took with her phone${why ? `, ${why}` : ""}. ${fm.hold}`,
@@ -264,8 +285,9 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
   const outfitRef = item?.image && images.length && fs.existsSync(item.image);
   if (outfitRef) images.push(dataUrl(item.image));
   // the same room every time, when the panel attached a picture of it: then only the camera moves
+  const isPapShot = String(config.selfieType || "mirror").toLowerCase() === "pap";
   const spotFile = String(persona?.mirror_spot_image || "");
-  const spotRef = spotFile && images.length && fs.existsSync(spotFile);
+  const spotRef = !isPapShot && spotFile && images.length && fs.existsSync(spotFile);
   if (spotRef) images.push(dataUrl(spotFile));
   const prompt = selfiePrompt(persona, { day, style, why, outfit: wear, outfitItem: item, outfitRef: !!outfitRef, spotRef: !!spotRef, slug: s });
   const res = await generateImage({
@@ -312,6 +334,7 @@ export const selfieSettings = (persona = null) => ({
   outfit: String(config.selfieOutfit || ""),
   face: String(config.selfieFace || "half"),
   pose: String(config.selfiePose || "auto"),
+  type: String(config.selfieType || "mirror"),
   spotImage: persona?.mirror_spot_image ? "/spot" : "",
   sent: loadState(persona?.slug || config.persona).sent,
 });
