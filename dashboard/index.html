@@ -1310,6 +1310,7 @@ function renderPhotos(){
   const root=$("#tab-photos"); if(!root) return;
   const ph = DATA.photos || { history: [], settings: {}, profiles: {}, wardrobe: [], scores: {}, contacts: [] };
   const st = ph.settings || {};
+  const st2 = st;
   const gowns = ph.wardrobe || [];
   const times = ph.wardrobeTimes || ["pagi","siang","malam"];
   const styles = ph.wardrobeStyles || ["casual","kerja","formal","fitness","santai","tidur"];
@@ -1362,6 +1363,24 @@ function renderPhotos(){
       ${numRow("Kandidat wajah per run","PHOTO_CANDIDATE_COUNT", st.PHOTO_CANDIDATE_COUNT ?? 4, 1, 8)}
     </div>
     <div class="btns"><button class="act" data-pact="save-settings">Simpan</button></div>
+  </div>
+
+  <div class="card tight fadein">
+    <h2 style="margin:0 0 4px">Selfie terjadwal</h2>
+    <div class="hint" style="margin-bottom:10px">Tempatnya <b>selalu sama</b> (itu yang bikin masuk akal); yang berganti tiap kali: baju, angle, cahaya, framing, ekspresi.
+      Jamnya <b>ikut rutinitasnya</b> — keluar, olahraga, habis ganti, pergi makan.</div>
+    <div class="rows">
+      <div class="mrow2"><span>Aktif</span><span class="swline">${SW(st2.SELFIE_ENABLED, `data-ssw="SELFIE_ENABLED"`)}</span></div>
+      <div class="mrow2"><span>Tempat (jangan diubah-ubah)</span><input class="sin" id="selfie-spot" value="${esc((ph.selfie||{}).spot||"")}"></div>
+      <div class="mrow2"><span>Jam cadangan (kalau rutinitasnya nggak ada momen)</span><input class="sin" id="selfie-sched" value="${esc((ph.selfie||{}).schedule||"")}"></div>
+      <div class="mrow2"><span>Maksimal per hari</span><input class="nin" type="number" id="selfie-max" min="1" max="5" value="${(ph.selfie||{}).maxPerDay ?? 2}"></div>
+    </div>
+    <div class="btns">
+      <button class="act" data-pact="selfie-save">Simpan</button>
+      <button class="act" data-pact="selfie-now">Bikin &amp; kirim sekarang</button>
+      <span class="tiny">$0.07 per selfie · dikirim ke kontak yang diizinkan</span>
+    </div>
+    ${((ph.selfie||{}).moments||[]).length?`<div class="hint" style="margin-top:8px">Momen selfie hari ini dari rutinitasnya: ${(ph.selfie.moments||[]).map(m=>`<b>${esc(m.at)}</b> (${esc(m.why)})`).join(" · ")}</div>`:""}
   </div>
 
   <h2 style="margin:20px 0 8px;font-size:17px">Baju (${gowns.length})</h2>
@@ -1483,6 +1502,28 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     const r = await api("/api/photos",{ action:"settings", values });
     toast(r.ok?"Disimpan (langsung berlaku)":("Gagal: "+(r.error||"")));
     return refresh(true);
+  }
+  if(act==="selfie-save"){
+    const values = {
+      SELFIE_SCHEDULE: $("#selfie-sched").value.trim(),
+      SELFIE_MAX_PER_DAY: $("#selfie-max").value,
+    };
+    const r = await api("/api/photos",{ action:"selfie-settings", values, spot: $("#selfie-spot").value.trim() });
+    toast(r.ok?"Setelan selfie disimpan":("Gagal: "+(r.error||"")));
+    return refresh(true);
+  }
+  if(act==="selfie-now"){
+    toast("Bikin selfie… (10-20 detik)");
+    const r = await api("/api/photos",{ action:"selfie-now" });
+    toast(r.ok ? ("Selfie jadi & dikirim ke " + r.sent + " kontak") : ("Gagal: " + (r.error||"")));
+    return refresh(true);
+  }
+  const ssw = e.target.closest("[data-ssw]");
+  if(ssw){
+    ssw.classList.toggle("on");
+    await api("/api/photos",{ action:"selfie-settings", values:{ [ssw.dataset.ssw]: ssw.classList.contains("on") } });
+    toast(ssw.classList.contains("on") ? "Selfie terjadwal nyala" : "Selfie terjadwal mati");
+    return;
   }
   if(act==="wardrobe-add"){
     const name = $("#w-name").value.trim();

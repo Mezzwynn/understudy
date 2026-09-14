@@ -18,6 +18,7 @@ import { stripAudioTags, detectInjection } from "./guard.mjs";
 import { applyDeltas, normalize, isMoodLocked, baselineFor, KEYS as MOOD_KEYS } from "./mood.mjs";
 import { generateImage, randomSticker, saveUserSticker } from "./image.mjs";
 import { shouldSendPhoto, markSent } from "./photo-library.mjs";
+import { makeSelfie } from "./selfie.mjs";
 import {
   decide,
   promoteIfReady,
@@ -794,15 +795,46 @@ async function respond(sock, jid, p) {
       }
     })();
     const decision = shouldSendPhoto({ chat, moment, sleepy, force: wantsPhoto });
-    if (decision.ok) {
-      const photo = decision.photo;
+    // When he asks, sometimes she takes a NEW one at the mirror instead of picking an old photo out of the
+    // library — a person asked for a photo does not scroll through their camera roll.
+    let freshSelfie = null;
+    if (wantsPhoto && config.selfieEnabled && Math.random() < 0.5) {
+      try {
+        const made = await makeSelfie(persona, { slug: persona.slug || config.persona, style: "casual", why: "she just took it, for him" });
+        if (made.ok) freshSelfie = made;
+        else log(`fresh selfie failed: ${made.error}`);
+      } catch (err) {
+        log(`fresh selfie failed: ${err.message}`);
+      }
+    }
+    if (freshSelfie || decision.ok) {
+      const photo = freshSelfie ? freshSelfie.photo : decision.photo;
       try {
         const file = path.join(DATA_DIR, "photos", "library", String(persona.slug || config.persona), photo.file);
         if (fs.existsSync(file)) {
           await presence(sock, jid, "composing");
           await sleep(1200 + Math.random() * 1800);
           // a photo goes first, and the line that follows never describes the picture
-          const caption = chatText.length <= 160 ? chatText : undefined;
+          let caption = chatText.length <= 160 ? chatText : undefined;
+          if (freshSelfie && Math.random() < 0.4) {
+            try {
+              const recent = chat.history.slice(-4).map((m) => `${m.role === "assistant" ? "her" : "him"}: ${String(m.content || "").slice(0, 90)}`).join("\n");
+              const line = await llmChat(
+                [
+                  {
+                    role: "system",
+                    content: `You just took a mirror selfie and are sending it. Add ONE very short line, in the language you two are using, max 6 words — dry, low effort, like "outfit check." or "this one ok?" or "capek.". No emoji. No money. If nothing fits, answer NONE.`,
+                  },
+                  { role: "user", content: recent },
+                ],
+                { temperature: 1.0, maxTokens: 20 },
+              );
+              const cl = String(line || "").trim().split("\n")[0].slice(0, 40);
+              if (cl && !/^none$/i.test(cl)) caption = cl;
+            } catch {
+              /* a caption is optional */
+            }
+          }
           await sendImage(sock, jid, fs.readFileSync(file), "image/jpeg", caption);
           chat.stats.outbound = (chat.stats.outbound || 0) + 1;
           chat.stats.photoCount = (chat.stats.photoCount || 0) + 1;

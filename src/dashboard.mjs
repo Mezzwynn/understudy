@@ -41,6 +41,7 @@ import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
 import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent, photoHistory, rateSent, sceneScores } from "./photo-library.mjs";
 import { PHONE_PROFILES } from "./humanize.mjs";
 import { wardrobeFor, loadWardrobe, addWardrobeItem, updateWardrobeItem, removeWardrobeItem, setWardrobeImage, TIMES, STYLES } from "./photos.mjs";
+import { selfieSettings, selfieMoments, makeSelfie } from "./selfie.mjs";
 import { describeOutfit } from "./photo-check.mjs";
 import {
   loadFace,
@@ -348,6 +349,7 @@ async function summary() {
         scores: sceneScores(slug),
         wardrobeTimes: TIMES,
         wardrobeStyles: STYLES,
+        selfie: { ...selfieSettings(loadPersona(slug)), moments: selfieMoments(slug) },
         contacts: listChats().map((c) => ({ jid: c.jid, name: c.profile?.name || c.name || String(c.jid).split("@")[0], trusted: c.trusted === true, allowed: c.photoAllowed !== false && (c.photoAllowed === true || c.trusted === true), sentCount: (c.stats?.photoCount || 0), lastAt: c.stats?.lastPhotoAt || 0 })),
         profiles: Object.fromEntries(Object.entries(PHONE_PROFILES).map(([k, v]) => [k, v.label])),
         wardrobe: wardrobeFor(loadPersona(slug)),
@@ -582,6 +584,7 @@ export function startDashboard() {
           ...lib,
           wardrobeTimes: TIMES,
           wardrobeStyles: STYLES,
+          selfie: { ...selfieSettings(loadPersona(slug)), moments: selfieMoments(slug) },
           contacts: listChats().map((c) => ({ jid: c.jid, name: c.profile?.name || c.name || String(c.jid).split("@")[0], trusted: c.trusted === true, allowed: c.photoAllowed !== false && (c.photoAllowed === true || c.trusted === true), sentCount: (c.stats?.photoCount || 0), lastAt: c.stats?.lastPhotoAt || 0 })),
           history,
           scores: sceneScores(slug),
@@ -834,6 +837,41 @@ export function startDashboard() {
             log(`photo permission: ${body.jid} → ${chat2.photoAllowed === undefined ? "default" : chat2.photoAllowed}`);
             return json(res, 200, { ok: true });
           }
+          if (act === "selfie-now") {
+            const persona = loadPersona(slug);
+            const r = await makeSelfie(persona, { slug });
+            if (!r.ok) return json(res, 400, { ok: false, error: r.error });
+            const photo = loadWardrobe ? null : null;
+            const lib = loadLibrary(slug);
+            const file = path.join(DATA_DIR, "photos", "library", slug, r.photo.file);
+            let sent = 0;
+            if (body.send !== false && fs.existsSync(file)) {
+              const { getSock, sendImage } = await import("./whatsapp.mjs");
+              const sock = getSock();
+              if (sock) {
+                for (const c of listChats()) {
+                  if (c.photoAllowed === false) continue;
+                  if (c.photoAllowed !== true && c.trusted !== true) continue;
+                  try {
+                    await sendImage(sock, c.jid, fs.readFileSync(file), "image/jpeg");
+                    markSent(slug, r.photo.id, c.jid, { why: "selfie manual dari panel" });
+                    sent++;
+                  } catch (err) {
+                    log(`selfie manual gagal ke ${c.jid}: ${err.message}`);
+                  }
+                }
+              }
+            }
+            return json(res, 200, { ok: true, photo: r.photo, seconds: r.seconds, price: r.price, sent });
+          }
+          if (act === "selfie-settings") {
+            applyValues(body.values || {});
+            if (typeof body.spot === "string") setPersonaField(slug, "mirror_spot", body.spot.slice(0, 300));
+            reloadConfig();
+            log("dashboard: setelan selfie diperbarui");
+            return json(res, 200, { ok: true, selfie: selfieSettings(loadPersona(slug)) });
+          }
+
           if (act === "wardrobe-add") {
             const r = addWardrobeItem(slug, { name: body.name, times: body.times || [], styles: body.styles || [] });
             return json(res, r.ok ? 200 : 400, { ...r, wardrobe: loadWardrobe(slug).items });
