@@ -88,9 +88,9 @@ const FACE_LINES = (mood) => ({
 /** Front-camera "pap" selfie (no mirror): the face rules read differently when she is the one
  *  holding the lens at arm's length and there is no reflection. */
 const PAP_FACE = (mood) => ({
-  full: `Her whole face is visible and clear, close to the camera. Her expression: ${mood}. She is looking into the lens or at the screen.`,
-  half: `Her face is HALF HIDDEN by the phone: it covers one half of her face, so only one eye and half her mouth are visible and the other side is behind the phone. Her expression on the visible half: ${mood}.`,
-  hide: `Her face is FULLY HIDDEN behind the phone: the phone covers her whole face, so no eyes, no nose and no mouth are visible — at most a little hair or her forehead above the top edge.`,
+  full: `Her whole face is visible and clear, close to the camera. Her expression: ${mood}. She is looking into the lens.`,
+  half: `Only half of her face is in the frame — the edge of the photo cuts across her face, so one eye and half her mouth are visible. Her expression on the visible half: ${mood}.`,
+  hide: `Her face is NOT in the frame at all — the photo is taken from the neck down, showing her outfit, or she is turned away, so no eyes, no nose and no mouth are visible.`,
 });
 const FRAMING = [
   "waist up, the outfit readable",
@@ -171,7 +171,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
     const pf = PAP_FACE(mood)[mode] || PAP_FACE(mood).half;
     return [
       refs.length > 1 ? refs.join(" ") : `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
-      `New photo: a front-camera selfie she took at arm's length with her phone${why ? `, ${why}` : ""}. One arm is stretched toward the lens and her hand is clearly holding the phone, fingers wrapped around it.`,
+      `New photo: a front-camera selfie she took at arm's length with her phone${why ? `, ${why}` : ""}. One arm is stretched toward the lens to hold the camera, but the phone itself is NEVER visible — the camera is where the photo comes from.`,
       `PLACE: an ordinary lived-in room behind her — a plain wall, a bit of her bed or a desk visible, not tidy, not staged.`,
       `She is wearing ${wear}.${garment}`,
       pose ? `Pose: ${pose}.` : `${pickR(FRAMING, seed + 1)}, ${pickR(LIGHT, seed + 3)}.`,
