@@ -486,6 +486,40 @@ export function startDashboard() {
       }
 
       // rating page: Hik's eye is the ground truth for photos, so it gets a page
+      // What the browser actually sees: load the panel in an iframe and report any JS error it throws.
+      if (req.method === "GET" && url.pathname === "/diag") {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+        return res.end(`<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<body style="background:#131109;color:#f3e6d2;font:14px/1.6 system-ui;padding:16px">
+<h1 style="font-size:18px;margin:0 0 8px">Diagnosa panel</h1>
+<p style="color:#b39a78;margin:0 0 10px">Halaman ini membuka panel di dalam iframe dan menangkap error JavaScript-nya.</p>
+<pre id="out" style="white-space:pre-wrap;background:#1c1810;border:1px solid #33291c;border-radius:12px;padding:12px;min-height:100px">memuat…</pre>
+<iframe id="f" src="/?diag=1" style="width:100%;height:60vh;border:1px solid #33291c;border-radius:12px;background:#000;margin-top:10px"></iframe>
+<script>
+const out = document.getElementById("out");
+const lines = [];
+const say = (t) => { lines.push(t); out.textContent = lines.join("\n"); };
+const f = document.getElementById("f");
+f.addEventListener("load", () => {
+  say("panel dimuat: " + new Date().toLocaleTimeString("id-ID"));
+  try {
+    const w = f.contentWindow;
+    w.addEventListener("error", (e) => say("ERROR: " + e.message + " @ " + String(e.filename||"").split("/").pop() + ":" + e.lineno));
+    w.addEventListener("unhandledrejection", (e) => say("REJECT: " + (e.reason && e.reason.message || e.reason)));
+    const d = w.document;
+    const stamp = d.querySelector("script") && /BUILD_STAMP = "([^"]+)"/.exec(w.document.documentElement.innerHTML);
+    say("build: " + (stamp ? stamp[1] : "tidak terbaca"));
+    say("tombol switch di halaman: " + d.querySelectorAll(".switch").length);
+    say("kartu selfie ada: " + (d.documentElement.innerHTML.includes("Selfie terjadwal") ? "ya" : "TIDAK"));
+    say("tab Photos ada: " + (d.querySelector("#tab-photos") ? "ya" : "TIDAK"));
+    say("handler 'photos' terpasang: " + (typeof w.renderPhotos === "function" ? "ya" : "TIDAK"));
+    try { w.renderPhotos && w.renderPhotos(); say("renderPhotos() jalan tanpa error ✓"); }
+    catch (err) { say("renderPhotos() ERROR: " + err.message); }
+  } catch (err) { say("tidak bisa memeriksa isi iframe: " + err.message); }
+});
+</script>`);
+      }
+
       // escape hatch: open /reset-sw once when the panel keeps showing an old version
       if (req.method === "GET" && url.pathname === "/reset-sw") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });

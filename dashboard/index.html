@@ -368,6 +368,20 @@
 </div>
 
 <script>
+// Kalau ada error JS, tampilkan di layar: error sebelumnya bikin tombol & switch diam tanpa jejak
+window.addEventListener("error", (e) => {
+  try {
+    let b = document.getElementById("understudyErrorBar");
+    if (!b) {
+      b = document.createElement("div");
+      b.id = "understudyErrorBar";
+      b.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#4d1a1a;color:#ffc9c9;font:12px/1.45 monospace;padding:8px 10px;white-space:pre-wrap;max-height:34vh;overflow:auto";
+      document.body.appendChild(b);
+    }
+    b.textContent = "PANEL ERROR: " + (e.message || e.type) + " @ " + String(e.filename || "").split("/").pop() + ":" + (e.lineno || "?");
+  } catch {}
+});
+
 // no service worker: it only ever hid updates
 if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
 
