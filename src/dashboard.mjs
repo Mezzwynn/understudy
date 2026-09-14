@@ -12,7 +12,10 @@ import { ROOT, PERSONA_DIR, DATA_DIR, config, envGet, STARTED_AT, log, reloadCon
  * refreshes from this payload, and any key missing here came back empty and overwrote what was on screen.
  */
 function panelSettings() {
-  const wanted = (k) => k.startsWith("PHOTO_") || k.startsWith("SELFIE_") || k === "IMAGE_ENGINE";
+  // Everything the photos tab renders. The three model keys do not start with PHOTO_, which is how they
+  // ended up missing from the payload and the panel drew them empty.
+  const MODEL_KEYS = ["IMAGE_ENGINE", "FACE_MODEL", "SCENE_MODEL", "EDIT_MODEL"];
+  const wanted = (k) => k.startsWith("PHOTO_") || k.startsWith("SELFIE_") || MODEL_KEYS.includes(k);
   return Object.fromEntries(
     FEATURES.filter((f) => wanted(f.key)).map((f) => {
       const raw = envGet(f.key, f.def);
