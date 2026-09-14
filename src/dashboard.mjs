@@ -8,7 +8,7 @@ import { ROOT, PERSONA_DIR, DATA_DIR, config, envGet, STARTED_AT, log, reloadCon
 /** Where the model-comparison photos live — the rating page reads and serves them. */
 /** The photo rules in one line, for the panel to show. */
 function photoRule() {
-  return `chance ${Math.round((config.photoChance || 0) * 100)}% · strangers ${config.photoTrustStrangers ? "yes" : "no"} · library ${config.photoLibrary ? "on" : "off"}`;
+  return `izin per kontak · library ${config.photoLibrary ? "on" : "off"} · belajar ${config.photoLearn ? "on" : "off"}`;
 }
 
 const PHOTO_TEST_DIR = envGet("PHOTO_TEST_DIR", "/sdcard/Download/Understudy/model-test");
@@ -357,13 +357,8 @@ async function summary() {
           SCENE_MODEL: config.sceneModel,
           EDIT_MODEL: config.editModel,
           PHOTO_CANDIDATE_COUNT: config.photoCandidateCount,
-          PHOTO_CHANCE: config.photoChance,
           PHOTO_TRUST_STRANGERS: config.photoTrustStrangers,
           PHOTO_GENERATE_ON_DEMAND: config.photoGenerateOnDemand,
-          PHOTO_WINDOW_START: config.photoWindowStart,
-          PHOTO_WINDOW_END: config.photoWindowEnd,
-          PHOTO_KINDS: config.photoKinds,
-          PHOTO_MAX_PER_CONV: config.photoMaxPerConv,
           PHOTO_FIRST: config.photoFirst,
           PHOTO_PHONE: config.photoPhone,
           PHOTO_GRAIN: config.photoGrain,
@@ -598,12 +593,7 @@ export function startDashboard() {
             SCENE_MODEL: config.sceneModel,
             EDIT_MODEL: config.editModel,
             PHOTO_CANDIDATE_COUNT: config.photoCandidateCount,
-            PHOTO_CHANCE: config.photoChance,
             PHOTO_GENERATE_ON_DEMAND: config.photoGenerateOnDemand,
-            PHOTO_WINDOW_START: config.photoWindowStart,
-            PHOTO_WINDOW_END: config.photoWindowEnd,
-            PHOTO_KINDS: config.photoKinds,
-            PHOTO_MAX_PER_CONV: config.photoMaxPerConv,
             PHOTO_FIRST: config.photoFirst,
             PHOTO_PHONE: config.photoPhone,
             PHOTO_GRAIN: config.photoGrain,

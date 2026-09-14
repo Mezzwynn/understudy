@@ -136,10 +136,8 @@ export function pickPhoto({ slug = config.persona, chat = null, moment = null, b
   if (!lib.photos.length) return null;
   const who = persona || loadPersona(slug);
   // a photo from the wrong class of place is a tell: filter before scoring
-  const kinds = String(config.photoKinds || "view,self").split(",").map((k) => k.trim()).filter(Boolean);
-  const eligible = lib.photos.filter(
-    (p) => fitsPersonaClass(`${p.scene} ${p.note || ""}`, who, { allowOneStep: true }) && (!kinds.length || kinds.includes(p.kind)),
-  );
+  // no kind filter any more — any photo that fits her class and her moment is fair game
+  const eligible = lib.photos.filter((p) => fitsPersonaClass(`${p.scene} ${p.note || ""}`, who, { allowOneStep: true }));
   if (!eligible.length) return null;
   const pod = partOfDay(now.getHours());
   const context = `${block?.what || ""} ${block?.place || ""} ${moment?.what || ""} ${moment?.kind || ""} ${chat?.summary || ""}`.toLowerCase();
@@ -282,29 +280,23 @@ export function rateSent(slug, historyId, { rating = "", weird = null, note = ""
  * Should a photo go out with this reply at all? Rare is the point: a chat where every third message
  * is a photo reads like a bot, and a photo that does not match her day reads worse than none.
  */
-export function shouldSendPhoto({ chat, moment = null, sleepy = false, force = false, now = new Date() } = {}) {
+/**
+ * Should a photo go out with this reply?
+ *
+ * Hik's rule: the ONLY thing that decides is the contact list. Everything else that used to gate a photo —
+ * a daily cap, a twelve-hour gap, a chance roll, allowed hours, a per-conversation cap, a kind filter — is
+ * gone. Each of them, at some point, refused a photo he had just asked for, and a photo that does not arrive
+ * reads as her saying no.
+ *
+ * What remains: the feature has to be on, she has to be awake, and the contact has to be allowed.
+ */
+export function shouldSendPhoto({ chat, moment = null, sleepy = false, now = new Date() } = {}) {
   if (!config.photoLibrary || !config.photoSend) return { ok: false, reason: "off" };
   if (sleepy) return { ok: false, reason: "asleep" };
-  // per contact, not a global switch: a contact is allowed because Hik said so, or because they are trusted
   if (chat?.photoAllowed === false) return { ok: false, reason: "turned off for this contact" };
   if (chat?.photoAllowed !== true && !chat?.trusted) return { ok: false, reason: "not allowed for this contact" };
-  const hour = new Date(now).getHours();
-  const ws = Number(config.photoWindowStart ?? 0);
-  const we = Number(config.photoWindowEnd ?? 24);
-  if (ws !== we && (hour < ws || hour >= we)) return { ok: false, reason: `outside her photo hours (${ws}-${we})` };
-  const perConv = Number(chat?.stats?.photoConvCount || 0);
-  if (perConv >= Number(config.photoMaxPerConv || 1) && Date.now() - Number(chat?.stats?.lastPhotoAt || 0) < 3600000) {
-    return { ok: false, reason: `already ${perConv} in this conversation` };
-  }
-  // The daily cap and the minimum gap are gone: Hik removed them. What is left is the chance (she
-  // decides to send something), the hours, the per-conversation guard, and the permission per contact.
-  // force = he asked for a photo; the daily cap and the gap still apply, the dice do not
-  if (!force) {
-    const chance = Number(config.photoChance || 0.05);
-    if (Math.random() > chance) return { ok: false, reason: `chance (${Math.round(chance * 100)}%)` };
-  }
   const pick = pickPhoto({ chat, moment, now });
-  if (!pick) return { ok: false, reason: "nothing fits her day" };
+  if (!pick) return { ok: false, reason: "nothing in the library fits her day" };
   return { ok: true, photo: pick };
 }
 

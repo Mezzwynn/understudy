@@ -1324,9 +1324,7 @@ function renderPhotos(){
       ${numRow("Maksimal per orang per hari","PHOTO_DAILY_MAX", st.PHOTO_DAILY_MAX ?? 1, 0, 10)}
       ${numRow("Jeda minimal (menit)","PHOTO_MIN_GAP_MIN", st.PHOTO_MIN_GAP_MIN ?? 720, 0, 2880)}
       ${numRow("Peluang tiap balasan (%)","PHOTO_CHANCE_PCT", Math.round((st.PHOTO_CHANCE ?? 0.05)*100), 0, 100)}
-      ${numRow("Maksimal per percakapan","PHOTO_MAX_PER_CONV", st.PHOTO_MAX_PER_CONV ?? 1, 1, 5)}
-      <div class="mrow2"><span>Jam boleh kirim foto</span><span class="row"><input class="nin" data-pk="PHOTO_WINDOW_START" type="number" min="0" max="23" value="${st.PHOTO_WINDOW_START ?? 8}"><span class="tiny">s/d</span><input class="nin" data-pk="PHOTO_WINDOW_END" type="number" min="0" max="24" value="${st.PHOTO_WINDOW_END ?? 22}"></span></div>
-      ${swRow("Foto duluan, baru kalimatnya","PHOTO_FIRST", st.PHOTO_FIRST)}
+      ${numRow("Maksimal per percakapan","PHOTO_MAX_PER_CONV", st.PHOTO_MAX_PER_CONV ?? 1, 1, 5)}      ${swRow("Foto duluan, baru kalimatnya","PHOTO_FIRST", st.PHOTO_FIRST)}
       ${swRow("Dia boleh generate kalau diminta","PHOTO_GENERATE_ON_DEMAND", st.PHOTO_GENERATE_ON_DEMAND)}
       ${swRow("Belajar dari rating foto","PHOTO_LEARN", st.PHOTO_LEARN)}
     </div>

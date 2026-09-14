@@ -124,10 +124,6 @@ function buildConfig() {
   // ── perpustakaan foto (dia kirim dari sini, bukan generate tiap kali)
   photoLibrary: envFlag("PHOTO_LIBRARY", true),
   photoSend: envFlag("PHOTO_SEND", true),
-  photoWindowStart: num(envGet("PHOTO_WINDOW_START", "8"), 8),
-  photoWindowEnd: num(envGet("PHOTO_WINDOW_END", "22"), 22),
-  photoKinds: envGet("PHOTO_KINDS", "view,self"),
-  photoMaxPerConv: num(envGet("PHOTO_MAX_PER_CONV", "1"), 1),
   photoFirst: envFlag("PHOTO_FIRST", true),
   photoGenerateOnDemand: envFlag("PHOTO_GENERATE_ON_DEMAND", false),
   // tampilan foto: "HP"-nya, dan knob olah gambarnya
@@ -362,7 +358,6 @@ function buildConfig() {
 
   // Photos & stickers out
   imageModel: envGet("IMAGE_MODEL", "gemini-2.5-flash-image"),
-  photoChance: num(envGet("PHOTO_CHANCE", "0.05"), 0.05),
   photoGlobalDailyMax: num(envGet("PHOTO_GLOBAL_DAILY_MAX", "30"), 30),
   stickerChance: num(envGet("STICKER_CHANCE", "0.08"), 0.08),
   // chance the sticker is the whole reply instead of an addition to text/voice
