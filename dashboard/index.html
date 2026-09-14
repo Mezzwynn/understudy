@@ -319,6 +319,9 @@
 </div>
 
 <script>
+// no service worker: it only ever hid updates
+if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
+
 const BUILD_STAMP = "2026-09-14 15:20 foto-wardrobe"; // naikkan tiap kali UI berubah
 
 /* ═══════════════════════════════ helpers ═══════════════════════════════ */
@@ -1979,7 +1982,7 @@ function renderAll(){
   if(tab==="contacts" && !dragging && !contactsDirty) renderContacts();
   if(tab==="chat") renderChat();
   if(tab==="status") renderStatus();
-  if(tab==="photos") renderPhotos();
+  try { if(tab==="photos") renderPhotos(); } catch (err) { const el=$("#tab-photos"); if(el) el.innerHTML = `<div class="card tight"><b style="color:var(--bad)">Photos tab error</b><pre style="white-space:pre-wrap;margin-top:8px">${String(err && err.message || err)}</pre></div>`; }
   if(tab==="character") renderCharacter();
   if(tab==="agent") renderAgent();
   if(tab==="schedule") renderSchedule();
