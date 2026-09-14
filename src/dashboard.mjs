@@ -569,6 +569,13 @@ f.addEventListener("load", () => {
         res.writeHead(200, { "content-type": /\.png$/i.test(file) ? "image/png" : "image/jpeg", "cache-control": "no-store" });
         return res.end(fs.readFileSync(file));
       }
+      if (req.method === "GET" && url.pathname === "/spot") {
+        const slug2 = loadPersona().slug;
+        const file = String(loadPersona(slug2).mirror_spot_image || "");
+        if (!file || !fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
+        res.writeHead(200, { "content-type": /\.png$/i.test(file) ? "image/png" : "image/jpeg", "cache-control": "no-store" });
+        return res.end(fs.readFileSync(file));
+      }
       if (req.method === "GET" && url.pathname === "/photo") {
         const name = path.basename(String(url.searchParams.get("f") || ""));
         const dir = path.basename(String(url.searchParams.get("d") || "model-test"));
@@ -900,6 +907,9 @@ f.addEventListener("load", () => {
             return json(res, 200, { ok: true, photo: r.photo, seconds: r.seconds, price: r.price, sent });
           }
           if (act === "selfie-settings") {
+            // the selfie card sends only its own fields, so an empty outfit really means "rotate again" —
+            // applyValues() skips empty strings on purpose, so it is written directly here
+            if (body.values && "SELFIE_OUTFIT" in body.values) setEnv("SELFIE_OUTFIT", String(body.values.SELFIE_OUTFIT || "").trim().slice(0, 120));
             applyValues(body.values || {});
             if (typeof body.spot === "string") setPersonaField(slug, "mirror_spot", body.spot.slice(0, 300));
             reloadConfig();
@@ -948,6 +958,27 @@ f.addEventListener("load", () => {
               auto,
               wardrobe: loadWardrobe(slug).items,
             });
+          }
+          if (act === "spot-image") {
+            const ext = String(body.ext || "jpg").replace(/[^a-z]/gi, "") || "jpg";
+            const dir = path.join(DATA_DIR, "photos", "spot");
+            fs.mkdirSync(dir, { recursive: true });
+            const data = String(body.data || "").replace(/^data:[^,]+,/, "");
+            if (!data || data.length < 100) return json(res, 400, { ok: false, error: "upload kosong" });
+            // one spot picture per character: replace whichever extension was there before
+            for (const f of fs.readdirSync(dir)) if (f.startsWith(`${slug}.`)) fs.rmSync(path.join(dir, f), { force: true });
+            const target = path.join(dir, `${slug}.${ext}`);
+            fs.writeFileSync(target, Buffer.from(data, "base64"));
+            setPersonaField(slug, "mirror_spot_image", target);
+            log("dashboard: foto referensi tempat disimpan");
+            return json(res, 200, { ok: true, spotImage: "/spot" });
+          }
+          if (act === "spot-image-remove") {
+            const cur = String(loadPersona(slug).mirror_spot_image || "");
+            if (cur && fs.existsSync(cur)) fs.rmSync(cur, { force: true });
+            setPersonaField(slug, "mirror_spot_image", "");
+            log("dashboard: foto referensi tempat dihapus");
+            return json(res, 200, { ok: true });
           }
           if (act === "rate") {
             const r = rateSent(slug, String(body.id || ""), { rating: body.rating, weird: body.weird, note: body.note });

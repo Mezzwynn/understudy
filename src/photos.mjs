@@ -174,9 +174,11 @@ export function wardrobeFor(persona) {
   return loadWardrobe(persona?.slug).items;
 }
 
-export function pickOutfit(persona, { hour = new Date().getHours(), style = "", avoid = "" } = {}) {
+/** The wardrobe item that fits this hour and style — the whole object, so callers can use its
+ *  description and its reference picture, not just the name. */
+export function pickOutfitItem(persona, { hour = new Date().getHours(), style = "", avoid = "" } = {}) {
   const items = loadWardrobe(persona?.slug).items;
-  if (!items.length) return WARDROBE[0];
+  if (!items.length) return null;
   const bucket = timeBucket(hour);
   const fits = (i) => ({
     time: !i.times?.length || i.times.includes(bucket),
@@ -189,7 +191,7 @@ export function pickOutfit(persona, { hour = new Date().getHours(), style = "", 
   });
   const pool = scored.filter((x) => x.score >= 3);
   const use = pool.length ? pool : scored.filter((x) => x.score >= 1);
-  if (!use.length) return items[0].name;
+  if (!use.length) return items[0];
   // Rotate per photo, not per day: the day seed meant every selfie on the same day wore the same thing,
   // which is exactly what Hik noticed ("she keeps wearing the kaos").
   const candidates = use.sort((a, b) => b.score - a.score);
@@ -198,7 +200,24 @@ export function pickOutfit(persona, { hour = new Date().getHours(), style = "", 
   const idx = avoid
     ? Math.floor(Math.random() * rotate.length)
     : Math.abs(new Date().getFullYear() * 372 + (new Date().getMonth() + 1) * 31 + new Date().getDate()) % rotate.length;
-  return rotate[idx].item.name;
+  return rotate[idx].item;
+}
+
+export function pickOutfit(persona, opts = {}) {
+  const item = pickOutfitItem(persona, opts);
+  return item ? item.name : WARDROBE[0];
+}
+
+/** Find one outfit by name or id, so the panel's choice can be turned into its description and picture. */
+export function findWardrobeItem(slug, nameOrId) {
+  const wanted = String(nameOrId || "").trim().toLowerCase();
+  if (!wanted) return null;
+  const items = loadWardrobe(slug).items;
+  return (
+    items.find((i) => String(i.id).toLowerCase() === wanted) ||
+    items.find((i) => String(i.name).toLowerCase() === wanted) ||
+    null
+  );
 }
 
 /** The shared rules, kept in one place so every scene obeys them. */

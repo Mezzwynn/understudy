@@ -1356,7 +1356,8 @@ function selfieCard(ph, gowns, styles) {
   const times = (sf.moments || []).map((m) => `${m.at} (${m.why})`).join(" · ") || "belum ada momen hari ini";
   return `<div class="card tight fadein" id="selfie-card">
     <h2 style="margin:0 0 4px">Selfie terjadwal</h2>
-    <div class="hint" style="margin-bottom:10px">Tempatnya <b>selalu sama</b>; yang berganti tiap kali: baju, angle, cahaya, framing, ekspresi.
+    <div class="hint" style="margin-bottom:10px">Tempatnya <b>selalu sama</b>; yang berganti tiap kali: angle, cahaya, framing, ekspresi.
+      Unggah foto tempat + baju biar dua-duanya konsisten, jadi tinggal angle-nya yang main.
       Jamnya ikut rutinitasnya — sekarang: <b>${esc(times)}</b></div>
 
     <div class="rows">
@@ -1366,16 +1367,24 @@ function selfieCard(ph, gowns, styles) {
       <div class="mrow2"><span>Tempat (jangan diubah-ubah)</span>
         <input class="sin" id="sf-spot" value="${esc(sf.spot || "")}"></div>
 
+      <div class="mrow2"><span>Foto tempat (biar persis sama tiap foto)</span>
+        <span class="swline">
+          ${sf.spotImage ? `<img src="${sf.spotImage}?t=${Date.now()}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--line-2)">` : `<em class="tiny">belum ada</em>`}
+          <button class="act" onclick="uwSpotPick()">Gambar</button>
+          <button class="act" onclick="uwSpotDelete()" style="color:var(--bad)">Hapus</button>
+          <input type="file" accept="image/*" id="sf-spot-file" hidden onchange="uwSpotUpload(this)">
+        </span></div>
+
       <div class="mrow2"><span>Jam cadangan (kalau rutinitasnya nggak ada momen)</span>
         <input class="sin" id="sf-sched" value="${esc(sf.schedule || "")}"></div>
 
       <div class="mrow2"><span>Maksimal per hari</span>
         <input class="nin" id="sf-max" type="number" min="1" max="5" value="${sf.maxPerDay ?? 2}"></div>
 
-      <div class="mrow2"><span>Baju buat kirim manual</span>
+      <div class="mrow2"><span>Baju tetap (kosong = rotasi otomatis)</span>
         <select class="sin" id="sf-outfit">
-          <option value="">otomatis (rotasi)</option>
-          ${(gowns || []).map((w) => `<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("")}
+          <option value="" ${!sf.outfit ? "selected" : ""}>otomatis (rotasi)</option>
+          ${(gowns || []).map((w) => `<option value="${esc(w.name)}" ${(sf.outfit === w.name || sf.outfit === w.id) ? "selected" : ""}>${esc(w.name)}</option>`).join("")}
         </select></div>
 
       <div class="mrow2"><span>atau tulis sendiri</span>
@@ -1413,6 +1422,7 @@ window.uwSelfieSave = async () => {
   const values = {
     SELFIE_SCHEDULE: document.getElementById("sf-sched").value.trim(),
     SELFIE_MAX_PER_DAY: document.getElementById("sf-max").value,
+    SELFIE_OUTFIT: document.getElementById("sf-outfit").value,
   };
   const spot = document.getElementById("sf-spot").value.trim();
   const typed = document.getElementById("sf-outfit-text").value.trim();
@@ -1429,7 +1439,7 @@ window.uwSelfieSave = async () => {
   const now = read && read.selfie ? read.selfie : null;
   if (st) {
     st.textContent = now
-      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · tempat: "${String(now.spot).slice(0, 40)}" · maks: ${now.maxPerDay}${extra}`
+      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · baju: ${now.outfit || "rotasi"} · tempat: "${String(now.spot).slice(0, 40)}" · maks: ${now.maxPerDay}${extra}`
       : "tersimpan ✓";
   }
   PHOTO_PICK = { outfit: document.getElementById("sf-outfit").value, style: document.getElementById("sf-style").value, typed };
@@ -1444,6 +1454,25 @@ window.uwSelfieNow = async () => {
   if (st) st.textContent = "bikin selfie… (10-20 detik)";
   const r = await api("/api/photos", { action: "selfie-now", outfit, style });
   if (st) st.textContent = r.ok ? `selfie jadi ✓ dikirim ke ${r.sent} kontak (${Math.round(r.seconds)}s)` : "GAGAL: " + (r.error || "");
+};
+
+/* foto referensi tempat — disimpan sekali, dipakai di semua selfie berikutnya */
+window.uwSpotPick = () => document.getElementById("sf-spot-file")?.click();
+window.uwSpotUpload = async (inp) => {
+  const f = inp.files && inp.files[0];
+  if (!f) return;
+  if (f.size > 6 * 1024 * 1024) return toast("Gambarnya kegedhean (maks 6MB)");
+  const ext = (f.name.split(".").pop() || "jpg").toLowerCase();
+  toast("Mengunggah foto tempat…");
+  const data = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(",")[1]); fr.readAsDataURL(f); });
+  const res = await api("/api/photos", { action: "spot-image", data, ext });
+  toast(res.ok ? "Foto tempat tersimpan — tinggal angle-nya yang beda" : "Gagal: " + (res.error || ""));
+  if (res.ok) { photosDirty = false; await refresh(true); }
+};
+window.uwSpotDelete = async () => {
+  const res = await api("/api/photos", { action: "spot-image-remove" });
+  toast(res.ok ? "Foto tempat dihapus" : "Gagal: " + (res.error || ""));
+  if (res.ok) { photosDirty = false; await refresh(true); }
 };
 
 /* ═══════════════════════════ photos tab ═══════════════════════════ */

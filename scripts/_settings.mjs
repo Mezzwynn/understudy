@@ -97,6 +97,7 @@ export const FEATURES = [
   { key: "SELFIE_SCHEDULE", label: "Selfie: jam cadangan", kind: "text", def: "07:30,16:30" },
   { key: "SELFIE_SPOT", label: "Selfie: tempatnya (jangan diubah)", kind: "text", def: "the full-length mirror on the inside of her bedroom door" },
   { key: "SELFIE_MAX_PER_DAY", label: "Selfie: maksimal per hari", kind: "int", def: 2 },
+  { key: "SELFIE_OUTFIT", label: "Selfie: baju tetap (kosong = rotasi)", kind: "text", def: "" },
   { key: "PHOTO_PHONE", label: "Foto-nya gaya HP apa (pixel/iphone/samsung/oppo/vivo/xiaomi/biasa)", kind: "text", def: "pixel" },
   { key: "PHOTO_GRAIN", label: "Grain (0 = ikut profil HP)", kind: "int", def: 0 },
   { key: "PHOTO_BLOOM", label: "Bloom highlight (0.00-0.30, -1 = ikut profil)", kind: "float", def: -1 },

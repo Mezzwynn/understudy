@@ -15,7 +15,7 @@ import path from "node:path";
 import { DATA_DIR, config, log } from "./config.mjs";
 import { generateImage, writeImage, imageEngineReady } from "./image-engine.mjs";
 import { humanize } from "./humanize.mjs";
-import { loadWardrobe, timeBucket, pickOutfit } from "./photos.mjs";
+import { loadWardrobe, timeBucket, pickOutfit, pickOutfitItem, findWardrobeItem } from "./photos.mjs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -32,6 +32,13 @@ function loadState(slug) {
   }
 }
 const saveState = (slug, st) => fs.writeFileSync(stateFile(slug), JSON.stringify(st, null, 2));
+
+/** A local file as a data URL, so a reference picture can be sent without publishing it first. */
+const MIME_BY_EXT = { png: "image/png", webp: "image/webp", gif: "image/gif" };
+function dataUrl(file) {
+  const ext = path.extname(String(file)).slice(1).toLowerCase();
+  return `data:${MIME_BY_EXT[ext] || "image/jpeg"};base64,${fs.readFileSync(file).toString("base64")}`;
+}
 
 /** The angle, the light and the mood rotate; the place never moves. */
 const ANGLES = [
@@ -87,19 +94,29 @@ function lastOutfit(slug) {
  * The prompt. The spot comes from the character (bedroom mirror by the door by default) and is the same
  * every time; everything else is drawn from the lists above by day, so two selfies never look alike.
  */
-export function selfiePrompt(persona, { day = null, outfit = null, style = "casual", why = "", slug: slugIn = null } = {}) {
+export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, style = "casual", why = "", slug: slugIn = null } = {}) {
   const slug = slugIn || persona?.slug || config.persona;
   const d = day || new Date();
   const seed = d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate();
   // the card carries it as mirror_spot (snake_case, like every other frontmatter key)
   const spot = String(persona?.mirror_spot || persona?.mirrorSpot || config.selfieSpot || "the full-length mirror on the inside of her bedroom door");
-  const wear = outfit || pickOutfit(persona, { hour: d.getHours(), style: style || "casual", avoid: lastOutfit(slug) });
+  const item = outfitItem || null;
+  const wear = item?.name || outfit || pickOutfit(persona, { hour: d.getHours(), style: style || "casual", avoid: lastOutfit(slug) });
+  // a bare name gives the model nothing to match; the wardrobe entry carries what the garment really looks like
+  const garment = item?.description ? ` The garment: ${item.description}` : "";
+  // when the panel attaches the room and the garment as pictures, the model only has to move the camera
+  const refs = ["Image 1 is her face — keep it exactly and do not change her."];
+  let n = 2;
+  if (outfitRef) refs.push(`Image ${n++} is the outfit she must wear: put that exact garment on her, matching its fabric, colour, cut and pattern.`);
+  if (spotRef) refs.push(`Image ${n++} is the place: reproduce that exact room, wall, mirror and objects in the same layout every time — only the camera angle, framing and light change.`);
   const who = `${persona?.name || "a young woman"}, ${String(persona?.appearance || "slim, 20, shoulder-length black hair, minimal monochrome clothes").slice(0, 160)}`;
   return [
-    `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
+    refs.length > 1 ? refs.join(" ") : `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
     `New photo: a mirror selfie she took with her phone${why ? `, ${why}` : ""}.`,
-    `PLACE (always exactly this, it never changes): ${spot}, a plain wall behind her, the edge of her room visible — same corner of the same room as every other mirror photo she has taken.`,
-    `She is wearing ${wear}.`,
+    spotRef
+      ? `PLACE: exactly the place in the reference image — the same room, the same mirror, wall and objects, the same corner; it never changes between photos.`
+      : `PLACE (always exactly this, it never changes): ${spot}, a plain wall behind her, the edge of her room visible — same corner of the same room as every other mirror photo she has taken.`,
+    `She is wearing ${wear}.${garment}`,
     `${pickR(FRAMING, seed + 1)}, ${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}.`,
     `Her face: ${pickR(MOOD, seed + 4)} — and the phone partly covers her face or her eyes are on the screen, the way a mirror selfie actually looks.`,
     `Ordinary and unpolished: the mirror has a smudge, the room behind is lived in, the framing is not quite straight. Not a photoshoot, not a studio, no filter. No text, no watermark.`,
@@ -185,13 +202,27 @@ export function markSelfieSent(slug, key) {
 export async function makeSelfie(persona, { slug = null, day = null, style = "casual", why = "", outfit = "" } = {}) {
   const s = slug || persona?.slug || config.persona;
   if (!imageEngineReady()) return { ok: false, error: "no image engine configured" };
+  const hour = new Date().getHours();
+  // the panel can lock one outfit (SELFIE_OUTFIT); otherwise the wardrobe rotates for this hour and style
+  const wanted = String(outfit || config.selfieOutfit || "").trim();
+  const item = wanted ? findWardrobeItem(s, wanted) : pickOutfitItem(persona, { hour, style, avoid: lastOutfit(s) });
+  const wear = item?.name || wanted || null;
   const ref = avatarPath(s);
-  const prompt = selfiePrompt(persona, { day, style, why, outfit: outfit || null, slug: s });
+  const images = [];
+  if (ref && fs.existsSync(ref)) images.push(dataUrl(ref));
+  // attach the garment picture too, but only when her face is already attached: the prompt names them in order
+  const outfitRef = item?.image && images.length && fs.existsSync(item.image);
+  if (outfitRef) images.push(dataUrl(item.image));
+  // the same room every time, when the panel attached a picture of it: then only the camera moves
+  const spotFile = String(persona?.mirror_spot_image || "");
+  const spotRef = spotFile && images.length && fs.existsSync(spotFile);
+  if (spotRef) images.push(dataUrl(spotFile));
+  const prompt = selfiePrompt(persona, { day, style, why, outfit: wear, outfitItem: item, outfitRef: !!outfitRef, spotRef: !!spotRef, slug: s });
   const res = await generateImage({
     model: config.editModel,
     prompt,
     aspect: "3:4",
-    images: ref && fs.existsSync(ref) ? [`data:image/jpeg;base64,${fs.readFileSync(ref).toString("base64")}`] : [],
+    images,
   });
   if (!res.ok) return { ok: false, error: res.error };
   const tmp = writeImage(path.join(DATA_DIR, "photos", `selfie-tmp-${Date.now()}`), res.buf);
@@ -214,10 +245,9 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
     topics: "cermin,outfit,selfie",
   });
   fs.rmSync(final, { force: true });
-  const hour = new Date().getHours();
   // remember what she was wearing so the next selfie differs
   const st = loadState(s);
-  const wearLine = (prompt.match(/She is wearing ([^.]+)\./) || [])[1] || "";
+  const wearLine = (prompt.match(/She is wearing ([^.]+)\./) || [])[1] || wear || "";
   saveState(s, { ...st, lastOutfit: wearLine });
   log(`selfie: ${res.seconds}s, $${(res.price || 0).toFixed(3)} — pakai "${String(wearLine).slice(0, 40)}" → ${added.ok ? added.photo.id : "gagal simpan"}`);
   return { ok: true, photo: added.photo, seconds: res.seconds, price: res.price, bucket: timeBucket(hour) };
@@ -229,5 +259,7 @@ export const selfieSettings = (persona = null) => ({
   schedule: String(config.selfieSchedule || ""),
   spot: String(persona?.mirror_spot || persona?.mirrorSpot || config.selfieSpot || ""),
   maxPerDay: Number(config.selfieMaxPerDay || 2),
+  outfit: String(config.selfieOutfit || ""),
+  spotImage: persona?.mirror_spot_image ? "/spot" : "",
   sent: loadState(persona?.slug || config.persona).sent,
 });
