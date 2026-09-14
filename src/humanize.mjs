@@ -76,22 +76,103 @@ function downscale(img, maxSide) {
  *                            grain: luminance noise amplitude; 1-2 is visible but not dirty
  *                            warmth / lift: small colour and black-level nudges
  */
-export function humanize(buf, { maxSide = 1280, quality = 74, grain = 1.8, warmth = 3, lift = 2, seed = 7 } = {}) {
+/**
+ * Targets measured from real photos taken on this phone (see scripts/photostats.mjs):
+ *   contrast 43 · saturation 26 · noise 2.2 · sharpness 4.0
+ * A generated photo arrives around contrast 70-75, saturation 30-34, noise 1.0-2.0. The gap in
+ * contrast is the one the eye reads as "clean and shiny", so it is pulled towards the real number
+ * rather than guessed at with a filter.
+ */
+export const REAL_PHOTO_TARGET = { contrast: 46, saturation: 27, noise: 2.2 };
+
+export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warmth = 3, lift = 2, seed = 7, calibrate = true } = {}) {
   const small = downscale(decode(buf), maxSide);
   const { width: w, height: h, data } = small;
+  const grainAmount = grain === null ? 10 : grain; // enough noise to land near a real photo
   const rand = rng(seed);
   const out = Buffer.alloc(w * h * 4);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
-      const n = (rand() - 0.5) * 2 * grain;
+      const n = (rand() - 0.5) * 2 * grainAmount;
       out[i] = Math.max(0, Math.min(255, data[i] + warmth + n + lift));
       out[i + 1] = Math.max(0, Math.min(255, data[i + 1] + n * 0.9 + lift));
       out[i + 2] = Math.max(0, Math.min(255, data[i + 2] - warmth * 0.5 + n * 0.8 + lift));
       out[i + 3] = 255;
     }
   }
-  const encoded = jpeg.encode({ data: out, width: w, height: h }, quality);
+  // pull contrast and saturation towards what a real phone photo measures
+  if (calibrate) {
+    const grab = (src) => {
+      let sum = 0;
+      let sumSq = 0;
+      let satSum = 0;
+      const n = src.length / 4;
+      for (let i = 0; i < src.length; i += 4) {
+        const y = 0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2];
+        sum += y;
+        sumSq += y * y;
+        const mx = Math.max(src[i], src[i + 1], src[i + 2]);
+        const mn = Math.min(src[i], src[i + 1], src[i + 2]);
+        satSum += mx === 0 ? 0 : (mx - mn) / mx;
+      }
+      return { mean: sum / n, contrast: Math.sqrt(Math.max(0, sumSq / n - (sum / n) ** 2)), saturation: (satSum / n) * 100 };
+    };
+    const now = grab(out);
+    const cScale = Math.min(1.15, Math.max(0.45, REAL_PHOTO_TARGET.contrast / Math.max(1, now.contrast)));
+    const sScale = Math.min(1.2, Math.max(0.6, REAL_PHOTO_TARGET.saturation / Math.max(1, now.saturation)));
+    // contrast first, saturation second — the other order drops saturation twice
+    for (let i = 0; i < out.length; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        out[i + c] = Math.max(0, Math.min(255, now.mean + (out[i + c] - now.mean) * cScale));
+      }
+    }
+    const after = grab(out);
+    const s2 = Math.min(1.4, Math.max(0.5, REAL_PHOTO_TARGET.saturation / Math.max(1, after.saturation)));
+    for (let i = 0; i < out.length; i += 4) {
+      const grey = 0.299 * out[i] + 0.587 * out[i + 1] + 0.114 * out[i + 2];
+      for (let c = 0; c < 3; c++) {
+        out[i + c] = Math.max(0, Math.min(255, grey + (out[i + c] - grey) * s2));
+      }
+    }
+  }
+
+  let encoded = jpeg.encode({ data: out, width: w, height: h }, quality);
+
+  // JPEG itself pulls saturation and contrast down again, so measure the ENCODED result and correct
+  // once — measuring the in-memory buffer overstated it and the photos came out washed out
+  if (calibrate) {
+    const back = decode(encoded.data);
+    const fin = (() => {
+      let sum = 0;
+      let sumSq = 0;
+      let satSum = 0;
+      const n = back.data.length / 4;
+      for (let i = 0; i < back.data.length; i += 4) {
+        const y = 0.299 * back.data[i] + 0.587 * back.data[i + 1] + 0.114 * back.data[i + 2];
+        sum += y;
+        sumSq += y * y;
+        const mx = Math.max(back.data[i], back.data[i + 1], back.data[i + 2]);
+        const mn = Math.min(back.data[i], back.data[i + 1], back.data[i + 2]);
+        satSum += mx === 0 ? 0 : (mx - mn) / mx;
+      }
+      return { mean: sum / n, contrast: Math.sqrt(Math.max(0, sumSq / n - (sum / n) ** 2)), saturation: (satSum / n) * 100 };
+    })();
+    const cFix = Math.min(1.3, Math.max(0.7, REAL_PHOTO_TARGET.contrast / Math.max(1, fin.contrast)));
+    const sFix = Math.min(1.5, Math.max(0.7, REAL_PHOTO_TARGET.saturation / Math.max(1, fin.saturation)));
+    if (Math.abs(1 - cFix) > 0.05 || Math.abs(1 - sFix) > 0.05) {
+      const fixed = Buffer.alloc(back.data.length);
+      for (let i = 0; i < back.data.length; i += 4) {
+        const grey = 0.299 * back.data[i] + 0.587 * back.data[i + 1] + 0.114 * back.data[i + 2];
+        for (let c = 0; c < 3; c++) {
+          const satAdj = grey + (back.data[i + c] - grey) * sFix;
+          fixed[i + c] = Math.max(0, Math.min(255, fin.mean + (satAdj - fin.mean) * cFix));
+        }
+        fixed[i + 3] = 255;
+      }
+      encoded = jpeg.encode({ data: fixed, width: back.width, height: back.height }, quality);
+    }
+  }
   return { buf: encoded.data, width: w, height: h, kb: Math.round(encoded.data.length / 1024) };
 }
 

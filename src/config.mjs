@@ -115,10 +115,10 @@ function buildConfig() {
   // ── gambar: Atlas Cloud (pilihan Hik: nano-banana-pro buat wajah, seedream-v5 buat scene)
   atlasApiKey: envGet("ATLAS_API_KEY", ""),
   atlasBaseUrl: envGet("ATLAS_BASE_URL", "https://api.atlascloud.ai"),
-  faceModel: envGet("FACE_MODEL", "bytedance/seedream-v5.0-pro/text-to-image"),
-  sceneModel: envGet("SCENE_MODEL", "bytedance/seedream-v5.0-pro/text-to-image"),
+  faceModel: envGet("FACE_MODEL", "black-forest-labs/flux-2-pro/text-to-image"),
+  sceneModel: envGet("SCENE_MODEL", "black-forest-labs/flux-2-pro/text-to-image"),
   // model yang menerima foto referensi (dia yang dipakai buat foto dengan wajahnya)
-  editModel: envGet("EDIT_MODEL", "bytedance/seedream-v4.7/edit"),
+  editModel: envGet("EDIT_MODEL", "black-forest-labs/flux-2-pro/edit"),
   // ── perpustakaan foto (dia kirim dari sini, bukan generate tiap kali)
   photoLibrary: envFlag("PHOTO_LIBRARY", true),
   photoSend: envFlag("PHOTO_SEND", true),

@@ -13,6 +13,7 @@ import path from "node:path";
 import { DATA_DIR, config, log } from "../src/config.mjs";
 import { addPhoto, removePhoto, librarySummary, loadLibrary, saveLibrary as saveLibraryFile, pickPhoto, partOfDay } from "../src/photo-library.mjs";
 import { checkPhoto } from "../src/photo-check.mjs";
+import { humanize } from "../src/humanize.mjs";
 import { avatarPath } from "../src/face.mjs";
 
 const args = process.argv.slice(2);
@@ -168,6 +169,22 @@ else if (cmd === "add") {
 } else if (cmd === "remove") {
   const r = removePhoto(slug, args[1]);
   console.log(r.ok ? "  removed" : `  gagal: ${r.error}`);
+} else if (cmd === "rehumanize") {
+  // the whole library re-processed against the real-photo targets (contrast 46, sat 27, noise 2.2)
+  const dir = `data/photos/library/${slug}`;
+  const lib = loadLibrary(slug);
+  let n = 0;
+  for (const p of lib.photos) {
+    const f = `${dir}/${p.file}`;
+    if (!fs.existsSync(f)) continue;
+    try {
+      fs.writeFileSync(f, humanize(fs.readFileSync(f)).buf);
+      n++;
+    } catch (err) {
+      console.log(`  ✗ ${p.scene}: ${err.message.slice(0, 60)}`);
+    }
+  }
+  console.log(`  rehumanize: ${n} foto diproses ulang ke target foto asli`);
 } else if (cmd === "retag") {
   const lib = loadLibrary(slug);
   const hourForAll = {

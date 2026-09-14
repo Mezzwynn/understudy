@@ -230,6 +230,30 @@ for (const dir of ["src", "scripts"]) {
   }
 }
 
+// Node built-ins used as `path.join(...)`, `fs.existsSync(...)` and so on: a missing import here is
+// invisible to the call check above, and it cost a live photo send ("path is not defined").
+{
+  const BUILTINS = { path: 'node:path', fs: 'node:fs', os: 'node:os', url: 'node:url', crypto: 'node:crypto', child_process: 'node:child_process' };
+  let missing = 0;
+  for (const file of files) {
+    const raw = fs.readFileSync(file, "utf8");
+    const code = stripCode(raw);
+    const locals = collectBindings(raw);
+    for (const [name, mod] of Object.entries(BUILTINS)) {
+      if (locals.has(name)) continue; // a local variable with that name (const url = new URL(...))
+      const used = new RegExp(`(^|[^\\w$.])${name}\\s*\\.`, "m").test(code);
+      if (!used) continue;
+      // check the raw source: the stripper removes the quotes, and the module path lives in one
+      const imported = new RegExp(`from\\s+["']${mod}["']`).test(raw) || new RegExp(`require\\(["']${mod}["']\\)`).test(raw);
+      if (!imported) {
+        console.log(`  ${path.relative(ROOT, file)}  "${name}" is used but ${mod} is never imported`);
+        missing++;
+      }
+    }
+  }
+  if (missing) process.exitCode = 1;
+}
+
 // Constants that are used but never defined: the function check above only sees
 // `name(`, so a missing import of something used as a value slipped through once
 // (DATA_DIR in the dashboard). Our convention is ALL_CAPS for module constants, which
