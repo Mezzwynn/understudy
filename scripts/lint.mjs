@@ -17,6 +17,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const quiet = process.argv.includes("--quiet");
 
 const GLOBALS = new Set([
+  "addEventListener",
+  "removeEventListener",
+  "dispatchEvent",
   "RGX",
   "Float32Array",
   "Float64Array",
