@@ -13,7 +13,16 @@ import { ROOT, PERSONA_DIR, DATA_DIR, config, envGet, STARTED_AT, log, reloadCon
  */
 function panelSettings() {
   const wanted = (k) => k.startsWith("PHOTO_") || k.startsWith("SELFIE_") || k === "IMAGE_ENGINE";
-  return Object.fromEntries(FEATURES.filter((f) => wanted(f.key)).map((f) => [f.key, envGet(f.key, f.def)]));
+  return Object.fromEntries(
+    FEATURES.filter((f) => wanted(f.key)).map((f) => {
+      const raw = envGet(f.key, f.def);
+      // .env holds strings. "false" is a truthy string, so a switch rendered from it came back ON after every
+      // save — the panel redrew itself from these values and the toggle looked like it reset itself.
+      if (f.kind === "bool") return [f.key, /^(1|true|on|yes)$/i.test(String(raw))];
+      if (f.kind === "int" || f.kind === "float") return [f.key, Number(raw)];
+      return [f.key, raw];
+    }),
+  );
 }
 
 /** The photo rules in one line, for the panel to show. */
