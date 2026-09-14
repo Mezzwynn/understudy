@@ -25,6 +25,8 @@ export function loadEngine() {
   return fs.readFileSync(ENGINE_FILE, "utf8");
 }
 
+globalThis.__understudyPromptLoader = { loadPersona: (slug) => loadPersona(slug) };
+
 export function parsePersonaFrontmatter(raw) {
   const meta = {};
   const m = raw.match(/^---\s*\n([\s\S]*?)\n---/);

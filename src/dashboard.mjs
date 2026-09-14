@@ -40,7 +40,7 @@ import { listChats, loadChat, saveChat, loadState } from "./store.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
 import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent, photoHistory, rateSent, sceneScores } from "./photo-library.mjs";
 import { PHONE_PROFILES } from "./humanize.mjs";
-import { wardrobeFor, setWardrobePhoto, wardrobePhotos } from "./photos.mjs";
+import { wardrobeFor, loadWardrobe, addWardrobeItem, removeWardrobeItem, setWardrobeImage, TIMES, STYLES } from "./photos.mjs";
 import {
   loadFace,
   saveFace,
@@ -345,7 +345,8 @@ async function summary() {
             return { ...h, url: p ? `/photo?d=library/${slug}&f=${encodeURIComponent(p.file)}` : "" };
           }),
         scores: sceneScores(slug),
-        wardrobeIndex: wardrobePhotos(slug),
+        wardrobeTimes: TIMES,
+        wardrobeStyles: STYLES,
         contacts: listChats().map((c) => ({ jid: c.jid, name: c.profile?.name || c.name || String(c.jid).split("@")[0], trusted: c.trusted === true, allowed: c.photoAllowed !== false && (c.photoAllowed === true || c.trusted === true), sentCount: (c.stats?.photoCount || 0), lastAt: c.stats?.lastPhotoAt || 0 })),
         profiles: Object.fromEntries(Object.entries(PHONE_PROFILES).map(([k, v]) => [k, v.label])),
         wardrobe: wardrobeFor(loadPersona(slug)),
@@ -497,9 +498,9 @@ export function startDashboard() {
       }
       if (req.method === "GET" && url.pathname === "/wardrobe") {
         const slug2 = loadPersona().slug;
-        const idx = String(Number(url.searchParams.get("i")));
-        const map = wardrobePhotos(slug2);
-        const file = map[idx];
+        const want = String(url.searchParams.get("id") || url.searchParams.get("i") || "");
+        const item = loadWardrobe(slug2).items.find((x) => x.id === want || String(x.id) === want);
+        const file = item?.image || "";
         if (!file || !fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
         res.writeHead(200, { "content-type": /\.png$/i.test(file) ? "image/png" : "image/jpeg", "cache-control": "no-store" });
         return res.end(fs.readFileSync(file));
@@ -566,7 +567,8 @@ export function startDashboard() {
           .map((h) => ({ ...h, url: (() => { const p = loadLibrary(slug).photos.find((x) => x.id === h.photoId); return p ? `/photo?d=library/${slug}&f=${encodeURIComponent(p.file)}` : ""; })() }));
         return json(res, 200, {
           ...lib,
-          wardrobeIndex: wardrobePhotos(slug),
+          wardrobeTimes: TIMES,
+          wardrobeStyles: STYLES,
           contacts: listChats().map((c) => ({ jid: c.jid, name: c.profile?.name || c.name || String(c.jid).split("@")[0], trusted: c.trusted === true, allowed: c.photoAllowed !== false && (c.photoAllowed === true || c.trusted === true), sentCount: (c.stats?.photoCount || 0), lastAt: c.stats?.lastPhotoAt || 0 })),
           history,
           scores: sceneScores(slug),
@@ -826,18 +828,26 @@ export function startDashboard() {
             log(`photo permission: ${body.jid} → ${chat2.photoAllowed === undefined ? "default" : chat2.photoAllowed}`);
             return json(res, 200, { ok: true });
           }
-          if (act === "wardrobe-upload") {
-            const idx = Number(body.index);
+          if (act === "wardrobe-add") {
+            const r = addWardrobeItem(slug, { name: body.name, times: body.times || [], styles: body.styles || [] });
+            return json(res, r.ok ? 200 : 400, { ...r, wardrobe: loadWardrobe(slug).items });
+          }
+          if (act === "wardrobe-remove") {
+            const r = removeWardrobeItem(slug, String(body.id || ""));
+            return json(res, r.ok ? 200 : 400, { ...r, wardrobe: loadWardrobe(slug).items });
+          }
+          if (act === "wardrobe-image") {
+            const id = String(body.id || "");
             const ext = String(body.ext || "jpg").replace(/[^a-z]/gi, "") || "jpg";
             const dir = path.join(DATA_DIR, "photos", "wardrobe", slug);
             fs.mkdirSync(dir, { recursive: true });
-            const target = path.join(dir, `${idx}.${ext}`);
+            const target = path.join(dir, `${id}.${ext}`);
             const data = String(body.data || "").replace(/^data:[^,]+,/, "");
-            if (!data || data.length < 100) return json(res, 400, { ok: false, error: "empty upload" });
+            if (!data || data.length < 100) return json(res, 400, { ok: false, error: "upload kosong" });
             fs.writeFileSync(target, Buffer.from(data, "base64"));
-            setWardrobePhoto(slug, idx, target);
-            log(`wardrobe: photo set for outfit ${idx}`);
-            return json(res, 200, { ok: true, wardrobe: wardrobeFor(loadPersona(slug)) });
+            const r = setWardrobeImage(slug, id, target);
+            log(`wardrobe: photo set for ${id}`);
+            return json(res, r.ok ? 200 : 400, { ...r, wardrobe: loadWardrobe(slug).items });
           }
           if (act === "rate") {
             const r = rateSent(slug, String(body.id || ""), { rating: body.rating, weird: body.weird, note: body.note });

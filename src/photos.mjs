@@ -25,52 +25,160 @@ export const WARDROBE = [
   "a grey hoodie with the sleeves pushed up",
   "a faded denim jacket over a black tee",
   "a loose dark long-sleeve shirt",
-  "a black blazer over a plain white shirt (a client day)",
+  "a black blazer over a plain white shirt",
   "a washed-out band t-shirt",
   "a simple black dress with a thin cardigan",
 ];
 
-/**
- * From the character's own card when it lists one, otherwise the default rotation. An outfit may also
- * carry a photo (data/photos/wardrobe/<slug>.json) — a picture of the clothes is more use than a
- * sentence when the point is to draw her wearing them.
- */
-export function wardrobeFor(persona) {
-  const raw = String(persona?.wardrobe || "").trim();
-  const names = raw
-    ? raw.split("|").map((s) => s.trim()).filter(Boolean)
-    : WARDROBE;
-  const photos = wardrobePhotos(persona?.slug);
-  return (names.length ? names : WARDROBE).map((name, i) => ({
-    name,
-    image: photos[String(i)] || "",
-  }));
+/** Pagi / siang / malam — the three the photos care about. */
+export const TIMES = ["pagi", "siang", "malam"];
+/** What kind of clothes they are. A pilates photo in a blazer is the same mistake as a warung photo
+ *  for an upper-middle-class character: one detail and the whole thing reads as invented. */
+export const STYLES = ["casual", "kerja", "formal", "fitness", "santai", "tidur"];
+
+export const timeBucket = (hour = new Date().getHours()) => (hour < 11 ? "pagi" : hour < 17 ? "siang" : "malam");
+
+/** First guess at categories from the name, so the wardrobe works before anyone sorts it by hand. */
+export function autoCategorize(name) {
+  const n = String(name || "").toLowerCase();
+  const styles = [];
+  const times = [];
+  if (/blazer|kemeja|dress|formal|jas/.test(n)) styles.push("kerja");
+  if (/kaos|hoodie|jeans|denim|casual|oversized/.test(n)) styles.push("casual");
+  if (/sport|gym|olahraga|pilates|training|running/.test(n)) styles.push("fitness");
+  if (/piyama|tidur|sleep/.test(n)) styles.push("tidur");
+  if (/cardigan|santai|hoodie/.test(n)) styles.push("santai");
+  if (/blazer|kemeja|kerja/.test(n)) times.push("pagi", "siang");
+  if (/kaos|hoodie|denim|casual|santai/.test(n)) times.push("siang", "malam");
+  if (/dress|malam/.test(n)) times.push("malam");
+  return { times: [...new Set(times)], styles: [...new Set(styles)] };
 }
 
 const wardrobeFile = (slug) => path.join(DATA_DIR, "photos", "wardrobe", `${String(slug || "character").replace(/[^\w.-]/g, "")}.json`);
 
-export function wardrobePhotos(slug) {
+/**
+ * The wardrobe lives in its own file now, as items with categories, because a flat list cannot say
+ * "this is what she wears to pilates" — and generating a photo needs exactly that.
+ * The card's `wardrobe:` line is still read the first time, then split into items with no categories.
+ */
+export function loadWardrobe(slug) {
   try {
-    return JSON.parse(fs.readFileSync(wardrobeFile(slug), "utf8"));
+    const j = JSON.parse(fs.readFileSync(wardrobeFile(slug), "utf8"));
+    if (Array.isArray(j.items)) {
+      // items added before categories existed get a first guess, and stay editable
+      let changed = false;
+      for (const it of j.items) {
+        if ((!it.times || !it.times.length) && (!it.styles || !it.styles.length)) {
+          const guess = autoCategorize(it.name);
+          it.times = guess.times;
+          it.styles = guess.styles;
+          changed = true;
+        }
+      }
+      if (changed) saveWardrobe(slug, j);
+      return j;
+    }
   } catch {
-    return {};
+    /* first run */
+  }
+  const persona = loadPersonaSafe(slug);
+  const raw = String(persona?.wardrobe || "").trim();
+  const names = raw ? raw.split("|").map((x) => x.trim()).filter(Boolean) : WARDROBE;
+  const items = names.map((name, i) => {
+    const guess = autoCategorize(name);
+    return { id: `w${i + 1}`, name, times: guess.times, styles: guess.styles, image: "" };
+  });
+  const built = { items };
+  try {
+    fs.mkdirSync(path.dirname(wardrobeFile(slug)), { recursive: true });
+    fs.writeFileSync(wardrobeFile(slug), JSON.stringify(built, null, 2));
+  } catch {
+    /* the file is a convenience, not a requirement */
+  }
+  return built;
+}
+
+function loadPersonaSafe(slug) {
+  try {
+    // imported lazily to avoid a cycle: prompt.mjs is the card reader, not a wardrobe concern
+    const { loadPersona } = require_prompt_sync();
+    return loadPersona(slug || config.persona);
+  } catch {
+    return null;
   }
 }
 
-export function setWardrobePhoto(slug, index, file) {
-  const map = wardrobePhotos(slug);
-  map[String(index)] = String(file);
-  fs.mkdirSync(path.dirname(wardrobeFile(slug)), { recursive: true });
-  fs.writeFileSync(wardrobeFile(slug), JSON.stringify(map, null, 2));
-  return map;
+function require_prompt_sync() {
+  if (!globalThis.__understudyPromptLoader) {
+    throw new Error("prompt loader not registered");
+  }
+  return globalThis.__understudyPromptLoader;
 }
 
-/** Deterministic per day and per photo, so a single day's photos do not all share one outfit. */
-export function pickOutfit(persona, seed = 0) {
-  const list = wardrobeFor(persona).map((w) => (typeof w === "string" ? w : w.name));
-  const day = new Date();
-  const dayIndex = day.getFullYear() * 372 + (day.getMonth() + 1) * 31 + day.getDate();
-  return list[Math.abs(dayIndex + Number(seed || 0)) % list.length];
+export function saveWardrobe(slug, wardrobe) {
+  fs.mkdirSync(path.dirname(wardrobeFile(slug)), { recursive: true });
+  fs.writeFileSync(wardrobeFile(slug), JSON.stringify(wardrobe, null, 2));
+  return wardrobe;
+}
+
+export function addWardrobeItem(slug, { name, times = [], styles = [] } = {}) {
+  const w = loadWardrobe(slug);
+  const clean = String(name || "").trim().slice(0, 120);
+  if (!clean) return { ok: false, error: "namanya belum diisi" };
+  const item = {
+    id: `w${Date.now().toString(36)}`,
+    name: clean,
+    times: times.filter((t) => TIMES.includes(t)),
+    styles: styles.filter((t) => STYLES.includes(t)),
+    image: "",
+  };
+  w.items.push(item);
+  saveWardrobe(slug, w);
+  return { ok: true, item, wardrobe: w };
+}
+
+export function removeWardrobeItem(slug, id) {
+  const w = loadWardrobe(slug);
+  const before = w.items.length;
+  w.items = w.items.filter((i) => i.id !== id);
+  if (w.items.length === before) return { ok: false, error: "not found" };
+  saveWardrobe(slug, w);
+  return { ok: true, wardrobe: w };
+}
+
+export function setWardrobeImage(slug, id, file) {
+  const w = loadWardrobe(slug);
+  const item = w.items.find((i) => i.id === id);
+  if (!item) return { ok: false, error: "not found" };
+  item.image = String(file);
+  saveWardrobe(slug, w);
+  return { ok: true, wardrobe: w };
+}
+
+/** Kept for callers that only want names (the card text stays the source of the words). */
+export function wardrobeFor(persona) {
+  return loadWardrobe(persona?.slug).items;
+}
+
+export function pickOutfit(persona, { hour = new Date().getHours(), style = "" } = {}) {
+  const items = loadWardrobe(persona?.slug).items;
+  if (!items.length) return WARDROBE[0];
+  const bucket = timeBucket(hour);
+  const fits = (i) => ({
+    time: !i.times?.length || i.times.includes(bucket),
+    style: !style || !i.styles?.length || i.styles.includes(style),
+    exactStyle: !!style && (i.styles || []).includes(style),
+  });
+  const scored = items.map((i) => {
+    const f = fits(i);
+    return { item: i, score: (f.time ? 2 : -2) + (f.style ? 3 : -1) + (f.exactStyle ? 2 : 0) };
+  });
+  const pool = scored.filter((x) => x.score >= 3);
+  const use = pool.length ? pool : scored.filter((x) => x.score >= 1);
+  if (!use.length) return items[0].name;
+  const dayIndex = new Date().getFullYear() * 372 + (new Date().getMonth() + 1) * 31 + new Date().getDate();
+  const pick = use.sort((a, b) => b.score - a.score)[Math.abs(dayIndex) % use.length];
+  return pick.item.name;
 }
 
 /** The shared rules, kept in one place so every scene obeys them. */
@@ -99,6 +207,8 @@ Do not change her face, do not beautify or stylise her. Only the outfit and the 
  */
 export const SCENES = {
   "meja-pagi": {
+    style: "kerja",
+    hour: 9,
     kind: "view",
     aspect: "4:3",
     time: "morning",
@@ -112,6 +222,8 @@ hand from where she sits: iced coffee in a plastic cup, an open laptop, earphone
 the frame. Not tidy, nothing posed. ${SELF_RULES}`,
   },
   "warung-malam": {
+    style: "casual",
+    hour: 20,
     kind: "view",
     aspect: "4:3",
     time: "night",
@@ -138,6 +250,8 @@ sits: a grey and white street cat on a closed laptop, one paw off the edge. Her 
 her hand or a sleeve edge. Indoor daylight. ${SELF_RULES}`,
   },
   "selfie-siang": {
+    style: "casual",
+    hour: 14,
     kind: "self",
     aspect: "3:4",
     time: "day",
@@ -151,6 +265,8 @@ selfie in the afternoon in her room in Denpasar, indoor daylight from a window o
 behind her, one arm stretched toward the camera, no makeup, flat unimpressed expression. ${SELF_RULES}`,
   },
   "selfie-malam": {
+    style: "casual",
+    hour: 22,
     kind: "self",
     aspect: "3:4",
     time: "night",
@@ -164,6 +280,8 @@ cafe in Denpasar, lit by a warm street light and the phone screen, a dark noisy 
 and a lit shop sign, no makeup, tired relaxed face, half a smile at most. ${SELF_RULES}`,
   },
   "jalan-pulang": {
+    style: "casual",
+    hour: 18,
     kind: "view",
     aspect: "4:3",
     time: "evening",
@@ -179,11 +297,10 @@ is NOT in the frame. ${SELF_RULES}`,
 };
 
 /** The prompt for one scene, with the outfit she is wearing today (or one you pass in). */
-export function scenePrompt(sceneId, { persona = null, outfit = "", edit = false, seed = 0 } = {}) {
+export function scenePrompt(sceneId, { persona = null, outfit = "", edit = false, hour = null } = {}) {
   const scene = SCENES[sceneId];
   if (!scene) return "";
-  const pick = outfit || pickOutfit(persona, seed);
-  const wear = typeof pick === "string" ? pick : pick.name;
+  const wear = outfit || pickOutfit(persona, { hour: hour ?? scene.hour ?? new Date().getHours(), style: scene.style || "" });
   const fn = edit ? scene.editPrompt : scene.prompt;
   return fn(wear);
 }
