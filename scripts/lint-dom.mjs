@@ -47,9 +47,11 @@ for (const m of html.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w
   console.log(`  dashboard/index.html: const ${alias} = ${source} copies a value that changes later — use the source directly`);
 }
 
+// ids the script creates itself (an error bar, a temporary node) are not expected in the markup
+const DYNAMIC_IDS = new Set(["understudyErrorBar"]);
 let missing = 0;
 for (const id of refs.keys()) {
-  if (defined.has(id)) continue;
+  if (defined.has(id) || DYNAMIC_IDS.has(id)) continue;
   missing++;
   console.log(`  dashboard/index.html: #${id} is used by the script but does not exist in the markup`);
 }

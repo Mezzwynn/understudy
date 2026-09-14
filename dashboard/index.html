@@ -402,6 +402,7 @@ const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const MOODKEYS = ["valence","energy","arousal","affection","patience","playfulness"];
 const MOODCOLOR = { valence:"#cfe08a", energy:"#ffc773", arousal:"#ff9a6b", affection:"#ffb0c4", patience:"#a8dcd0", playfulness:"#ffe08a" };
+let PHOTO_PICK={outfit:"",style:"casual"};
 let DATA=null, tab="contacts", SETTINGS_LOADED=false, CHAR_SLUG=null, charDirty=false;
 let contactsDirty=false, dragging=false, AGENT_LOG=[], AGENT_LOADED=false;
 const draft={}, openCards=new Set();
@@ -1393,12 +1394,12 @@ function renderPhotos(){
       <div class="mrow2"><span>Baju buat kirim manual</span>
         <select class="sin" id="selfie-outfit">
           <option value="">otomatis (rotasi)</option>
-          ${(gowns||[]).map(w=>`<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("")}
+          ${(gowns||[]).map(w=>`<option value="${esc(w.name)}" ${PHOTO_PICK.outfit===w.name?"selected":""}>${esc(w.name)}</option>`).join("")}
         </select></div>
       <div class="mrow2"><span>Gaya (kalau otomatis)</span>
-        <select class="sin" id="selfie-style">${(ph.wardrobeStyles||[]).map(t=>`<option value="${t}">${esc(t)}</option>`).join("")}</select></div>
+        <select class="sin" id="selfie-style">${(ph.wardrobeStyles||[]).map(t=>`<option value="${t}" ${PHOTO_PICK.style===t?"selected":""}>${esc(t)}</option>`).join("")}</select></div>
       <div class="mrow2"><span>atau tulis sendiri</span>
-        <input class="sin" id="selfie-outfit-text" placeholder="mis. dress hitam lengan panjang, atau kaos putih + celana denim"></div>
+        <input class="sin" id="selfie-outfit-text" value="${esc(PHOTO_PICK.typed||"")}" placeholder="mis. dress hitam lengan panjang, atau kaos putih + celana denim"></div>
       <div class="mrow2"><span>Simpan tulisannya ke wardrobe</span><span class="swline">${SW(false, 'data-wto="1"')}</span></div>
     </div>
     <div class="btns">
@@ -1550,6 +1551,7 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     const typed = ($("#selfie-outfit-text")?.value || "").trim();
     const outfit = typed || $("#selfie-outfit")?.value || "";
     const style = $("#selfie-style")?.value || "casual";
+    PHOTO_PICK = { outfit, style, typed };   // supaya tidak balik ke default setelah panel disegarkan
     // kalau dicentang, baju yang ditulis juga masuk ke wardrobe biar bisa dipakai lagi
     const saveIt = $("#tab-photos [data-wto]")?.classList.contains("on");
     if (typed && saveIt) await api("/api/photos",{ action:"wardrobe-add", name: typed, times: [], styles: [] });

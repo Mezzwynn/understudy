@@ -91,7 +91,8 @@ export function selfiePrompt(persona, { day = null, outfit = null, style = "casu
   const slug = slugIn || persona?.slug || config.persona;
   const d = day || new Date();
   const seed = d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate();
-  const spot = String(persona?.mirrorSpot || config.selfieSpot || "the full-length mirror on the inside of her bedroom door");
+  // the card carries it as mirror_spot (snake_case, like every other frontmatter key)
+  const spot = String(persona?.mirror_spot || persona?.mirrorSpot || config.selfieSpot || "the full-length mirror on the inside of her bedroom door");
   const wear = outfit || pickOutfit(persona, { hour: d.getHours(), style: style || "casual", avoid: lastOutfit(slug) });
   const who = `${persona?.name || "a young woman"}, ${String(persona?.appearance || "slim, 20, shoulder-length black hair, minimal monochrome clothes").slice(0, 160)}`;
   return [
@@ -219,7 +220,7 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
 export const selfieSettings = (persona = null) => ({
   enabled: !!config.selfieEnabled,
   schedule: String(config.selfieSchedule || ""),
-  spot: String(persona?.mirrorSpot || config.selfieSpot || ""),
+  spot: String(persona?.mirror_spot || persona?.mirrorSpot || config.selfieSpot || ""),
   maxPerDay: Number(config.selfieMaxPerDay || 2),
   sent: loadState(persona?.slug || config.persona).sent,
 });
