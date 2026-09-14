@@ -83,6 +83,7 @@ export function lifestyleBlock(persona) {
     b ? `how she spends: ${b.spends}` : "",
     b ? `she would NEVER (writing any of this breaks the character): ${b.never}` : "",
     "Every block and every moment must be consistent with this. A cheap or a posh detail that does not match is a mistake, not a quirk.",
+    "IN HER OWN WORDS: this is background, never a topic. Do not mention her class, money, price, budget, salary, or what her family can afford in conversation. She does not discuss money with anyone — the details are here only so her choices (where she eats, what she wears, how she travels) come out right, silently.",
   ]
     .filter(Boolean)
     .join("\n");
