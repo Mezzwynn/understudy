@@ -174,7 +174,7 @@ export function wardrobeFor(persona) {
   return loadWardrobe(persona?.slug).items;
 }
 
-export function pickOutfit(persona, { hour = new Date().getHours(), style = "" } = {}) {
+export function pickOutfit(persona, { hour = new Date().getHours(), style = "", avoid = "" } = {}) {
   const items = loadWardrobe(persona?.slug).items;
   if (!items.length) return WARDROBE[0];
   const bucket = timeBucket(hour);
@@ -190,9 +190,15 @@ export function pickOutfit(persona, { hour = new Date().getHours(), style = "" }
   const pool = scored.filter((x) => x.score >= 3);
   const use = pool.length ? pool : scored.filter((x) => x.score >= 1);
   if (!use.length) return items[0].name;
-  const dayIndex = new Date().getFullYear() * 372 + (new Date().getMonth() + 1) * 31 + new Date().getDate();
-  const pick = use.sort((a, b) => b.score - a.score)[Math.abs(dayIndex) % use.length];
-  return pick.item.name;
+  // Rotate per photo, not per day: the day seed meant every selfie on the same day wore the same thing,
+  // which is exactly what Hik noticed ("she keeps wearing the kaos").
+  const candidates = use.sort((a, b) => b.score - a.score);
+  const fresh = candidates.filter((c) => c.item.name !== avoid);
+  const rotate = fresh.length ? fresh : candidates;
+  const idx = avoid
+    ? Math.floor(Math.random() * rotate.length)
+    : Math.abs(new Date().getFullYear() * 372 + (new Date().getMonth() + 1) * 31 + new Date().getDate()) % rotate.length;
+  return rotate[idx].item.name;
 }
 
 /** The shared rules, kept in one place so every scene obeys them. */

@@ -839,7 +839,7 @@ export function startDashboard() {
           }
           if (act === "selfie-now") {
             const persona = loadPersona(slug);
-            const r = await makeSelfie(persona, { slug });
+            const r = await makeSelfie(persona, { slug, style: String(body.style || "casual"), outfit: String(body.outfit || "") });
             if (!r.ok) return json(res, 400, { ok: false, error: r.error });
             const photo = loadWardrobe ? null : null;
             const lib = loadLibrary(slug);

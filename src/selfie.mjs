@@ -74,16 +74,25 @@ const REASONS = [
 
 const pickR = (list, seed) => list[Math.abs(seed) % list.length];
 
+/** The outfit of the last selfie, so the next one is not the same shirt. */
+function lastOutfit(slug) {
+  try {
+    return String(loadState(slug).lastOutfit || "");
+  } catch {
+    return "";
+  }
+}
+
 /**
  * The prompt. The spot comes from the character (bedroom mirror by the door by default) and is the same
  * every time; everything else is drawn from the lists above by day, so two selfies never look alike.
  */
-export function selfiePrompt(persona, { day = null, outfit = null, style = "casual", why = "" } = {}) {
-  const slug = persona?.slug || config.persona;
+export function selfiePrompt(persona, { day = null, outfit = null, style = "casual", why = "", slug: slugIn = null } = {}) {
+  const slug = slugIn || persona?.slug || config.persona;
   const d = day || new Date();
   const seed = d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate();
   const spot = String(persona?.mirrorSpot || config.selfieSpot || "the full-length mirror on the inside of her bedroom door");
-  const wear = outfit || pickOutfit(persona, { hour: d.getHours(), style: style || "casual" });
+  const wear = outfit || pickOutfit(persona, { hour: d.getHours(), style: style || "casual", avoid: lastOutfit(slug) });
   const who = `${persona?.name || "a young woman"}, ${String(persona?.appearance || "slim, 20, shoulder-length black hair, minimal monochrome clothes").slice(0, 160)}`;
   return [
     `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
@@ -172,11 +181,11 @@ export function markSelfieSent(slug, key) {
  * Make one and file it in the library. The photo is generated fresh, then humanised like everything else
  * and added with the mirror spot as its scene, so it can be sent again later and rated like the rest.
  */
-export async function makeSelfie(persona, { slug = null, day = null, style = "casual", why = "" } = {}) {
+export async function makeSelfie(persona, { slug = null, day = null, style = "casual", why = "", outfit = "" } = {}) {
   const s = slug || persona?.slug || config.persona;
   if (!imageEngineReady()) return { ok: false, error: "no image engine configured" };
   const ref = avatarPath(s);
-  const prompt = selfiePrompt(persona, { day, style, why });
+  const prompt = selfiePrompt(persona, { day, style, why, outfit: outfit || null, slug: s });
   const res = await generateImage({
     model: config.editModel,
     prompt,
@@ -198,7 +207,11 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
   });
   fs.rmSync(final, { force: true });
   const hour = new Date().getHours();
-  log(`selfie: generated (${res.seconds}s, $${(res.price || 0).toFixed(3)}) → ${added.ok ? added.photo.id : "not filed"}`);
+  // remember what she was wearing so the next selfie differs
+  const st = loadState(s);
+  const wearLine = (prompt.match(/She is wearing ([^.]+)\./) || [])[1] || "";
+  saveState(s, { ...st, lastOutfit: wearLine });
+  log(`selfie: ${res.seconds}s, $${(res.price || 0).toFixed(3)} — pakai "${String(wearLine).slice(0, 40)}" → ${added.ok ? added.photo.id : "gagal simpan"}`);
   return { ok: true, photo: added.photo, seconds: res.seconds, price: res.price, bucket: timeBucket(hour) };
 }
 

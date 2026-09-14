@@ -1375,6 +1375,15 @@ function renderPhotos(){
       <div class="mrow2"><span>Jam cadangan (kalau rutinitasnya nggak ada momen)</span><input class="sin" id="selfie-sched" value="${esc((ph.selfie||{}).schedule||"")}"></div>
       <div class="mrow2"><span>Maksimal per hari</span><input class="nin" type="number" id="selfie-max" min="1" max="5" value="${(ph.selfie||{}).maxPerDay ?? 2}"></div>
     </div>
+    <div class="rows" style="margin-bottom:8px">
+      <div class="mrow2"><span>Baju buat kirim manual</span>
+        <select class="sin" id="selfie-outfit">
+          <option value="">otomatis (rotasi)</option>
+          ${(gowns||[]).map(w=>`<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("")}
+        </select></div>
+      <div class="mrow2"><span>Gaya (kalau otomatis)</span>
+        <select class="sin" id="selfie-style">${(ph.wardrobeStyles||[]).map(t=>`<option value="${t}">${esc(t)}</option>`).join("")}</select></div>
+    </div>
     <div class="btns">
       <button class="act" data-pact="selfie-save">Simpan</button>
       <button class="act" data-pact="selfie-now">Bikin &amp; kirim sekarang</button>
@@ -1521,8 +1530,10 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     return refresh(true);
   }
   if(act==="selfie-now"){
-    toast("Bikin selfie… (10-20 detik)");
-    const r = await api("/api/photos",{ action:"selfie-now" });
+    const outfit = $("#selfie-outfit")?.value || "";
+    const style = $("#selfie-style")?.value || "casual";
+    toast("Bikin selfie… (10-20 detik)" + (outfit ? " pakai " + outfit : ""));
+    const r = await api("/api/photos",{ action:"selfie-now", outfit, style });
     toast(r.ok ? ("Selfie jadi & dikirim ke " + r.sent + " kontak") : ("Gagal: " + (r.error||"")));
     return refresh(true);
   }
