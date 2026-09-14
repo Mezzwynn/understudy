@@ -486,6 +486,14 @@ export function startDashboard() {
       }
 
       // rating page: Hik's eye is the ground truth for photos, so it gets a page
+      // The page compares its own build stamp against this and reloads itself when they differ, so a
+      // browser that keeps a stale copy of the panel corrects itself within a second.
+      if (req.method === "GET" && url.pathname === "/build-stamp.js") {
+        const stamp = String(Math.round(fs.statSync(HTML_FILE).mtimeMs));
+        res.writeHead(200, { "content-type": "text/javascript", "cache-control": "no-store" });
+        return res.end(`window.__SERVER_BUILD__ = "${stamp}";\n`);
+      }
+
       // What the browser actually sees: load the panel in an iframe and report any JS error it throws.
       if (req.method === "GET" && url.pathname === "/diag") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });

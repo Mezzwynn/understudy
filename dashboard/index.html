@@ -386,7 +386,19 @@ window.addEventListener("error", (e) => {
 // no service worker: it only ever hid updates
 if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
 
-const BUILD_STAMP = "2026-09-14 19:25 switch-baju-baru"; // naikkan tiap kali UI berubah
+const BUILD_STAMP = "tanya-server"; // nilai aslinya dari /build-stamp.js (mtime file = selalu baru kalau ada perubahan)
+if (!window.__autoReloaded) {
+  fetch("/build-stamp.js", { cache: "reload" })
+    .then((r) => r.text())
+    .then((t) => {
+      const m = /__SERVER_BUILD__ = "([^"]+)"/.exec(t);
+      if (m && window.__SERVER_BUILD__ && m[1] !== window.__SERVER_BUILD__) {
+        window.__autoReloaded = true;
+        location.reload();
+      }
+    })
+    .catch(() => {});
+}
 
 /* ═══════════════════════════════ helpers ═══════════════════════════════ */
 // surface any runtime error instead of leaving a half-dead page behind
@@ -543,7 +555,9 @@ function renderHeader(){
     if (el && cur) { el.innerHTML = `${esc(cur.what)} <b>${cur.start}–${cur.end}</b>`; el.style.display=""; }
     else if (el) { el.style.display="none"; }
   } catch (e) { /* the chip is a nicety */ }
-  $("#chip-ver").textContent = "v" + (DATA.version || "0.0.0") + " · " + String(BUILD_STAMP).slice(11, 16);
+  const stamp = window.__SERVER_BUILD__ || BUILD_STAMP;
+  $("#chip-ver").textContent = "v" + (DATA.version || "0.0.0") + " · " + (stamp === "tanya-server" ? "…" : String(stamp).slice(-8));
+  $("#chip-ver").title = "build " + String(stamp);
   $("#chip-ver").title = BUILD_STAMP;
   $("#dot").className = "pulse" + (b.connected ? " on" : "");
   $("#num").textContent = b.number ? "+"+b.number : "not connected";
