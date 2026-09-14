@@ -9,7 +9,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Fio" />
+<meta name="apple-mobile-web-app-title" content="Understudy" />
 <title id="doctitle">Understudy — Control Panel</title>
 <style>
   /* ─────────────────────────────  design tokens  ───────────────────────────── */
@@ -203,6 +203,21 @@
   .hb{font-size:11px;padding:6px 7px;flex:1}
   .hb.sel{background:#241e14;border-color:var(--accent);color:var(--accent)}
   @media(max-width:520px){ .wgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  /* ── baris setelan: label di kiri, kontrol di kanan, tidak bisa nabrak ── */
+  .rows{display:flex;flex-direction:column;gap:11px}
+  .mrow2{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;min-width:0}
+  .mrow2>span:first-child{font-size:13px;line-height:1.45;min-width:0;overflow-wrap:anywhere}
+  .mrow2 .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;min-width:0}
+  .swline{display:inline-flex;align-items:center;gap:7px;min-width:0;justify-content:flex-end}
+  .swline em{font-style:normal;font-size:11.5px;color:var(--dim);white-space:nowrap}
+  .nin{width:78px;text-align:right;background:#241e14;border:1px solid var(--line);color:var(--tx);border-radius:9px;padding:8px 10px;font-size:13px;box-sizing:border-box}
+  .sin{background:#241e14;border:1px solid var(--line);color:var(--tx);border-radius:9px;padding:8px 10px;font-size:13px;min-width:0;max-width:100%;box-sizing:border-box}
+  @media(max-width:430px){
+    .mrow2{grid-template-columns:1fr;gap:7px}
+    .mrow2 .row{justify-content:flex-start}
+    .swline{justify-content:flex-start}
+    .nin{width:100%;text-align:left}
+  }
   .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
   input,select,textarea{background:var(--input-bg);color:var(--tx);border:1px solid var(--line-2);
     border-radius:11px;padding:10px 12px;font-size:13px;font-family:inherit;width:100%;transition:.16s}
@@ -356,7 +371,7 @@
 // no service worker: it only ever hid updates
 if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
 
-const BUILD_STAMP = "2026-09-14 17:45 status-switch"; // naikkan tiap kali UI berubah
+const BUILD_STAMP = "2026-09-14 18:05 baris-rapi"; // naikkan tiap kali UI berubah
 
 /* ═══════════════════════════════ helpers ═══════════════════════════════ */
 // surface any runtime error instead of leaving a half-dead page behind
@@ -497,8 +512,8 @@ function dayTimeline(info){
 /* ═══════════════════════════════ header ═══════════════════════════════ */
 function renderHeader(){
   const b=DATA.bot;
-  $("#pname").textContent = `${b.persona.emoji||""} ${b.persona.name}`.trim();
-  document.title = `${b.persona.name} — panel`;
+  $("#pname").textContent = "Understudy";
+  document.title = "Understudy — Control Panel";
   // what she is doing right now, from her own routine
   try {
     const now = new Date();
