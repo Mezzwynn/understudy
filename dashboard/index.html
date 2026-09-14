@@ -1383,6 +1383,9 @@ function renderPhotos(){
         </select></div>
       <div class="mrow2"><span>Gaya (kalau otomatis)</span>
         <select class="sin" id="selfie-style">${(ph.wardrobeStyles||[]).map(t=>`<option value="${t}">${esc(t)}</option>`).join("")}</select></div>
+      <div class="mrow2"><span>atau tulis sendiri</span>
+        <input class="sin" id="selfie-outfit-text" placeholder="mis. dress hitam lengan panjang, atau kaos putih + celana denim"></div>
+      <div class="mrow2"><span>Simpan tulisannya ke wardrobe</span><span class="swline">${SW(false, "data-wto="1"")}</span></div>
     </div>
     <div class="btns">
       <button class="act" data-pact="selfie-save">Simpan</button>
@@ -1530,8 +1533,12 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     return refresh(true);
   }
   if(act==="selfie-now"){
-    const outfit = $("#selfie-outfit")?.value || "";
+    const typed = ($("#selfie-outfit-text")?.value || "").trim();
+    const outfit = typed || $("#selfie-outfit")?.value || "";
     const style = $("#selfie-style")?.value || "casual";
+    // kalau dicentang, baju yang ditulis juga masuk ke wardrobe biar bisa dipakai lagi
+    const saveIt = $("#tab-photos [data-wto]")?.classList.contains("on");
+    if (typed && saveIt) await api("/api/photos",{ action:"wardrobe-add", name: typed, times: [], styles: [] });
     toast("Bikin selfie… (10-20 detik)" + (outfit ? " pakai " + outfit : ""));
     const r = await api("/api/photos",{ action:"selfie-now", outfit, style });
     toast(r.ok ? ("Selfie jadi & dikirim ke " + r.sent + " kontak") : ("Gagal: " + (r.error||"")));
