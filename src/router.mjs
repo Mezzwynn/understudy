@@ -660,13 +660,20 @@ async function respond(sock, jid, p) {
   await subscribePresence(sock, jid);
   // sometimes she just reads it and doesn't reply
   // never leave a health message on read
+  // A photo request is worked out here, before anything decides to stay quiet: it used to be computed
+  // further down, so the skip rules (short ping, short fuse, busy) could throw the message away and the
+  // photo path never ran — which reads as her refusing.
+  const wantsPhoto = /\b(foto|photo|photograph|pic|pics|picture|selfie|potret|pap|gambar|muka|wajah)\b/i.test(
+    String(incoming || ""),
+  );
+
   const worth = worthReplying(chat, incoming, {
     mood: chat.mood,
     worried,
     crisis: crisisActive,
     cameBack: pstate.state === "awaiting" || pstate.state === "nudged",
   });
-  if (!worried && worth.skip) {
+  if (!worried && worth.skip && !wantsPhoto) {
     chat.stats.skips = (chat.stats.skips || 0) + 1;
     chat.lastSkipAt = Date.now();
     saveChat(chat);
@@ -767,12 +774,6 @@ async function respond(sock, jid, p) {
   }
 
   // photo: when she's asked, or rarely on her own (daily cap per contact)
-  // Any mention of a photo counts. It used to need an Indonesian phrasing ("foto dong"), so an English
-  // request — "send me a pic", "ur pic's..." — never registered as asking, and she answered no because the
-  // system had never treated it as a request at all.
-  const wantsPhoto = /\b(foto|photo|photograph|pic|pics|picture|selfie|potret|pap|gambar|muka|wajah)\b/i.test(
-    String(incoming || ""),
-  );
   const today = new Date().toISOString().slice(0, 10);
   if (chat.stats.photoDay !== today) {
     chat.stats.photoDay = today;
