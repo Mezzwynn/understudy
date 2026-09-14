@@ -1,6 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
-import { config, DATA_DIR, log, ROOT, PERSONA_DIR, PROMPT_DIR } from "./config, DATA_DIR.mjs";
+import { config, DATA_DIR, log, ROOT, PERSONA_DIR, PROMPT_DIR } from "./config.mjs";
 import { listChats, saveChat, loadChat, loadState, saveState } from "./store.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { generateProactive, generateNudge, generateFollowup, generateCheckup } from "./engine.mjs";
