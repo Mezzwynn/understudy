@@ -1371,6 +1371,17 @@ function selfieCard(ph, gowns, styles) {
           <option value="hide" ${sf.face === "hide" ? "selected" : ""}>hide — ketutup semua</option>
         </select></div>
 
+      <div class="mrow2"><span>Pose</span>
+        <select class="sin" id="sf-pose">
+          <option value="auto" ${(!sf.pose || sf.pose === "auto") ? "selected" : ""}>auto (rotasi)</option>
+          <option value="natural" ${sf.pose === "natural" ? "selected" : ""}>natural — santai</option>
+          <option value="peace" ${sf.pose === "peace" ? "selected" : ""}>peace — dua jari</option>
+          <option value="hip" ${sf.pose === "hip" ? "selected" : ""}>tangan di pinggang</option>
+          <option value="hair" ${sf.pose === "hair" ? "selected" : ""}>rapiin rambut</option>
+          <option value="sit" ${sf.pose === "sit" ? "selected" : ""}>duduk</option>
+          <option value="shoulder" ${sf.pose === "shoulder" ? "selected" : ""}>noleh ke belakang</option>
+        </select></div>
+
       <div class="mrow2"><span>Tempat (jangan diubah-ubah)</span>
         <input class="sin" id="sf-spot" value="${esc(sf.spot || "")}"></div>
 
@@ -1431,6 +1442,7 @@ window.uwSelfieSave = async () => {
     SELFIE_MAX_PER_DAY: document.getElementById("sf-max").value,
     SELFIE_OUTFIT: document.getElementById("sf-outfit").value,
     SELFIE_FACE: document.getElementById("sf-face").value,
+    SELFIE_POSE: document.getElementById("sf-pose").value,
   };
   const spot = document.getElementById("sf-spot").value.trim();
   const typed = document.getElementById("sf-outfit-text").value.trim();
@@ -1447,7 +1459,7 @@ window.uwSelfieSave = async () => {
   const now = read && read.selfie ? read.selfie : null;
   if (st) {
     st.textContent = now
-      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · baju: ${now.outfit || "rotasi"} · wajah: ${now.face || "half"} · tempat: "${String(now.spot).slice(0, 40)}" · maks: ${now.maxPerDay}${extra}`
+      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · baju: ${now.outfit || "rotasi"} · wajah: ${now.face || "half"} · pose: ${now.pose || "auto"} · maks: ${now.maxPerDay}${extra}`
       : "tersimpan ✓";
   }
   PHOTO_PICK = { outfit: document.getElementById("sf-outfit").value, style: document.getElementById("sf-style").value, typed };

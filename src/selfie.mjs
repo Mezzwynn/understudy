@@ -110,11 +110,21 @@ function lastOutfit(slug) {
   }
 }
 
+/** How she stands/holds herself in a mirror selfie — the panel exposes a pose dropdown. */
+const POSES = {
+  natural: "standing relaxed with her weight on one leg, a normal quick mirror check, not posing at all",
+  peace: "holding up a small deadpan peace sign with her free hand, like she is half-mocking the gesture",
+  hip: "one hand on her hip, elbow out, looking a little impatient",
+  hair: "her free hand touching her hair or tucking a strand behind her ear, caught mid-motion",
+  sit: "sitting on the edge of her bed in front of the mirror, phone held up",
+  shoulder: "turned a little to the side, looking back over her shoulder at the mirror",
+};
+
 /**
  * The prompt. The spot comes from the character (bedroom mirror by the door by default) and is the same
  * every time; everything else is drawn from the lists above by day, so two selfies never look alike.
  */
-export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, style = "casual", why = "", slug: slugIn = null } = {}) {
+export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, style = "casual", why = "", slug: slugIn = null } = {}) {
   const slug = slugIn || persona?.slug || config.persona;
   const d = day || new Date();
   // Vary per shot, not per day: with a day-only seed every selfie on the same day shared the same
@@ -135,6 +145,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   const mood = pickR(MOOD, seed + 4);
   const mode = String(faceMode || config.selfieFace || "half").toLowerCase();
   const fm = FACE_LINES(mood)[mode] || FACE_LINES(mood).half;
+  const pose = POSES[String(poseMode || config.selfiePose || "auto").toLowerCase()] || null;
   return [
     refs.length > 1 ? refs.join(" ") : `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
     `New photo: a mirror selfie she took with her phone${why ? `, ${why}` : ""}. ${fm.hold}`,
@@ -142,7 +153,9 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
       ? `PLACE: exactly the place in the reference image — the same room, the same mirror, wall and objects, the same corner; it never changes between photos.`
       : `PLACE (always exactly this, it never changes): ${spot}, a plain wall behind her, the edge of her room visible — same corner of the same room as every other mirror photo she has taken.`,
     `She is wearing ${wear}.${garment}`,
-    `${pickR(FRAMING, seed + 1)}, ${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}.`,
+    pose
+      ? `${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}. Pose: ${pose}.`
+      : `${pickR(FRAMING, seed + 1)}, ${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}.`,
     fm.face,
     `Ordinary and unpolished: the mirror has a smudge, the room behind is lived in, the framing is not quite straight. Not a photoshoot, not a studio, no filter. No text, no watermark.`,
   ].join(" ");
@@ -286,6 +299,7 @@ export const selfieSettings = (persona = null) => ({
   maxPerDay: Number(config.selfieMaxPerDay || 2),
   outfit: String(config.selfieOutfit || ""),
   face: String(config.selfieFace || "half"),
+  pose: String(config.selfiePose || "auto"),
   spotImage: persona?.mirror_spot_image ? "/spot" : "",
   sent: loadState(persona?.slug || config.persona).sent,
 });

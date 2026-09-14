@@ -142,6 +142,8 @@ function buildConfig() {
   selfieOutfit: envGet("SELFIE_OUTFIT", ""),
   // how much of her face shows in a mirror selfie: full | half | hide
   selfieFace: envGet("SELFIE_FACE", "half"),
+  // how she stands/holds herself: auto | natural | peace | hip | hair | sit | shoulder
+  selfiePose: envGet("SELFIE_POSE", "auto"),
   objectModel: envGet("OBJECT_MODEL", "openai/gpt-image-1-mini/text-to-image"),
   photoCandidateCount: num(envGet("PHOTO_CANDIDATE_COUNT", "4"), 4),
   topicFatigue: envFlag("TOPIC_FATIGUE", true),
