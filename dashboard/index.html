@@ -170,6 +170,35 @@
   button.act.ghost{background:transparent}
   button.act.danger{color:var(--bad);border-color:rgba(255,107,125,.35)}
   button.act[disabled]{opacity:.4;pointer-events:none}
+  /* ── tab Photos: baju ── */
+  .wadd{display:flex;flex-direction:column;gap:8px}
+  .wadd input{width:100%}
+  .whead{display:flex;flex-direction:column;gap:10px}
+  .wphoto{display:flex;gap:12px;align-items:center}
+  .wthumb{width:76px;height:100px;object-fit:cover;border-radius:10px;flex:0 0 auto}
+  .wno{background:#0d0b06;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:10.5px;text-align:center}
+  .wname,.wdesc{width:100%;min-width:0;box-sizing:border-box}
+  .wname{font-size:13.5px}
+  .wdesc{font-size:12px;color:var(--dim)}
+  .wact{display:flex;gap:8px;flex-wrap:wrap}
+  .wact .act{flex:1;min-width:92px}
+  .wcat{display:flex;flex-direction:column;gap:9px;margin-top:12px;border-top:1px solid var(--line);padding-top:11px}
+  .wcatrow{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center}
+  .wcatrow .lbl{font-size:11px;color:var(--dim);width:40px}
+  .wgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 10px}
+  .swline{display:flex;align-items:center;gap:6px;min-width:0}
+  .swline em{font-style:normal;font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cg{display:flex;flex-direction:column;gap:6px}
+  .ci{display:flex;gap:10px;align-items:center;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:13px}
+  .ci .tiny{margin-left:auto;color:var(--dim)}
+  .histgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-top:10px}
+  .hist{background:var(--bg2);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .hist img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#000}
+  .hist .noimg{width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:var(--dim)}
+  .hist .body{padding:8px 10px}
+  .hb{font-size:11px;padding:6px 7px;flex:1}
+  .hb.sel{background:#241e14;border-color:var(--accent);color:var(--accent)}
+  @media(max-width:520px){ .wgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
   .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
   input,select,textarea{background:var(--input-bg);color:var(--tx);border:1px solid var(--line-2);
     border-radius:11px;padding:10px 12px;font-size:13px;font-family:inherit;width:100%;transition:.16s}
@@ -322,7 +351,7 @@
 // no service worker: it only ever hid updates
 if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
 
-const BUILD_STAMP = "2026-09-14 15:20 foto-wardrobe"; // naikkan tiap kali UI berubah
+const BUILD_STAMP = "2026-09-14 16:05 foto-rapi"; // naikkan tiap kali UI berubah
 
 /* ═══════════════════════════════ helpers ═══════════════════════════════ */
 // surface any runtime error instead of leaving a half-dead page behind
