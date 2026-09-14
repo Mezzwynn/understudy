@@ -20,6 +20,7 @@ import path from "node:path";
 import { chat as llmChat } from "./llm.mjs";
 import { ROOT, DATA_DIR, config, trackerProvider, log } from "./config.mjs";
 import { lifestyleBlock, hasClass, bandOf, BANDS } from "./lifestyle.mjs";
+import { loadWorld } from "./world.mjs";
 import { languageDirective } from "./lang.mjs";
 
 // under DATA_DIR so a test run with a throwaway data dir cannot touch real routines
@@ -42,8 +43,8 @@ const SYSTEM = `You plan ONE day in the life of a roleplay character, so she has
 
 Return ONLY JSON, no prose:
 {"theme":"one short line for the whole day",
- "blocks":[{"start":"HH:MM","end":"HH:MM","what":"short, concrete","place":"short"}],
- "moments":[{"at":"HH:MM","kind":"fun|annoyed|sad|scared|proud|tired|sweet|awkward","what":"short, concrete, specific","intensity":0.4,"share":true}]}
+ "blocks":[{"start":"HH:MM","end":"HH:MM","what":"short, concrete","place":"short","with":"name or empty"}],
+ "moments":[{"at":"HH:MM","kind":"fun|annoyed|sad|scared|proud|tired|sweet|awkward","what":"short, concrete, specific","with":"name or empty","intensity":0.4,"share":true}]}
 
 Rules:
 - Cover her WHOLE waking day, in order, 6-10 blocks, each 45-180 minutes, no overlaps.
@@ -59,6 +60,11 @@ Rules:
 - intensity 0.2-1.0. share=true if she would naturally bring it up in chat, false if private.
 - kind must be one of the listed values.
 - LANGUAGE: "theme", "what" and "place" must follow the LANGUAGE line in the user message exactly. Keep every string SHORT, max ~12 words.
+- COMPANIONS: at least ONE block and ONE moment a day must involve someone from the PEOPLE IN HER LIFE
+  list, and they must be NAMED — "jogging dengan Jessy", never "jogging with a friend". She is not a
+  hermit: people show up on most days. Do not invent names, and do not put the same person in every block
+  (vary who, and let some blocks be alone).
+- NO GAPS: the blocks must run back to back from waking to sleeping, with no unexplained hole.
 - Nothing sexual, nothing illegal, nothing about the people she chats with (this is HER day, they are not in it).`;
 
 /**
@@ -190,6 +196,7 @@ function sanitize(raw) {
       end: String(b?.end || "").trim(),
       what: String(b?.what || "").trim().slice(0, 120),
       place: String(b?.place || "").trim().slice(0, 60),
+      with: String(b?.with || "").trim().slice(0, 40),
     }))
     .filter((b) => toMin(b.start) !== null && toMin(b.end) !== null && b.what)
     .sort((a, b) => toMin(a.start) - toMin(b.start))
@@ -199,6 +206,7 @@ function sanitize(raw) {
       at: String(m?.at || "").trim(),
       kind: KIND_EFFECT[m?.kind] ? m.kind : "annoyed",
       what: String(m?.what || "").trim().slice(0, 160),
+      with: String(m?.with || "").trim().slice(0, 40),
       intensity: Math.max(0.2, Math.min(1, Number(m?.intensity) || 0.5)),
       share: m?.share !== false,
       firedAt: 0,
@@ -208,6 +216,14 @@ function sanitize(raw) {
     .slice(0, 6);
   const theme = String(raw.theme || "").trim().slice(0, 160);
   if (!blocks.length || !theme) return null;
+  // A hole in the day is always a mistake: either the model skipped time or a block was dropped.
+  // Extending the previous block is honest — she is still doing something.
+  for (let i = 1; i < blocks.length; i++) {
+    const prevEnd = toMin(blocks[i - 1].end);
+    const nextStart = toMin(blocks[i].start);
+    if (prevEnd === null || nextStart === null || nextStart <= prevEnd) continue;
+    if (nextStart - prevEnd <= 180) blocks[i - 1].end = blocks[i].start;
+  }
   return { theme, blocks, moments };
 }
 
@@ -242,6 +258,14 @@ export async function ensureToday(persona, { force = false, mood = null } = {}) 
   const user = [
     `CHARACTER CARD:\n${String(persona?.card || "").slice(0, 2600)}`,
     lifestyleBlock(persona),
+    (() => {
+      const w = loadWorld(persona?.slug || config.persona);
+      const cast = (w?.cast || []).filter((c) => c.relation && !/cat|kucing|pet/i.test(c.relation));
+      if (!cast.length) return "";
+      return `PEOPLE IN HER LIFE (use these names when someone is with her — never say "a friend"):\n${cast
+        .map((c) => `- ${c.name} — ${c.relation}${c.vibe ? `, ${c.vibe}` : ""}`)
+        .join("\n")}`;
+    })(),
     `LANGUAGE: ${languageDirective(persona?.language) || "match the character card"} (card: "${persona?.language || "-"}")`,
     `TODAY: ${weekdayName()} ${key}`,
     persona?.work_hours ? `HER WORK HOURS: ${persona.work_hours}` : "",
@@ -336,6 +360,14 @@ export async function ensureToday(persona, { force = false, mood = null } = {}) 
   const mergedBlocks = [...keepBlocks, ...freshBlocks]
     .sort((a, b) => (toMin(a.start) ?? 0) - (toMin(b.start) ?? 0))
     .slice(0, 14);
+  // close any hole the merge created: the kept blocks end where the day was when she regenerated,
+  // and the fresh ones start at that moment, so a small hole is normal here and only looks like a bug
+  for (let i = 1; i < mergedBlocks.length; i++) {
+    const prevEnd = toMin(mergedBlocks[i - 1].end);
+    const nextStart = toMin(mergedBlocks[i].start);
+    if (prevEnd === null || nextStart === null || nextStart <= prevEnd) continue;
+    if (nextStart - prevEnd <= 180) mergedBlocks[i - 1].end = mergedBlocks[i].start;
+  }
   const mergedMoments = [...keepMoments, ...freshMoments]
     .sort((a, b) => (toMin(a.at) ?? 0) - (toMin(b.at) ?? 0))
     .slice(-8);
