@@ -68,6 +68,22 @@ const MOOD = [
   "a short real laugh, caught before she could stop it",
   "one eyebrow raised, amused at her own reflection",
 ];
+
+/** How much of her face is visible in a mirror selfie — the panel exposes this as full | half | hide. */
+const FACE_LINES = (mood) => ({
+  full: {
+    hold: `One arm is bent up and her hand is clearly holding the phone, but the phone is held lower, beside her cheek or at chest height, so it does NOT cover her face — the hand and the phone stay visible in the mirror.`,
+    face: `Her whole face is visible and clear. Her expression: ${mood}. She is looking at the lens or at the screen, not posing for the mirror.`,
+  },
+  half: {
+    hold: `One arm is bent up and her hand is clearly holding the phone in front of her — the hand and the phone are both visible in the mirror, fingers wrapped around the phone.`,
+    face: `Her face is HALF HIDDEN by the phone: it covers one half of her face, so only one eye, half her nose and half her mouth are visible and the other side is behind the phone. Her expression on the visible half: ${mood}. She is looking at the phone or past it, not posing for the mirror.`,
+  },
+  hide: {
+    hold: `One arm is bent up and her hand is clearly holding the phone up in front of her face — the hand and the phone are both visible in the mirror, fingers wrapped around the phone.`,
+    face: `Her face is FULLY HIDDEN behind the phone: the phone covers her whole face in the mirror, so no eyes, no nose and no mouth are visible — at most a little hair or her forehead above the top edge. Her hand gripping the phone is clearly visible.`,
+  },
+});
 const FRAMING = [
   "waist up, the outfit readable",
   "shoulders down, the whole shirt visible",
@@ -98,7 +114,7 @@ function lastOutfit(slug) {
  * The prompt. The spot comes from the character (bedroom mirror by the door by default) and is the same
  * every time; everything else is drawn from the lists above by day, so two selfies never look alike.
  */
-export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, style = "casual", why = "", slug: slugIn = null } = {}) {
+export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, style = "casual", why = "", slug: slugIn = null } = {}) {
   const slug = slugIn || persona?.slug || config.persona;
   const d = day || new Date();
   // Vary per shot, not per day: with a day-only seed every selfie on the same day shared the same
@@ -116,15 +132,18 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   if (outfitRef) refs.push(`Image ${n++} is the outfit she must wear: put that exact garment on her, matching its fabric, colour, cut and pattern.`);
   if (spotRef) refs.push(`Image ${n++} is the place: reproduce that exact room, wall, mirror and objects in the same layout every time — only the camera angle, framing and light change.`);
   const who = `${persona?.name || "a young woman"}, ${String(persona?.appearance || "slim, 20, shoulder-length black hair, minimal monochrome clothes").slice(0, 160)}`;
+  const mood = pickR(MOOD, seed + 4);
+  const mode = String(faceMode || config.selfieFace || "half").toLowerCase();
+  const fm = FACE_LINES(mood)[mode] || FACE_LINES(mood).half;
   return [
     refs.length > 1 ? refs.join(" ") : `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
-    `New photo: a mirror selfie she took with her phone${why ? `, ${why}` : ""}. One arm is bent up and her hand is clearly holding the phone in front of her — the hand and the phone are both visible in the mirror, fingers wrapped around the phone.`,
+    `New photo: a mirror selfie she took with her phone${why ? `, ${why}` : ""}. ${fm.hold}`,
     spotRef
       ? `PLACE: exactly the place in the reference image — the same room, the same mirror, wall and objects, the same corner; it never changes between photos.`
       : `PLACE (always exactly this, it never changes): ${spot}, a plain wall behind her, the edge of her room visible — same corner of the same room as every other mirror photo she has taken.`,
     `She is wearing ${wear}.${garment}`,
     `${pickR(FRAMING, seed + 1)}, ${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}.`,
-    `Her face is HALF HIDDEN by the phone: it covers one half of her face, so only one eye, half her nose and half her mouth are visible and the other side is behind the phone. Her expression on the visible half: ${pickR(MOOD, seed + 4)}. She is looking at the phone or past it, not posing for the mirror.`,
+    fm.face,
     `Ordinary and unpolished: the mirror has a smudge, the room behind is lived in, the framing is not quite straight. Not a photoshoot, not a studio, no filter. No text, no watermark.`,
   ].join(" ");
 }
@@ -266,6 +285,7 @@ export const selfieSettings = (persona = null) => ({
   spot: String(persona?.mirror_spot || persona?.mirrorSpot || config.selfieSpot || ""),
   maxPerDay: Number(config.selfieMaxPerDay || 2),
   outfit: String(config.selfieOutfit || ""),
+  face: String(config.selfieFace || "half"),
   spotImage: persona?.mirror_spot_image ? "/spot" : "",
   sent: loadState(persona?.slug || config.persona).sent,
 });

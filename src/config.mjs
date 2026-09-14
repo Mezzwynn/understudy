@@ -140,6 +140,8 @@ function buildConfig() {
   selfieMaxPerDay: num(envGet("SELFIE_MAX_PER_DAY", "2"), 2),
   // empty = rotate through the wardrobe; a name/id here locks every selfie to that outfit
   selfieOutfit: envGet("SELFIE_OUTFIT", ""),
+  // how much of her face shows in a mirror selfie: full | half | hide
+  selfieFace: envGet("SELFIE_FACE", "half"),
   objectModel: envGet("OBJECT_MODEL", "openai/gpt-image-1-mini/text-to-image"),
   photoCandidateCount: num(envGet("PHOTO_CANDIDATE_COUNT", "4"), 4),
   topicFatigue: envFlag("TOPIC_FATIGUE", true),

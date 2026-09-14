@@ -1364,6 +1364,13 @@ function selfieCard(ph, gowns, styles) {
       <div class="mrow2"><span>Aktif</span>
         <button class="switch ${on(sf.enabled)}" id="sf-enable" onclick="uwSelfieToggle(this,'SELFIE_ENABLED')"><span></span></button></div>
 
+      <div class="mrow2"><span>Wajah</span>
+        <select class="sin" id="sf-face">
+          <option value="full" ${sf.face === "full" ? "selected" : ""}>full — kelihatan semua</option>
+          <option value="half" ${(!sf.face || sf.face === "half") ? "selected" : ""}>half — ketutup setengah</option>
+          <option value="hide" ${sf.face === "hide" ? "selected" : ""}>hide — ketutup semua</option>
+        </select></div>
+
       <div class="mrow2"><span>Tempat (jangan diubah-ubah)</span>
         <input class="sin" id="sf-spot" value="${esc(sf.spot || "")}"></div>
 
@@ -1423,6 +1430,7 @@ window.uwSelfieSave = async () => {
     SELFIE_SCHEDULE: document.getElementById("sf-sched").value.trim(),
     SELFIE_MAX_PER_DAY: document.getElementById("sf-max").value,
     SELFIE_OUTFIT: document.getElementById("sf-outfit").value,
+    SELFIE_FACE: document.getElementById("sf-face").value,
   };
   const spot = document.getElementById("sf-spot").value.trim();
   const typed = document.getElementById("sf-outfit-text").value.trim();
@@ -1439,7 +1447,7 @@ window.uwSelfieSave = async () => {
   const now = read && read.selfie ? read.selfie : null;
   if (st) {
     st.textContent = now
-      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · baju: ${now.outfit || "rotasi"} · tempat: "${String(now.spot).slice(0, 40)}" · maks: ${now.maxPerDay}${extra}`
+      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · baju: ${now.outfit || "rotasi"} · wajah: ${now.face || "half"} · tempat: "${String(now.spot).slice(0, 40)}" · maks: ${now.maxPerDay}${extra}`
       : "tersimpan ✓";
   }
   PHOTO_PICK = { outfit: document.getElementById("sf-outfit").value, style: document.getElementById("sf-style").value, typed };
