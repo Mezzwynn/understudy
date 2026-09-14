@@ -939,23 +939,26 @@ f.addEventListener("load", () => {
             if (!data || data.length < 100) return json(res, 400, { ok: false, error: "upload kosong" });
             fs.writeFileSync(target, Buffer.from(data, "base64"));
             setWardrobeImage(slug, id, target);
-            // read the clothes off the picture: the description writes itself, and categories are suggested
-            let auto = { ok: false };
+            // The picture is saved and answered right away. Reading the clothes off it is a vision
+            // round-trip that can be slow or down — it must never hold up (or fail) the upload itself,
+            // which is exactly what made "upload gambar baju" look broken.
             if (body.describe !== false) {
-              auto = await describeOutfit(target);
-              if (auto.ok) {
-                const before = loadWardrobe(slug).items.find((i) => i.id === id) || {};
-                updateWardrobeItem(slug, id, {
-                  description: auto.description,
-                  times: (before.times || []).length ? before.times : auto.times,
-                  styles: (before.styles || []).length ? before.styles : auto.styles,
-                });
-                log(`wardrobe: deskripsi otomatis untuk ${id} — ${auto.description.slice(0, 60)}`);
-              }
+              describeOutfit(target)
+                .then((auto) => {
+                  if (!auto.ok) return log(`wardrobe: deskripsi otomatis dilewati untuk ${id} (${auto.error || "?"})`);
+                  const before = loadWardrobe(slug).items.find((i) => i.id === id) || {};
+                  updateWardrobeItem(slug, id, {
+                    description: auto.description,
+                    times: (before.times || []).length ? before.times : auto.times,
+                    styles: (before.styles || []).length ? before.styles : auto.styles,
+                  });
+                  log(`wardrobe: deskripsi otomatis untuk ${id} — ${auto.description.slice(0, 60)}`);
+                })
+                .catch((err) => log(`wardrobe: deskripsi otomatis gagal untuk ${id}: ${err.message}`));
             }
             return json(res, 200, {
               ok: true,
-              auto,
+              auto: { ok: false, pending: true },
               wardrobe: loadWardrobe(slug).items,
             });
           }
