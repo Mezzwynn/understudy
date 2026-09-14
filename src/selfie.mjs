@@ -207,5 +207,6 @@ export const selfieSettings = (persona = null) => ({
   enabled: !!config.selfieEnabled,
   schedule: String(config.selfieSchedule || ""),
   spot: String(persona?.mirrorSpot || config.selfieSpot || ""),
+  maxPerDay: Number(config.selfieMaxPerDay || 2),
   sent: loadState(persona?.slug || config.persona).sent,
 });
