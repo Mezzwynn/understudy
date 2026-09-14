@@ -387,17 +387,30 @@ window.addEventListener("error", (e) => {
 if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
 
 const BUILD_STAMP = "tanya-server"; // nilai aslinya dari /build-stamp.js (mtime file = selalu baru kalau ada perubahan)
-if (!window.__autoReloaded) {
-  fetch("/build-stamp.js", { cache: "reload" })
-    .then((r) => r.text())
-    .then((t) => {
-      const m = /__SERVER_BUILD__ = "([^"]+)"/.exec(t);
-      if (m && window.__SERVER_BUILD__ && m[1] !== window.__SERVER_BUILD__) {
-        window.__autoReloaded = true;
-        location.reload();
-      }
-    })
-    .catch(() => {});
+// Versi baru TIDAK memuat ulang sendiri: percobaan itu malah jadi loop reload.
+// Sekarang cuma muncul tawaran untuk memuat ulang, dan kamu yang menekan.
+fetch("/build-stamp.js", { cache: "reload" })
+  .then((r) => r.text())
+  .then((t) => {
+    const m = /__SERVER_BUILD__ = "([^"]+)"/.exec(t);
+    if (!m || m[1] === window.__SERVER_BUILD__) return;
+    window.__SERVER_BUILD__ = m[1];
+    const bar = document.createElement("div");
+    bar.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:9998;background:#241c10;border:1px solid var(--accent);color:var(--tx);border-radius:12px;padding:10px 12px;font-size:13px;display:flex;gap:10px;align-items:center";
+    bar.innerHTML = '<span style="flex:1">Ada versi panel yang lebih baru.</span>';
+    const b = document.createElement("button");
+    b.className = "act";
+    b.textContent = "Muat ulang";
+    b.onclick = () => location.reload();
+    bar.appendChild(b);
+    const x = document.createElement("button");
+    x.className = "act";
+    x.textContent = "nanti";
+    x.onclick = () => bar.remove();
+    bar.appendChild(x);
+    document.body.appendChild(bar);
+  })
+  .catch(() => {}););
 }
 
 /* ═══════════════════════════════ helpers ═══════════════════════════════ */
