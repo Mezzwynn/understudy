@@ -85,14 +85,9 @@ export function busyPromptBlock(chat, now = new Date()) {
     .join("\n");
 }
 
-/** The line she sends when she cannot talk — short, in character, no drama. */
-export const BUSY_REPLIES = [
-  "lagi kerja. nanti ya.",
-  "in the middle of something. talk later.",
-  "can't right now. busy.",
-  "kerja dulu. i'll reply when i'm done.",
-  "nggak bisa sekarang. nanti.",
-];
+/* She used to send a canned "can't talk now" line when her routine said she was busy. Gone: a
+   system message dressed as her voice reads exactly like what it is, and a person who is busy simply
+   does not answer. Staying quiet is the honest version. */
 
 /* ------------------------- the rest of being human ------------------------ */
 

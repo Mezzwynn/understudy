@@ -7,7 +7,7 @@ import { recordEvent } from "./events.mjs";
 import { isSleeping, shouldIgnore, sleepiness } from "./sleep.mjs";
 import { detectCrisis, alertOwner } from "./crisis.mjs";
 import { worthReplying } from "./worth.mjs";
-import { dailyVariance, busyNow, BUSY_REPLIES, EDIT_AFTERMATH } from "./natural.mjs";
+import { dailyVariance, busyNow, EDIT_AFTERMATH } from "./natural.mjs";
 import { generateReply, generateDryReply } from "./engine.mjs";
 import { loadPersona } from "./prompt.mjs";
 import { splitBubbles, typingDelayFor, typingPlan, readingDelayFor, pretypeDelayFor, sleep, makeTypo, correctionFor, pickReaction, maybeBurst } from "./texting.mjs";
@@ -42,6 +42,16 @@ import {
   markRead,
   downloadMedia,
 } from "./whatsapp.mjs";
+
+/** The few things a busy person still answers: a question, health, an apology, a crisis. */
+function mustAnswerSomething(text) {
+  const t = String(text || "").toLowerCase();
+  if (/\?/.test(t)) return true;
+  if (/\b(kenapa|gimana|bagaimana|kapan|dimana|di mana|berapa|siapa|kok|apa)\b/.test(t)) return true;
+  if (/\b(makan|makanan|sehat|sakit|demam|obat|tidur|istirahat|minum|rumah sakit|dokter|puskesmas)\b/.test(t)) return true;
+  if (/\b(sorry|maaf|sori|forgive|sayang|kangen|rindu|miss you)\b/.test(t)) return true;
+  return false;
+}
 
 /* ------------------------------- helpers ------------------------------- */
 
@@ -410,34 +420,21 @@ async function respond(sock, jid, p) {
   dailyVariance(chat);
 
   // ── her routine says she is busy right now ──
+  // She does NOT send a line about it. A canned "nggak bisa sekarang" is a system message wearing her
+  // voice, and nobody announces that they are busy — they just do not answer. Anything that must be
+  // answered (a question, anything about health, a crisis) still gets through.
   if (!crisisActive) {
     const busy = busyNow(chat);
-    if (busy) {
-      if (Math.random() < config.busyReplyChance) {
-        const line = pick(BUSY_REPLIES);
-        await presence(sock, jid, "composing");
-        await sleep(typingDelayFor(line));
-        try {
-          await sendText(sock, jid, line);
-          chat.stats.outbound = (chat.stats.outbound || 0) + 1;
-          chat.lastInteraction = Date.now();
-          chat.busyUntil = Date.now() + busy.minutesLeft * 60000;
-          chat.history.push({ role: "assistant", content: line, ts: Date.now() });
-          saveChat(chat);
-          log(`busy (${busy.what}) — short "can't talk" reply → ${jid}`);
-        } catch (err) {
-          log(`busy reply failed: ${err.message}`);
-        }
-        return;
-      }
-      const cap = Math.min(config.busyDelayMaxMin, busy.minutesLeft);
-      if (cap >= 2) {
-        const mins = 1 + Math.random() * (cap - 1);
-        log(`busy (${busy.what}) — answering in ~${Math.round(mins)} min → ${jid}`);
-        await sleep(mins * 60000);
-      }
+    if (busy && !mustAnswerSomething(incoming)) {
+      chat.busyUntil = Date.now() + busy.minutesLeft * 60000;
+      chat.stats.skips = (chat.stats.skips || 0) + 1;
+      chat.lastSkipAt = Date.now();
+      saveChat(chat);
+      log(`left on read (busy — ${busy.what}, ${busy.minutesLeft}m left) — ${String(incoming).slice(0, 40)}`);
+      return;
     }
   }
+
 
   // ── a new day: yesterday's mood does not vanish overnight ──
   {
