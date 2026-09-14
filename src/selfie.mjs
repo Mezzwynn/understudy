@@ -118,6 +118,18 @@ const POSES = {
   hair: "her free hand touching her hair or tucking a strand behind her ear, caught mid-motion",
   sit: "sitting on the edge of her bed in front of the mirror, phone held up",
   shoulder: "turned a little to the side, looking back over her shoulder at the mirror",
+  lean: "leaning her shoulder against the wall beside the mirror, phone held up, relaxed",
+  back: "her back turned to the mirror, head turned a little so only her profile shows, showing the outfit from behind",
+  crouch: "crouching low in front of the mirror, phone held up, like she is fixing her shoe or checking the hem",
+  coffee: "holding a mug of iced coffee in her free hand, phone up in the other",
+  stretch: "one arm stretched up overhead, caught mid-stretch, eyes half closed",
+  scroll: "eyes down on the screen, her thumb scrolling, not paying attention to the mirror at all",
+  tongue: "sticking the tip of her tongue out a little, teasing, almost a smirk",
+  laugh: "caught mid-laugh, eyes squeezed, the phone slightly tilted",
+  wink: "one eye closed in a small wink, deadpan otherwise",
+  bag: "a small bag hanging on her arm, about to leave, one last quick check",
+  hem: "bent forward a little, checking the hem or her shoes, phone held low",
+  floor: "sitting cross-legged on the floor in front of the mirror, phone held up",
 };
 
 /**
