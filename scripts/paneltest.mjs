@@ -43,12 +43,43 @@ const checks = [
   ["script jalan tanpa error", errors.length === 0],
   ["renderPhotos ada", typeof win.renderPhotos === "function"],
   ["tab Photos ada", !!doc.querySelector("#tab-photos")],
-  ["tombol switch ada", doc.querySelectorAll(".switch").length > 0],
+  ["tombol switch ada (setelah render)", doc.querySelectorAll(".switch").length > 0],
   ["kartu selfie ada", doc.documentElement.innerHTML.includes("Selfie terjadwal")],
   ["bisa render tab Photos", (() => { try { win.renderPhotos(); return true; } catch { return false; } })()],
-  ["switch selfie ada setelah render", !!doc.querySelector('[data-ssw="SELFIE_ENABLED"]')],
-  ["field baju ada", !!doc.querySelector("#selfie-outfit-text")],
+  ["switch selfie ada setelah render", !!doc.querySelector("#sf-enable")],
+  ["field baju ada", !!doc.querySelector("#sf-outfit-text")],
+  ["field tempat ada", !!doc.querySelector("#sf-spot")],
 ];
+
+// ==== KLIK nyata: toggle switch selfie + tombol Simpan ====
+const calls = [];
+win.fetch = async (url, opts) => {
+  const body = opts && opts.body ? JSON.parse(opts.body) : null;
+  if (body) calls.push({ url: String(url), ...body });
+  if (String(url).includes("/api/summary")) return { ok: true, json: async () => JSON.parse(summaryStub), text: async () => summaryStub };
+  if (String(url).includes("/api/photos") && (!opts || opts.method !== "POST")) {
+    return { ok: true, json: async () => ({ ok: true, selfie: { enabled: true, spot: "uji", maxPerDay: 2 } }), text: async () => "" };
+  }
+  return { ok: true, json: async () => ({ ok: true, sent: 1, seconds: 12, selfie: { enabled: true, spot: "uji", maxPerDay: 2 } }), text: async () => "" };
+};
+win.renderPhotos();
+await new Promise((r) => setTimeout(r, 60));
+const toggle = doc.getElementById("sf-enable");
+const save = [...doc.querySelectorAll("#selfie-card .act")].find((b) => /Simpan/.test(b.textContent));
+const nowBtn = [...doc.querySelectorAll("#selfie-card .act")].find((b) => /Bikin/.test(b.textContent));
+console.log("\n  === klik nyata di kartu selfie ===");
+console.log(`  ${toggle ? "✓" : "✗"} tombol switch ada`);
+console.log(`  ${save ? "✓" : "✗"} tombol Simpan ada`);
+console.log(`  ${nowBtn ? "✓" : "✗"} tombol Bikin & kirim ada`);
+if (toggle) { toggle.click(); await new Promise((r) => setTimeout(r, 80)); }
+if (save) { save.click(); await new Promise((r) => setTimeout(r, 120)); }
+if (nowBtn) { nowBtn.click(); await new Promise((r) => setTimeout(r, 120)); }
+console.log("  payload yang dikirim panel:");
+for (const c of calls) console.log("   " + c.action + " " + JSON.stringify({ ...c, action: undefined, url: undefined }).slice(0, 110));
+console.log("  status di kartu: " + (doc.getElementById("sf-status") ? doc.getElementById("sf-status").textContent.slice(0, 90) : "-"));
+checks.push(["toggle selfie mengirim payload", calls.some((c) => c.action === "selfie-settings")]);
+checks.push(["Simpan mengirim payload", calls.filter((c) => c.action === "selfie-settings").length >= 2]);
+checks.push(["tombol kirim memanggil selfie-now", calls.some((c) => c.action === "selfie-now")]);
 
 console.log("  === panel test (jsdom) ===");
 for (const [name, ok] of checks) console.log(`  ${ok ? "✓" : "✗"} ${name}`);

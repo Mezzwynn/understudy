@@ -1333,6 +1333,107 @@ const AGENT_IDEAS = [
   "Make today's routine more interesting",
   "Add a note that she is moving house this month",
 ];
+/* ═══════════════════════ kartu selfie (rombak ulang) ═══════════════════════
+ * Versi lama dipasangi handler lewat delegasi di container tab, dan itu berkali-kali gagal karena
+ * urutan/guard di handler besar itu. Yang ini menempel langsung ke tombolnya (onclick inline), jadi
+ * tidak ada yang bisa menggagalkannya, dan hasilnya ditulis di baris status biar kelihatan.
+ */
+function selfieCard(ph, gowns, styles) {
+  const sf = ph.selfie || {};
+  const on = (v) => (v ? "on" : "");
+  const times = (sf.moments || []).map((m) => `${m.at} (${m.why})`).join(" · ") || "belum ada momen hari ini";
+  return `<div class="card tight fadein" id="selfie-card">
+    <h2 style="margin:0 0 4px">Selfie terjadwal</h2>
+    <div class="hint" style="margin-bottom:10px">Tempatnya <b>selalu sama</b>; yang berganti tiap kali: baju, angle, cahaya, framing, ekspresi.
+      Jamnya ikut rutinitasnya — sekarang: <b>${esc(times)}</b></div>
+
+    <div class="rows">
+      <div class="mrow2"><span>Aktif</span>
+        <button class="switch ${on(sf.enabled)}" id="sf-enable" onclick="uwSelfieToggle(this,'SELFIE_ENABLED')"><span></span></button></div>
+
+      <div class="mrow2"><span>Tempat (jangan diubah-ubah)</span>
+        <input class="sin" id="sf-spot" value="${esc(sf.spot || "")}"></div>
+
+      <div class="mrow2"><span>Jam cadangan (kalau rutinitasnya nggak ada momen)</span>
+        <input class="sin" id="sf-sched" value="${esc(sf.schedule || "")}"></div>
+
+      <div class="mrow2"><span>Maksimal per hari</span>
+        <input class="nin" id="sf-max" type="number" min="1" max="5" value="${sf.maxPerDay ?? 2}"></div>
+
+      <div class="mrow2"><span>Baju buat kirim manual</span>
+        <select class="sin" id="sf-outfit">
+          <option value="">otomatis (rotasi)</option>
+          ${(gowns || []).map((w) => `<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("")}
+        </select></div>
+
+      <div class="mrow2"><span>atau tulis sendiri</span>
+        <input class="sin" id="sf-outfit-text" placeholder="mis. dress hitam lengan panjang"></div>
+
+      <div class="mrow2"><span>Simpan tulisannya ke wardrobe</span>
+        <button class="switch" id="sf-savewear" onclick="uwFlip(this)"><span></span></button></div>
+
+      <div class="mrow2"><span>Gaya (kalau otomatis)</span>
+        <select class="sin" id="sf-style">${(styles || []).map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("")}</select></div>
+    </div>
+
+    <div class="btns">
+      <button class="act" onclick="uwSelfieSave()">Simpan</button>
+      <button class="act" onclick="uwSelfieNow()">Bikin &amp; kirim sekarang</button>
+    </div>
+    <div id="sf-status" class="hint" style="margin-top:8px">siap</div>
+  </div>`;
+}
+
+/** Toggle yang tidak butuh handler besar: langsung menempel di tombolnya. */
+window.uwFlip = (el) => el.classList.toggle("on");
+
+window.uwSelfieToggle = async (el, key) => {
+  el.classList.toggle("on");
+  const on = el.classList.contains("on");
+  const st = document.getElementById("sf-status");
+  if (st) st.textContent = "menyimpan…";
+  const r = await api("/api/photos", { action: "selfie-settings", values: { [key]: on } });
+  if (st) st.textContent = r.ok ? (on ? "selfie terjadwal: AKTIF ✓" : "selfie terjadwal: mati") : "GAGAL: " + (r.error || "");
+};
+
+window.uwSelfieSave = async () => {
+  const st = document.getElementById("sf-status");
+  const values = {
+    SELFIE_SCHEDULE: document.getElementById("sf-sched").value.trim(),
+    SELFIE_MAX_PER_DAY: document.getElementById("sf-max").value,
+  };
+  const spot = document.getElementById("sf-spot").value.trim();
+  const typed = document.getElementById("sf-outfit-text").value.trim();
+  const saveWear = document.getElementById("sf-savewear").classList.contains("on");
+  if (st) st.textContent = "menyimpan…";
+  const r = await api("/api/photos", { action: "selfie-settings", values, spot });
+  if (!r.ok) { if (st) st.textContent = "GAGAL: " + (r.error || ""); return; }
+  let extra = "";
+  if (typed && saveWear) {
+    const w = await api("/api/photos", { action: "wardrobe-add", name: typed, times: [], styles: [] });
+    extra = w.ok ? " · baju ditambahkan ke wardrobe" : "";
+  }
+  const read = await fetch("/api/photos", { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+  const now = read && read.selfie ? read.selfie : null;
+  if (st) {
+    st.textContent = now
+      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · tempat: "${String(now.spot).slice(0, 40)}" · maks: ${now.maxPerDay}${extra}`
+      : "tersimpan ✓";
+  }
+  PHOTO_PICK = { outfit: document.getElementById("sf-outfit").value, style: document.getElementById("sf-style").value, typed };
+};
+
+window.uwSelfieNow = async () => {
+  const st = document.getElementById("sf-status");
+  const typed = document.getElementById("sf-outfit-text").value.trim();
+  const outfit = typed || document.getElementById("sf-outfit").value || "";
+  const style = document.getElementById("sf-style").value || "casual";
+  PHOTO_PICK = { outfit, style, typed };
+  if (st) st.textContent = "bikin selfie… (10-20 detik)";
+  const r = await api("/api/photos", { action: "selfie-now", outfit, style });
+  if (st) st.textContent = r.ok ? `selfie jadi ✓ dikirim ke ${r.sent} kontak (${Math.round(r.seconds)}s)` : "GAGAL: " + (r.error || "");
+};
+
 /* ═══════════════════════════ photos tab ═══════════════════════════ */
 const SW = (on, attrs, label) => `<button class="switch ${on ? "on" : ""}" ${attrs}><span></span></button>${label ? `<em>${label}</em>` : ""}`;
 
@@ -1395,35 +1496,7 @@ function renderPhotos(){
     <div class="btns"><button class="act" data-pact="save-settings">Simpan</button></div>
   </div>
 
-  <div class="card tight fadein">
-    <h2 style="margin:0 0 4px">Selfie terjadwal</h2>
-    <div class="hint" style="margin-bottom:10px">Tempatnya <b>selalu sama</b> (itu yang bikin masuk akal); yang berganti tiap kali: baju, angle, cahaya, framing, ekspresi.
-      Jamnya <b>ikut rutinitasnya</b> — keluar, olahraga, habis ganti, pergi makan.</div>
-    <div class="rows">
-      <div class="mrow2"><span>Aktif</span><span class="swline">${SW(st2.SELFIE_ENABLED, `data-ssw="SELFIE_ENABLED"`)}</span></div>
-      <div class="mrow2"><span>Tempat (jangan diubah-ubah)</span><input class="sin" id="selfie-spot" value="${esc((ph.selfie||{}).spot||"")}"></div>
-      <div class="mrow2"><span>Jam cadangan (kalau rutinitasnya nggak ada momen)</span><input class="sin" id="selfie-sched" value="${esc((ph.selfie||{}).schedule||"")}"></div>
-      <div class="mrow2"><span>Maksimal per hari</span><input class="nin" type="number" id="selfie-max" min="1" max="5" value="${(ph.selfie||{}).maxPerDay ?? 2}"></div>
-    </div>
-    <div class="rows" style="margin-bottom:8px">
-      <div class="mrow2"><span>Baju buat kirim manual</span>
-        <select class="sin" id="selfie-outfit">
-          <option value="">otomatis (rotasi)</option>
-          ${(gowns||[]).map(w=>`<option value="${esc(w.name)}" ${PHOTO_PICK.outfit===w.name?"selected":""}>${esc(w.name)}</option>`).join("")}
-        </select></div>
-      <div class="mrow2"><span>Gaya (kalau otomatis)</span>
-        <select class="sin" id="selfie-style">${(ph.wardrobeStyles||[]).map(t=>`<option value="${t}" ${PHOTO_PICK.style===t?"selected":""}>${esc(t)}</option>`).join("")}</select></div>
-      <div class="mrow2"><span>atau tulis sendiri</span>
-        <input class="sin" id="selfie-outfit-text" value="${esc(PHOTO_PICK.typed||"")}" placeholder="mis. dress hitam lengan panjang, atau kaos putih + celana denim"></div>
-      <div class="mrow2"><span>Simpan tulisannya ke wardrobe</span><span class="swline">${SW(false, 'data-wto="1"')}</span></div>
-    </div>
-    <div class="btns">
-      <button class="act" data-pact="selfie-save">Simpan</button>
-      <button class="act" data-pact="selfie-now">Bikin &amp; kirim sekarang</button>
-      <span class="tiny">$0.07 per selfie · dikirim ke kontak yang diizinkan</span>
-    </div>
-    ${((ph.selfie||{}).moments||[]).length?`<div class="hint" style="margin-top:8px">Momen selfie hari ini dari rutinitasnya: ${(ph.selfie.moments||[]).map(m=>`<b>${esc(m.at)}</b> (${esc(m.why)})`).join(" · ")}</div>`:""}
-  </div>
+  ${selfieCard(ph, gowns, ph.wardrobeStyles||[])}
 
   <h2 style="margin:20px 0 8px;font-size:17px">Baju (${gowns.length})</h2>
   <div class="card tight fadein" style="border-style:dashed">
@@ -1530,14 +1603,7 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     return;
   }
 
-  const ssw = e.target.closest("[data-ssw]");
-  if(ssw){
-    ssw.classList.toggle("on");
-    await api("/api/photos",{ action:"selfie-settings", values:{ [ssw.dataset.ssw]: ssw.classList.contains("on") } });
-    toast(ssw.classList.contains("on") ? "Selfie terjadwal nyala" : "Selfie terjadwal mati");
-    return;
-  }
-
+  
   const b = e.target.closest("[data-pact],[data-rate]"); if(!b) return;
   const act = b.dataset.pact, rate = b.dataset.rate;
   if(act==="save-settings"){
@@ -1553,29 +1619,7 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     toast(r.ok?"Disimpan (langsung berlaku)":("Gagal: "+(r.error||"")));
     return refresh(true);
   }
-  if(act==="selfie-save"){
-    const values = {
-      SELFIE_SCHEDULE: $("#selfie-sched").value.trim(),
-      SELFIE_MAX_PER_DAY: $("#selfie-max").value,
-    };
-    const r = await api("/api/photos",{ action:"selfie-settings", values, spot: $("#selfie-spot").value.trim() });
-    toast(r.ok?"Setelan selfie disimpan":("Gagal: "+(r.error||"")));
-    return refresh(true);
-  }
-  if(act==="selfie-now"){
-    const typed = ($("#selfie-outfit-text")?.value || "").trim();
-    const outfit = typed || $("#selfie-outfit")?.value || "";
-    const style = $("#selfie-style")?.value || "casual";
-    PHOTO_PICK = { outfit, style, typed };   // supaya tidak balik ke default setelah panel disegarkan
-    // kalau dicentang, baju yang ditulis juga masuk ke wardrobe biar bisa dipakai lagi
-    const saveIt = $("#tab-photos [data-wto]")?.classList.contains("on");
-    if (typed && saveIt) await api("/api/photos",{ action:"wardrobe-add", name: typed, times: [], styles: [] });
-    toast("Bikin selfie… (10-20 detik)" + (outfit ? " pakai " + outfit : ""));
-    const r = await api("/api/photos",{ action:"selfie-now", outfit, style });
-    toast(r.ok ? ("Selfie jadi & dikirim ke " + r.sent + " kontak") : ("Gagal: " + (r.error||"")));
-    return refresh(true);
-  }
-  if(act==="wardrobe-add"){
+      if(act==="wardrobe-add"){
     const name = $("#w-name").value.trim();
     if(!name) return toast("Nama bajunya belum diisi");
     const r = await api("/api/photos",{ action:"wardrobe-add", name, description: $("#w-desc").value.trim(), times: [], styles: [] });
