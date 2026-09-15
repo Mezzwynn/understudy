@@ -97,6 +97,8 @@ const PAP_FACE = (mood) => ({
 
 /** A front-camera selfie must look like SHE is holding the lens, never like a third person took it. */
 const PAP_RULES = `She took this photo HERSELF, one arm stretched toward the lens — it must NOT look like someone else photographed her: she is seen from the FRONT and CLOSE, the background directly behind her, a slight foreshortening on the arm holding the phone. NOT a full-body shot from a distance, NOT from across the room, NOT posed for a photographer, no second person. The phone, the screen, the lens and the hand holding the camera are NEVER visible — at most one free hand may be in the frame if the pose or the scene calls for it. No mirror reflection. Slightly crooked framing, mild sensor noise, caught mid-movement, not a produced or staged photo. No text, no watermark.`;
+const ANTI_AI = `This must look like a REAL phone photo, not AI, not a render, not a professional shot: real skin texture (visible pores, tiny blemishes, slight uneven tone — never smooth, never plastic, no retouching, no beautify filter); natural mixed lighting with real shadows (window or lamp light, not studio, no HDR, no perfect white balance); a real lived-in room behind her (a little clutter, a cable, wrinkled fabric — not a clean empty wall, not a backdrop); small photo imperfections (mild sensor noise/grain, a touch of motion blur on any moving hand, slightly crooked framing, edges a little soft — not tack-sharp everywhere); correct hands and fingers; candid and unposed, caught mid-movement, not perfectly symmetrical, not smiling straight at the lens. No text, no watermark, no logo, no border, no vignette.`;
+
 const FRAMING = [
   "waist up, the outfit readable",
   "shoulders down, the whole shirt visible",
@@ -191,6 +193,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
       pf,
       ...(sceneText ? [`This photo is about: ${sceneText}. Include that in the frame — the object, the place, the moment she is showing.`] : []),
       PAP_RULES,
+      ANTI_AI,
     ].join(" ");
   }
   return [
@@ -206,6 +209,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
     fm.face,
     ...(sceneText ? [`This photo is about: ${sceneText}. Include that in the frame — the object, the place, the moment she is showing.`] : []),
     `Ordinary and unpolished: the mirror has a smudge, the room behind is lived in, the framing is not quite straight. Not a photoshoot, not a studio, no filter. No text, no watermark.`,
+    ANTI_AI,
   ].join(" ");
 }
 
