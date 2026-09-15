@@ -236,10 +236,8 @@ export function pickPhoto({ slug = config.persona, chat = null, moment = null, b
       return wanted.some((t) => (p.topics || []).includes(t)) || wanted.some((t) => hay.includes(t));
     });
   }
-  // "kirim foto kamu" means a photo of HER, not the cat or the car
-  if (force && /\b(selfie|pap|muka|wajah|potret|foto kamu|foto dia|kamu|diri)\b/i.test(String(request || ""))) {
-    eligible = eligible.filter((p) => p.kind === "self");
-  }
+  // a request for a photo means a photo of HER — a place photo (gym building, cat, car) is what felt random
+  if (force) eligible = eligible.filter((p) => p.kind === "self");
   if (!eligible.length) return null;
   const mood = Number(chat?.mood?.valence ?? 0.5);
 
