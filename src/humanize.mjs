@@ -69,6 +69,39 @@ function downscale(img, maxSide) {
   return { width: nw, height: nh, data: out };
 }
 
+/** One pass of a 3x3 box blur — cheap, and it takes the razor edge off a generated photo. */
+function boxBlur(img, radius = 1) {
+  const { width: w, height: h, data } = img;
+  const out = Buffer.alloc(data.length);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let n = 0;
+      for (let dy = -radius; dy <= radius; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (let dx = -radius; dx <= radius; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= w) continue;
+          const i = (yy * w + xx) * 4;
+          r += data[i];
+          g += data[i + 1];
+          b += data[i + 2];
+          n++;
+        }
+      }
+      const o = (y * w + x) * 4;
+      out[o] = r / n;
+      out[o + 1] = g / n;
+      out[o + 2] = b / n;
+      out[o + 3] = 255;
+    }
+  }
+  return { width: w, height: h, data: out };
+}
+
 /**
  * @param {Buffer} buf        a jpeg or png
  * @param {object} opts       maxSide: longest edge after downscaling (a phone photo is not 4k)
@@ -105,7 +138,7 @@ export const profileFor = (name) => PHONE_PROFILES[String(name || "").toLowerCas
 
 export const REAL_PHOTO_TARGET = { contrast: 46, saturation: 27, noise: 2.2 };
 
-export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warmth = null, lift = 2, seed = 7, calibrate = true, bloom = null, profile = null } = {}) {
+export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warmth = null, lift = 2, seed = 7, calibrate = true, bloom = null, profile = null, soften = true, vignette = 0.16, chroma = 0.55 } = {}) {
   const prof = profileFor(profile);
   if (prof) {
     grain = grain ?? prof.grain;
@@ -114,7 +147,9 @@ export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warm
   }
   warmth = warmth ?? 3;
   bloom = bloom ?? 0.06;
-  const small = downscale(decode(buf), maxSide);
+  let small = downscale(decode(buf), maxSide);
+  // a phone lens is never tack sharp: one soft pass kills the AI "crispness"
+  if (soften) small = boxBlur(small, 1);
   const { width: w, height: h, data } = small;
   const grainAmount = grain === null ? 10 : grain; // enough noise to land near a real photo
   const target = { contrast: prof?.contrast ?? REAL_PHOTO_TARGET.contrast, saturation: prof?.saturation ?? REAL_PHOTO_TARGET.saturation };
@@ -124,9 +159,13 @@ export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warm
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
       const n = (rand() - 0.5) * 2 * grainAmount;
-      out[i] = Math.max(0, Math.min(255, data[i] + warmth + n + lift));
-      out[i + 1] = Math.max(0, Math.min(255, data[i + 1] + n * 0.9 + lift));
-      out[i + 2] = Math.max(0, Math.min(255, data[i + 2] - warmth * 0.5 + n * 0.8 + lift));
+      // chroma noise: sensors add colour noise in the shadows, AI never does
+      const nr = (rand() - 0.5) * 2 * grainAmount * chroma;
+      const ng = (rand() - 0.5) * 2 * grainAmount * chroma;
+      const nb = (rand() - 0.5) * 2 * grainAmount * chroma;
+      out[i] = Math.max(0, Math.min(255, data[i] + warmth + n + nr + lift));
+      out[i + 1] = Math.max(0, Math.min(255, data[i + 1] + n * 0.9 + ng + lift));
+      out[i + 2] = Math.max(0, Math.min(255, data[i + 2] - warmth * 0.5 + n * 0.8 + nb + lift));
       out[i + 3] = 255;
     }
   }
@@ -158,6 +197,23 @@ export function humanize(buf, { maxSide = 1280, quality = 74, grain = null, warm
       if (y0 < 150) continue; // only highlights bloom
       const amount = ((y0 - 150) / 105) * bloom * 255;
       for (let c = 0; c < 3; c++) out[i + c] = Math.max(0, Math.min(255, out[i + c] + amount * (blur[p] / 255)));
+    }
+  }
+
+  // vignette: every small phone lens darkens the corners a little
+  if (vignette > 0) {
+    const cx = w / 2;
+    const cy = h / 2;
+    const maxD = Math.sqrt(cx * cx + cy * cy) || 1;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)) / maxD;
+        const f = 1 - vignette * d * d;
+        const i = (y * w + x) * 4;
+        out[i] *= f;
+        out[i + 1] *= f;
+        out[i + 2] *= f;
+      }
     }
   }
 
