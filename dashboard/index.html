@@ -1350,6 +1350,9 @@ const AGENT_IDEAS = [
  * urutan/guard di handler besar itu. Yang ini menempel langsung ke tombolnya (onclick inline), jadi
  * tidak ada yang bisa menggagalkannya, dan hasilnya ditulis di baris status biar kelihatan.
  */
+/* pose yang valid untuk tipe foto tertentu: pap cuma gesture muka, mirror cuma pose cermin, diphotoin/timer pakai kumpulan "shot" */
+const poseTypeFor = (type) => type === "pap" ? "pap" : (type === "diphotoin" || type === "timer") ? "shot" : "mirror";
+
 function selfieCard(ph, gowns, styles) {
   const sf = ph.selfie || {};
   window.SF_POSES = sf.poses || [];
@@ -1382,7 +1385,7 @@ function selfieCard(ph, gowns, styles) {
 
       <div class="mrow2"><span>Pose</span>
         <select class="sin" id="sf-pose">
-          ${(sf.poses || []).filter((p) => p.type === "both" || p.type === (sf.type || "mirror")).map((p) => `<option value="${esc(p.value)}" ${(sf.pose || "auto") === p.value ? "selected" : ""}>${esc(p.label)}</option>`).join("")}
+          ${(sf.poses || []).filter((p) => p.type === "both" || p.type === poseTypeFor(sf.type || "mirror")).map((p) => `<option value="${esc(p.value)}" ${(sf.pose || "auto") === p.value ? "selected" : ""}>${esc(p.label)}</option>`).join("")}
         </select></div>
 
       <div class="mrow2"><span>Ekspresi</span>
@@ -1546,7 +1549,7 @@ window.uwTypeChange = () => {
   if (!poseSel) return;
   const type = document.getElementById("sf-type").value;
   const prev = poseSel.value;
-  const opts = (window.SF_POSES || []).filter((p) => p.type === "both" || p.type === type);
+  const opts = (window.SF_POSES || []).filter((p) => p.type === "both" || p.type === poseTypeFor(type));
   poseSel.innerHTML = opts.map((p) => `<option value="${esc(p.value)}" ${p.value === prev ? "selected" : ""}>${esc(p.label)}</option>`).join("");
   if (![...poseSel.options].some((o) => o.value === prev)) poseSel.value = "auto";
 };

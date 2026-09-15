@@ -175,7 +175,7 @@ function lastOutfit(slug) {
  *  `type` mirrors the SELFIE_TYPE: mirror poses need the reflection, pap poses are face gestures. */
 const POSE_DEFS = {
   natural: { type: "both", label: "natural — santai", text: "standing relaxed with her weight on one leg, a normal quick check, not posing at all" },
-  peace: { type: "pap", label: "peace — dua jari", text: "holding up a small deadpan peace sign with her free hand, like she is half-mocking the gesture" },
+  peace: { type: "both", label: "peace — dua jari", text: "holding up a small deadpan peace sign, like she is half-mocking the gesture" },
   hip: { type: "both", label: "tangan di pinggang", text: "one hand on her hip, elbow out, looking a little impatient" },
   hair: { type: "both", label: "rapiin rambut", text: "her free hand touching her hair or tucking a strand behind her ear, caught mid-motion" },
   sit: { type: "both", label: "duduk", text: "sitting on the edge of her bed, phone held up" },
@@ -192,6 +192,20 @@ const POSE_DEFS = {
   bag: { type: "both", label: "bawa tas", text: "a small bag hanging on her arm, about to leave, one last quick check" },
   hem: { type: "mirror", label: "cek hem (cermin)", text: "bent forward a little, checking the hem or her shoes in the mirror, phone held low" },
   floor: { type: "both", label: "duduk lesehan", text: "sitting cross-legged on the floor, phone held up" },
+  lookaway: { type: "shot", label: "melihat ke samping", text: "looking off to the side, not at the camera, candid" },
+  pocket: { type: "shot", label: "tangan di saku", text: "one or both hands in her pockets, relaxed" },
+  crossed: { type: "shot", label: "tangan disilang", text: "arms crossed, a little guarded" },
+  over_shoulder: { type: "shot", label: "noleh dari belakang", text: "shot from behind, looking back over her shoulder at the camera" },
+  phone: { type: "shot", label: "main hp", text: "looking down at her phone, absorbed in it" },
+  drink: { type: "shot", label: "pegang minuman", text: "holding a drink in one hand" },
+  table: { type: "shot", label: "duduk di meja", text: "sitting at a table, food or a drink in front of her" },
+  cat: { type: "shot", label: "sama kucing", text: "petting or holding her cat" },
+  walk: { type: "shot", label: "jalan", text: "caught mid-step, walking toward or past the camera" },
+  jump: { type: "shot", label: "lompat", text: "mid-jump, hair moving, slightly blurred" },
+  wave: { type: "shot", label: "melambai", text: "waving at the camera" },
+  twirl: { type: "shot", label: "putar badan", text: "mid-twirl, skirt or hair moving" },
+  handsup: { type: "shot", label: "angkat tangan", text: "both hands up in a small cheer" },
+  squat: { type: "shot", label: "jongkok (difoto)", text: "squatting down, like fixing a shoe or reaching for something" },
 };
 
 /**
@@ -231,7 +245,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   const isTimer = typeKey === "timer";
   const poseKey = String(poseMode || config.selfiePose || "auto").toLowerCase();
   const poseDef = POSE_DEFS[poseKey];
-  const pose = poseDef && (poseDef.type === "both" || poseDef.type === (isPap ? "pap" : (isShot || isTimer) ? "both" : "mirror")) ? poseDef.text : null;
+  const pose = poseDef && (poseDef.type === "both" || poseDef.type === (isPap ? "pap" : (isShot || isTimer) ? "shot" : "mirror")) ? poseDef.text : null;
   // framing is a prompt instruction first; the reference photo (frameRef) is only an optional helper
   const frameKey = String(frameMode || config.selfieFraming || "off").toLowerCase();
   const frameText = frameKey === "auto"
