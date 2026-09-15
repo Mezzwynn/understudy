@@ -1710,7 +1710,8 @@ function renderPhotos(){
       <div class="hist" data-h="${esc(p.id)}">
         ${p.url?`<img src="${p.url}" loading="lazy" alt="">`:'<div class="noimg">—</div>'}
         <div class="body">
-          <div class="tiny">${esc(p.caption || p.scene)}</div>
+          <div style="font-size:12.5px;font-weight:600;margin-bottom:2px">${esc(p.title || p.caption || p.scene)}</div>
+          ${p.caption ? `<div class="tiny">${esc(p.caption)}</div>` : ""}
           <div class="swline" style="margin-top:6px">${SW(p.allowSend !== false, `data-pallow="${esc(p.id)}"`)}<em>${p.allowSend !== false ? "boleh kirim" : "jangan"}</em></div>
           <div class="btns" style="margin-top:6px"><button class="act" data-pdel="${esc(p.id)}" style="color:var(--bad)">Hapus</button></div>
         </div>

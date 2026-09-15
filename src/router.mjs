@@ -794,7 +794,7 @@ async function respond(sock, jid, p) {
         return null;
       }
     })();
-    const decision = shouldSendPhoto({ chat, moment, sleepy, force: wantsPhoto });
+    const decision = shouldSendPhoto({ chat, moment, sleepy, force: wantsPhoto, request: incoming });
     // When he asks, sometimes she takes a NEW one at the mirror instead of picking an old photo out of the
     // library — a person asked for a photo does not scroll through their camera roll.
     let freshSelfie = null;
@@ -835,7 +835,7 @@ async function respond(sock, jid, p) {
               /* a caption is optional */
             }
           }
-          await sendImage(sock, jid, fs.readFileSync(file), "image/jpeg", caption);
+          await sendImage(sock, jid, fs.readFileSync(file), "image/jpeg");
           chat.stats.outbound = (chat.stats.outbound || 0) + 1;
           chat.stats.photoCount = (chat.stats.photoCount || 0) + 1;
           chat.stats.photoDay = today;
@@ -843,6 +843,24 @@ async function respond(sock, jid, p) {
           sentMedia = true;
           markSent(persona.slug || config.persona, photo.id, jid);
           log(`photo → ${jid} "${photo.scene}" (${chat.stats.photoCount} today) · ${photo.why}`);
+          // the line that goes with the photo goes out as normal split bubbles, not one caption
+          const capText = String(caption || "").trim();
+          if (capText) {
+            const capBubbles = maybeBurst(splitBubbles(capText), config.burstChance);
+            for (let i = 0; i < capBubbles.length; i++) {
+              await presence(sock, jid, "composing");
+              const plan = typingPlan(capBubbles[i]);
+              await sleep(plan.first);
+              try {
+                await sendText(sock, jid, capBubbles[i]);
+                chat.stats.outbound = (chat.stats.outbound || 0) + 1;
+                if (config.debug) log(`→ ${jid} (after photo): ${capBubbles[i]}`);
+              } catch (err) {
+                log(`send failed: ${err.message}`);
+              }
+              if (i < capBubbles.length - 1) await sleep(200 + Math.random() * 700);
+            }
+          }
         }
       } catch (err) {
         log(`photo send failed: ${err.message}`);

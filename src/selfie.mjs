@@ -507,10 +507,12 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
 
   if (!best) return { ok: false, error: lastError };
   const whyText = String(config.selfieWhy || why || "").trim();
+  const title = (whyText || `${config.selfieType || "mirror"} selfie ${wear || ""}`).slice(0, 80);
   const caption = [whyText, `pakai ${wear || "outfit"}`].filter(Boolean).join(" · ").slice(0, 160);
   const added = addPhoto(s, best.file, {
     scene: `selfie-cermin-${new Date().toISOString().slice(0, 10)}`,
     note: "mirror selfie, same spot as always",
+    title,
     caption,
     kind: "self",
     hour: new Date().getHours(),

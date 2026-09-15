@@ -66,6 +66,12 @@ const TOPICS = {
   pasar: ["pasar", "belanja", "sayur", "errand"],
   hujan: ["hujan", "rain", "mendung"],
   kelas: ["kelas", "kampus", "kuliah", "tugas"],
+  gym: ["gym", "olahraga", "workout", "pilates", "fitness", "angkat beban", "jogging", "lari", "senam"],
+  kamar: ["kamar", "kasur", "tidur", "bantal", "cermin", "mirror", "kamar mandi"],
+  kantor: ["kantor", "office", "rapat", "meeting", "coworking"],
+  resto: ["resto", "restoran", "dinner", "makan malam", "meja makan", "makan siang"],
+  mall: ["mall", "belanja", "shopping", "toko"],
+  mandi: ["mandi", "shower", "handuk", "baru bangun", "bangun tidur"],
 };
 
 const topicTagsFor = (text) => {
@@ -101,6 +107,7 @@ export function addPhoto(slug, file, meta = {}) {
     classFit: classFitOf(`${scene} ${meta.note || ""}`),
     scene,
     note: String(meta.note || "").slice(0, 200),
+    title: String(meta.title || meta.caption || scene).slice(0, 80),
     caption: String(meta.caption || "").slice(0, 160),
     allowSend: meta.allowSend !== false,
     kind: meta.kind || (String(scene).startsWith("selfie") ? "self" : "view"),
@@ -142,21 +149,28 @@ export function removePhoto(slug, id) {
  * The weights say what matters: the time of day first (a night photo in the morning is impossible),
  * then whether it matches what she is doing, then whether this contact has already been sent it.
  */
-export function pickPhoto({ slug = config.persona, chat = null, moment = null, block = null, persona = null, now = new Date() } = {}) {
+export function pickPhoto({ slug = config.persona, chat = null, moment = null, block = null, persona = null, force = false, request = "", now = new Date() } = {}) {
   const lib = loadLibrary(slug);
   if (!lib.photos.length) return null;
   const who = persona || loadPersona(slug);
   const jid = String(chat?.jid || "");
-  // only approved photos, and never the same photo to the same person twice
-  const eligible = lib.photos.filter((p) =>
+  const pod = partOfDay(now.getHours());
+  const context = `${block?.what || ""} ${block?.place || ""} ${moment?.what || ""} ${moment?.kind || ""} ${request || ""} ${chat?.summary || ""}`.toLowerCase();
+  const wanted = topicTagsFor(context);
+  // only approved photos, none already sent to this person; when he asks for something specific,
+  // the photo has to actually match it (otherwise we return null and a fresh one is made)
+  let eligible = lib.photos.filter((p) =>
     p.allowSend !== false &&
     !(jid && (p.sentTo || {})[jid]) &&
     fitsPersonaClass(`${p.scene} ${p.note || ""}`, who, { allowOneStep: true })
   );
+  if (force && wanted.length) {
+    eligible = eligible.filter((p) => {
+      const hay = `${p.title || ""} ${p.caption || ""} ${p.scene || ""} ${p.note || ""}`.toLowerCase();
+      return wanted.some((t) => (p.topics || []).includes(t)) || wanted.some((t) => hay.includes(t));
+    });
+  }
   if (!eligible.length) return null;
-  const pod = partOfDay(now.getHours());
-  const context = `${block?.what || ""} ${block?.place || ""} ${moment?.what || ""} ${moment?.kind || ""} ${chat?.summary || ""}`.toLowerCase();
-  const wanted = topicTagsFor(context);
   const mood = Number(chat?.mood?.valence ?? 0.5);
 
   const scores = config.photoLearn ? sceneScores(slug) : {};
@@ -310,12 +324,12 @@ export function rateSent(slug, historyId, { rating = "", weird = null, note = ""
  *
  * What remains: the feature has to be on, she has to be awake, and the contact has to be allowed.
  */
-export function shouldSendPhoto({ chat, moment = null, sleepy = false, now = new Date() } = {}) {
+export function shouldSendPhoto({ chat, moment = null, sleepy = false, force = false, request = "", now = new Date() } = {}) {
   if (!config.photoLibrary || !config.photoSend) return { ok: false, reason: "off" };
   if (sleepy) return { ok: false, reason: "asleep" };
   if (chat?.photoAllowed === false) return { ok: false, reason: "turned off for this contact" };
   if (chat?.photoAllowed !== true && !chat?.trusted) return { ok: false, reason: "not allowed for this contact" };
-  const pick = pickPhoto({ chat, moment, now });
+  const pick = pickPhoto({ chat, moment, force, request, now });
   if (!pick) return { ok: false, reason: "nothing in the library fits her day" };
   return { ok: true, photo: pick };
 }
@@ -336,6 +350,7 @@ export function librarySummary(slug = config.persona) {
         url: `/photo?d=library/${slugOf(slug)}&f=${encodeURIComponent(p.file)}`,
         scene: p.scene,
         kind: p.kind,
+        title: p.title || p.caption || p.scene,
         caption: p.caption || "",
         allowSend: p.allowSend !== false,
         timeOfDay: p.timeOfDay,
