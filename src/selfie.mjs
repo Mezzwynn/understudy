@@ -281,6 +281,35 @@ export function markSelfieSent(slug, key) {
   saveState(slug, { ...st, sent: keep });
 }
 
+/** Ask a cheap vision judge how believable a generated selfie is (1..10), so the best candidate wins. */
+async function scoreSelfie(file, { avatarFile = null, isPap = false } = {}) {
+  try {
+    if (!config.openrouterApiKey || !fs.existsSync(file)) return 5;
+    const parts = [];
+    if (avatarFile && fs.existsSync(avatarFile)) parts.push({ type: "image_url", image_url: { url: dataUrl(avatarFile) } });
+    parts.push({ type: "image_url", image_url: { url: dataUrl(file) } });
+    parts.push({
+      type: "text",
+      text: `${avatarFile ? "Image 1 is her face for reference. " : ""}Image ${avatarFile ? 2 : 1} is a selfie she supposedly took with her phone${isPap ? " (front camera, so the phone must NOT be visible)" : " (mirror selfie, so the phone reflected in the mirror is normal)"}. Score it 1-10 ONLY on how believable it is as a real casual phone photo, not AI: hands/fingers, skin texture, lighting, background, proportions, uncanny artifacts. Return ONLY JSON: {"score":1-10,"flaw":"short note if below 8"}.`,
+    });
+    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${config.openrouterApiKey}` },
+      signal: AbortSignal.timeout(60000),
+      body: JSON.stringify({ model: "google/gemini-3.1-flash-lite", max_tokens: 120, messages: [{ role: "user", content: parts }] }),
+    });
+    const j = await r.json();
+    const txt = j.choices?.[0]?.message?.content || "";
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (!m) return 5;
+    const v = JSON.parse(m[0]);
+    const score = Number(v.score);
+    return Number.isFinite(score) ? Math.max(1, Math.min(10, score)) : 5;
+  } catch {
+    return 5;
+  }
+}
+
 /**
  * Make one and file it in the library. The photo is generated fresh, then humanised like everything else
  * and added with the mirror spot as its scene, so it can be sent again later and rated like the rest.
@@ -305,47 +334,65 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
   const spotRef = !isPapShot && spotFile && images.length && fs.existsSync(spotFile);
   if (spotRef) images.push(dataUrl(spotFile));
   const prompt = selfiePrompt(persona, { day, style, why, outfit: wear, outfitItem: item, outfitRef: !!outfitRef, spotRef: !!spotRef, slug: s });
-  let res = await generateImage({
-    model: config.editModel,
-    prompt,
-    aspect: "3:4",
-    images,
-  });
-  // some garment references trip the model's safety filter (e.g. sleepwear + her face). The outfit
-  // is still described in words, so retry with just her face instead of failing the whole selfie.
-  if (!res.ok && /no image|content filter|content_filter/i.test(String(res.error || "")) && images.length > 1) {
-    log(`selfie: ${res.error} with ${images.length} references — retrying with face only`);
-    const faceOnly = images.slice(0, 1);
-    const prompt2 = selfiePrompt(persona, { day, style, why, outfit: wear, outfitItem: item, outfitRef: false, spotRef: false, slug: s });
-    res = await generateImage({ model: config.editModel, prompt: prompt2, aspect: "3:4", images: faceOnly });
+  // Generate several candidates and keep the most believable one: a single shot can come out weird,
+  // and one bad photo used to mean the whole selfie was a total loss.
+  const candidates = Math.min(Math.max(Number(config.selfieCandidates || 3), 1), 5);
+  const avatarRef = ref && fs.existsSync(ref) ? ref : null;
+  let best = null;
+  let lastError = "no image generated";
+  let totalPrice = 0;
+  let totalSeconds = 0;
+
+  for (let i = 0; i < candidates; i++) {
+    let res = await generateImage({ model: config.editModel, prompt, aspect: "3:4", images });
+    // some garment references trip the model's safety filter (e.g. sleepwear + her face). The outfit
+    // is still described in words, so retry with just her face instead of failing the whole selfie.
+    if (!res.ok && /no image|content filter|content_filter/i.test(String(res.error || "")) && images.length > 1) {
+      log(`selfie: ${res.error} with ${images.length} references — retrying with face only`);
+      const prompt2 = selfiePrompt(persona, { day, style, why, outfit: wear, outfitItem: item, outfitRef: false, spotRef: false, slug: s });
+      res = await generateImage({ model: config.editModel, prompt: prompt2, aspect: "3:4", images: images.slice(0, 1) });
+    }
+    if (!res.ok) { lastError = res.error || lastError; continue; }
+    totalPrice += Number(res.price || 0);
+    totalSeconds += Number(res.seconds || 0);
+    const tmp = writeImage(path.join(DATA_DIR, "photos", `selfie-tmp-${Date.now()}`), res.buf);
+    const small = humanize(fs.readFileSync(tmp), {
+      profile: config.photoPhone,
+      maxSide: config.photoMaxSide,
+      quality: config.photoQuality,
+      // -1 means "whatever this phone profile does"
+      grain: Number(config.photoGrain) < 0 ? null : Number(config.photoGrain),
+      bloom: Number(config.photoBloom) < 0 ? null : Number(config.photoBloom),
+    });
+    const cand = path.join(DATA_DIR, "photos", `selfie-cand-${Date.now()}-${i}.jpg`);
+    fs.writeFileSync(cand, small.buf);
+    fs.rmSync(tmp, { force: true });
+    const score = await scoreSelfie(cand, { avatarFile: avatarRef, isPap: isPapShot });
+    log(`selfie: kandidat ${i + 1}/${candidates} skor ${score}/10`);
+    if (!best || score > best.score) {
+      if (best) fs.rmSync(best.file, { force: true });
+      best = { file: cand, score };
+    } else {
+      fs.rmSync(cand, { force: true });
+    }
+    if (best.score >= 9) break;
   }
-  if (!res.ok) return { ok: false, error: res.error };
-  const tmp = writeImage(path.join(DATA_DIR, "photos", `selfie-tmp-${Date.now()}`), res.buf);
-  const small = humanize(fs.readFileSync(tmp), {
-    profile: config.photoPhone,
-    maxSide: config.photoMaxSide,
-    quality: config.photoQuality,
-    // -1 means "whatever this phone profile does"
-    grain: Number(config.photoGrain) < 0 ? null : Number(config.photoGrain),
-    bloom: Number(config.photoBloom) < 0 ? null : Number(config.photoBloom),
-  });
-  const final = path.join(DATA_DIR, "photos", `selfie-${Date.now()}.jpg`);
-  fs.writeFileSync(final, small.buf);
-  fs.rmSync(tmp, { force: true });
-  const added = addPhoto(s, final, {
+
+  if (!best) return { ok: false, error: lastError };
+  const added = addPhoto(s, best.file, {
     scene: `selfie-cermin-${new Date().toISOString().slice(0, 10)}`,
     note: "mirror selfie, same spot as always",
     kind: "self",
     hour: new Date().getHours(),
     topics: "cermin,outfit,selfie",
   });
-  fs.rmSync(final, { force: true });
+  fs.rmSync(best.file, { force: true });
   // remember what she was wearing so the next selfie differs
   const st = loadState(s);
   const wearLine = (prompt.match(/She is wearing ([^.]+)\./) || [])[1] || wear || "";
   saveState(s, { ...st, lastOutfit: wearLine });
-  log(`selfie: ${res.seconds}s, $${(res.price || 0).toFixed(3)} — pakai "${String(wearLine).slice(0, 40)}" → ${added.ok ? added.photo.id : "gagal simpan"}`);
-  return { ok: true, photo: added.photo, seconds: res.seconds, price: res.price, bucket: timeBucket(hour) };
+  log(`selfie: ${best.score}/10 dari ${candidates} kandidat, $${totalPrice.toFixed(3)}, ${Math.round(totalSeconds)}s — pakai "${String(wearLine).slice(0, 40)}" → ${added.ok ? added.photo.id : "gagal simpan"}`);
+  return { ok: true, photo: added.photo, seconds: totalSeconds, price: totalPrice, bucket: timeBucket(hour) };
 }
 
 /** Used by the panel: what is scheduled and what the spot is. */
@@ -362,6 +409,7 @@ export const selfieSettings = (persona = null) => ({
   expression: String(config.selfieExpression || "auto"),
   expressions: [{ value: "auto", label: "auto (rotasi)" }, ...Object.entries(EXPRESSIONS).map(([value, d]) => ({ value, label: d.label }))],
   why: String(config.selfieWhy || ""),
+  candidates: Number(config.selfieCandidates || 3),
   spotImage: persona?.mirror_spot_image ? "/spot" : "",
   sent: loadState(persona?.slug || config.persona).sent,
 });

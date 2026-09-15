@@ -150,6 +150,8 @@ function buildConfig() {
   selfieExpression: envGet("SELFIE_EXPRESSION", "auto"),
   // why she is sending this photo ("nemu bunga di taman...") — manual, or generated from the routine
   selfieWhy: envGet("SELFIE_WHY", ""),
+  // how many selfie candidates to generate and judge, keeping the best (1-5)
+  selfieCandidates: num(envGet("SELFIE_CANDIDATES", "3"), 3),
   objectModel: envGet("OBJECT_MODEL", "openai/gpt-image-1-mini/text-to-image"),
   photoCandidateCount: num(envGet("PHOTO_CANDIDATE_COUNT", "4"), 4),
   topicFatigue: envFlag("TOPIC_FATIGUE", true),

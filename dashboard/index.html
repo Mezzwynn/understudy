@@ -1411,6 +1411,9 @@ function selfieCard(ph, gowns, styles) {
       <div class="mrow2"><span>Maksimal per hari</span>
         <input class="nin" id="sf-max" type="number" min="1" max="5" value="${sf.maxPerDay ?? 2}"></div>
 
+      <div class="mrow2"><span>Kandidat (1-5, makin banyak makin mahal)</span>
+        <input class="nin" id="sf-cand" type="number" min="1" max="5" value="${sf.candidates ?? 3}"></div>
+
       <div class="mrow2"><span>Baju tetap (kosong = rotasi otomatis)</span>
         <select class="sin" id="sf-outfit">
           <option value="" ${!sf.outfit ? "selected" : ""}>otomatis (rotasi)</option>
@@ -1458,6 +1461,7 @@ window.uwSelfieSave = async () => {
     SELFIE_TYPE: document.getElementById("sf-type").value,
     SELFIE_EXPRESSION: document.getElementById("sf-expr").value,
     SELFIE_WHY: document.getElementById("sf-why").value.trim(),
+    SELFIE_CANDIDATES: document.getElementById("sf-cand").value,
   };
   const spot = document.getElementById("sf-spot").value.trim();
   const typed = document.getElementById("sf-outfit-text").value.trim();
@@ -1474,7 +1478,7 @@ window.uwSelfieSave = async () => {
   const now = read && read.selfie ? read.selfie : null;
   if (st) {
     st.textContent = now
-      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · tipe: ${now.type || "mirror"} · baju: ${now.outfit || "rotasi"} · wajah: ${now.face || "half"} · pose: ${now.pose || "auto"} · ekspresi: ${now.expression || "auto"} · maks: ${now.maxPerDay}${extra}`
+      ? `tersimpan ✓ · aktif: ${now.enabled ? "ya" : "tidak"} · tipe: ${now.type || "mirror"} · baju: ${now.outfit || "rotasi"} · wajah: ${now.face || "half"} · pose: ${now.pose || "auto"} · ekspresi: ${now.expression || "auto"} · kandidat: ${now.candidates ?? 3} · maks: ${now.maxPerDay}${extra}`
       : "tersimpan ✓";
   }
   PHOTO_PICK = { outfit: document.getElementById("sf-outfit").value, style: document.getElementById("sf-style").value, typed };
