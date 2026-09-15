@@ -236,6 +236,10 @@ export function pickPhoto({ slug = config.persona, chat = null, moment = null, b
       return wanted.some((t) => (p.topics || []).includes(t)) || wanted.some((t) => hay.includes(t));
     });
   }
+  // "kirim foto kamu" means a photo of HER, not the cat or the car
+  if (force && /\b(selfie|pap|muka|wajah|potret|foto kamu|foto dia|kamu|diri)\b/i.test(String(request || ""))) {
+    eligible = eligible.filter((p) => p.kind === "self");
+  }
   if (!eligible.length) return null;
   const mood = Number(chat?.mood?.valence ?? 0.5);
 
@@ -264,6 +268,8 @@ export function pickPhoto({ slug = config.persona, chat = null, moment = null, b
         score += Math.min(3, capHits);
         why.push("caption nyambung");
       }
+      // a place photo only goes out when it actually matches what she is doing — never at random
+      if (p.kind !== "self" && !hits.length && !capHits) score -= 8;
       const lastTo = Number(p.sentTo?.[jid] || 0);
       const daysSince = lastTo ? (Date.now() - lastTo) / 86400000 : 999;
       if (daysSince < 14) {

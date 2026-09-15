@@ -798,7 +798,7 @@ async function respond(sock, jid, p) {
     // When he asks, sometimes she takes a NEW one at the mirror instead of picking an old photo out of the
     // library — a person asked for a photo does not scroll through their camera roll.
     let freshSelfie = null;
-    if (wantsPhoto && config.selfieEnabled && Math.random() < 0.5) {
+    if (wantsPhoto && config.selfieEnabled && (!decision.ok || Math.random() < 0.5)) {
       try {
         const made = await makeSelfie(persona, { slug: persona.slug || config.persona, style: "casual", why: "she just took it, for him" });
         if (made.ok) freshSelfie = made;
