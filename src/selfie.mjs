@@ -451,7 +451,7 @@ export const selfieSettings = (persona = null) => ({
   expressions: [{ value: "auto", label: "auto (rotasi)" }, ...Object.entries(EXPRESSIONS).map(([value, d]) => ({ value, label: d.label }))],
   why: String(config.selfieWhy || ""),
   candidates: Number(config.selfieCandidates || 1),
-  framing: String(config.selfieFraming || "off"),
+  framing: String(config.selfieFraming || "auto"),
   frameRefs: Object.fromEntries(Object.entries(poseRefGroups(persona?.slug || config.persona)).map(([g, f]) => [g, f.length])),
   spotImage: persona?.mirror_spot_image ? "/spot" : "",
   sent: loadState(persona?.slug || config.persona).sent,

@@ -1416,8 +1416,8 @@ function selfieCard(ph, gowns, styles) {
 
       <div class="mrow2"><span>Framing referensi</span>
         <select class="sin" id="sf-framing">
-          <option value="off" ${(!sf.framing || sf.framing === "off") ? "selected" : ""}>off</option>
-          <option value="auto" ${sf.framing === "auto" ? "selected" : ""}>auto (acak semua)</option>
+          <option value="off" ${sf.framing === "off" ? "selected" : ""}>off</option>
+          <option value="auto" ${(!sf.framing || sf.framing === "auto") ? "selected" : ""}>auto (acak semua)</option>
           <option value="full" ${sf.framing === "full" ? "selected" : ""}>full body</option>
           <option value="half" ${sf.framing === "half" ? "selected" : ""}>half body</option>
           <option value="waist" ${sf.framing === "waist" ? "selected" : ""}>sepinggang</option>

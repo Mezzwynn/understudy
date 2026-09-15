@@ -104,7 +104,7 @@ export const FEATURES = [
   { key: "SELFIE_EXPRESSION", label: "Selfie: ekspresi (auto/flat/tired/...)", kind: "text", def: "auto" },
   { key: "SELFIE_WHY", label: "Selfie: alasan pap (kosong = biasa)", kind: "text", def: "" },
   { key: "SELFIE_CANDIDATES", label: "Selfie: jumlah kandidat (1-5, makin banyak makin mahal)", kind: "int", def: 1 },
-  { key: "SELFIE_FRAMING", label: "Selfie: referensi framing (off/auto/full/half/waist/face)", kind: "text", def: "off" },
+  { key: "SELFIE_FRAMING", label: "Selfie: referensi framing (auto/off/full/half/waist/face)", kind: "text", def: "auto" },
   { key: "PHOTO_PHONE", label: "Foto-nya gaya HP apa (pixel/iphone/samsung/oppo/vivo/xiaomi/biasa)", kind: "text", def: "pixel" },
   { key: "PHOTO_GRAIN", label: "Grain (0 = ikut profil HP)", kind: "int", def: 0 },
   { key: "PHOTO_BLOOM", label: "Bloom highlight (0.00-0.30, -1 = ikut profil)", kind: "float", def: -1 },
