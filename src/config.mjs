@@ -148,6 +148,8 @@ function buildConfig() {
   selfieType: envGet("SELFIE_TYPE", "mirror"),
   // her expression: auto | flat | tired | hurry | halfsmile | annoyed | distant | smirk | soft | laugh | amused
   selfieExpression: envGet("SELFIE_EXPRESSION", "auto"),
+  // why she is sending this photo ("nemu bunga di taman...") — manual, or generated from the routine
+  selfieWhy: envGet("SELFIE_WHY", ""),
   objectModel: envGet("OBJECT_MODEL", "openai/gpt-image-1-mini/text-to-image"),
   photoCandidateCount: num(envGet("PHOTO_CANDIDATE_COUNT", "4"), 4),
   topicFatigue: envFlag("TOPIC_FATIGUE", true),

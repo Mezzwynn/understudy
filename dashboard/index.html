@@ -1388,6 +1388,12 @@ function selfieCard(ph, gowns, styles) {
           ${(sf.expressions || []).map((e) => `<option value="${esc(e.value)}" ${(sf.expression || "auto") === e.value ? "selected" : ""}>${esc(e.label)}</option>`).join("")}
         </select></div>
 
+      <div class="mrow2"><span>Kenapa pap ini</span>
+        <span class="swline" style="gap:6px">
+          <input class="sin" id="sf-why" value="${esc(sf.why || "")}" placeholder="mis. nemu bunga di taman pas jogging" style="flex:1">
+          <button class="act" onclick="uwSelfieReason()" title="tulis otomatis dari rutinitas sekarang">auto</button>
+        </span></div>
+
       <div class="mrow2"><span>Tempat (jangan diubah-ubah)</span>
         <input class="sin" id="sf-spot" value="${esc(sf.spot || "")}"></div>
 
@@ -1451,6 +1457,7 @@ window.uwSelfieSave = async () => {
     SELFIE_POSE: document.getElementById("sf-pose").value,
     SELFIE_TYPE: document.getElementById("sf-type").value,
     SELFIE_EXPRESSION: document.getElementById("sf-expr").value,
+    SELFIE_WHY: document.getElementById("sf-why").value.trim(),
   };
   const spot = document.getElementById("sf-spot").value.trim();
   const typed = document.getElementById("sf-outfit-text").value.trim();
@@ -1512,6 +1519,16 @@ window.uwTypeChange = () => {
   const opts = (window.SF_POSES || []).filter((p) => p.type === "both" || p.type === type);
   poseSel.innerHTML = opts.map((p) => `<option value="${esc(p.value)}" ${p.value === prev ? "selected" : ""}>${esc(p.label)}</option>`).join("");
   if (![...poseSel.options].some((o) => o.value === prev)) poseSel.value = "auto";
+};
+
+/* alasan pap otomatis: tulis dari rutinitas dia saat ini, lalu isi field-nya */
+window.uwSelfieReason = async () => {
+  const inp = document.getElementById("sf-why");
+  if (!inp) return;
+  toast("Nulis alasan dari rutinitas…");
+  const r = await api("/api/photos", { action: "selfie-reason" });
+  if (r.ok && r.reason) { inp.value = r.reason; toast("Alasan terisi — jangan lupa Simpan"); }
+  else toast("Gagal: " + (r.error || "nggak dapat alasan"));
 };
 
 /* ═══════════════════════════ photos tab ═══════════════════════════ */

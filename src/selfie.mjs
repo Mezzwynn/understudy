@@ -92,11 +92,11 @@ const FACE_LINES = (mood) => ({
 const PAP_FACE = (mood) => ({
   full: `Her whole face is visible and clear, close to the camera. Her expression: ${mood}. She is looking into the lens.`,
   half: `Only half of her face is in the frame — the edge of the photo cuts across her face, so one eye and half her mouth are visible. Her expression on the visible half: ${mood}.`,
-  hide: `Her face is NOT in the frame at all — the photo is taken from the neck down, showing her outfit, or she is turned away, so no eyes, no nose and no mouth are visible.`,
+  hide: `Her face is NOT in the frame at all — the photo is from the neck down or she is turned away, so no eyes, no nose and no mouth are visible. One of her hands may be in the frame (holding or pointing at the thing in the scene), but the hand holding the camera is never visible.`,
 });
 
 /** A front-camera selfie must look like SHE is holding the lens, never like a third person took it. */
-const PAP_RULES = `She took this photo HERSELF, one arm stretched toward the lens — it must NOT look like someone else photographed her: she is seen from the FRONT and CLOSE, the background directly behind her, a slight foreshortening on the arm holding the phone. NOT a full-body shot from a distance, NOT from across the room, NOT posed for a photographer, no second person, no free hand doing something for the camera unless the pose says so. The phone, the screen and the lens are NEVER visible (the phone is the camera), and there is no mirror reflection. Slightly crooked framing, mild sensor noise, caught mid-movement, not a produced or staged photo. No text, no watermark.`;
+const PAP_RULES = `She took this photo HERSELF, one arm stretched toward the lens — it must NOT look like someone else photographed her: she is seen from the FRONT and CLOSE, the background directly behind her, a slight foreshortening on the arm holding the phone. NOT a full-body shot from a distance, NOT from across the room, NOT posed for a photographer, no second person. The phone, the screen, the lens and the hand holding the camera are NEVER visible — at most one free hand may be in the frame if the pose or the scene calls for it. No mirror reflection. Slightly crooked framing, mild sensor noise, caught mid-movement, not a produced or staged photo. No text, no watermark.`;
 const FRAMING = [
   "waist up, the outfit readable",
   "shoulders down, the whole shirt visible",
@@ -150,7 +150,7 @@ const POSE_DEFS = {
  * The prompt. The spot comes from the character (bedroom mirror by the door by default) and is the same
  * every time; everything else is drawn from the lists above by day, so two selfies never look alike.
  */
-export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, typeMode = null, expressionMode = null, style = "casual", why = "", slug: slugIn = null } = {}) {
+export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, typeMode = null, expressionMode = null, scene = null, style = "casual", why = "", slug: slugIn = null } = {}) {
   const slug = slugIn || persona?.slug || config.persona;
   const d = day || new Date();
   // Vary per shot, not per day: with a day-only seed every selfie on the same day shared the same
@@ -160,6 +160,8 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   const spot = String(persona?.mirror_spot || persona?.mirrorSpot || config.selfieSpot || "the full-length mirror on the inside of her bedroom door");
   // the default spot describes a mirror; if Hik overrides it (e.g. "Park"), use that as the real place
   const spotLooksMirror = /mirror|cermin/i.test(spot);
+  // the panel can write WHY this photo exists ("nemu bunga di taman") — it becomes the scene in the image
+  const sceneText = String(scene || config.selfieWhy || "").trim();
   const item = outfitItem || null;
   const wear = item?.name || outfit || pickOutfit(persona, { hour: d.getHours(), style: style || "casual", avoid: lastOutfit(slug) });
   // a bare name gives the model nothing to match; the wardrobe entry carries what the garment really looks like
@@ -187,6 +189,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
       `She is wearing ${wear}.${garment}`,
       pose ? `Pose: ${pose}.` : `${pickR(FRAMING, seed + 1)}, ${pickR(LIGHT, seed + 3)}.`,
       pf,
+      ...(sceneText ? [`This photo is about: ${sceneText}. Include that in the frame — the object, the place, the moment she is showing.`] : []),
       PAP_RULES,
     ].join(" ");
   }
@@ -201,6 +204,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
       ? `${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}. Pose: ${pose}.`
       : `${pickR(FRAMING, seed + 1)}, ${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}.`,
     fm.face,
+    ...(sceneText ? [`This photo is about: ${sceneText}. Include that in the frame — the object, the place, the moment she is showing.`] : []),
     `Ordinary and unpolished: the mirror has a smudge, the room behind is lived in, the framing is not quite straight. Not a photoshoot, not a studio, no filter. No text, no watermark.`,
   ].join(" ");
 }
@@ -357,6 +361,34 @@ export const selfieSettings = (persona = null) => ({
   poses: [{ value: "auto", label: "auto (rotasi)", type: "both" }, ...Object.entries(POSE_DEFS).map(([value, d]) => ({ value, label: d.label, type: d.type }))],
   expression: String(config.selfieExpression || "auto"),
   expressions: [{ value: "auto", label: "auto (rotasi)" }, ...Object.entries(EXPRESSIONS).map(([value, d]) => ({ value, label: d.label }))],
+  why: String(config.selfieWhy || ""),
   spotImage: persona?.mirror_spot_image ? "/spot" : "",
   sent: loadState(persona?.slug || config.persona).sent,
 });
+
+/** One short reason why she is sending this photo, written from her routine at this moment. */
+export async function generateSelfieReason(persona) {
+  try {
+    const { loadRoutine, currentBlock } = await import("./routine.mjs");
+    const routine = loadRoutine(persona?.slug || config.persona);
+    const block = currentBlock(routine, new Date());
+    const what = String(block?.what || routine?.blocks?.[0]?.what || "").trim();
+    const name = persona?.name || "she";
+    const { chat } = await import("./llm.mjs");
+    const raw = await chat(
+      [
+        {
+          role: "system",
+          content: "Kamu nulis SATU baris alasan informal bahasa Indonesia (maks 12 kata, tanpa kutipan, tanpa emoji) kenapa dia ngirim selfie/pap sekarang. Contoh: 'nemu bunga cantik di taman pas jogging, mau nunjukin ke kamu', 'beli matcha pas jalan pulang', 'lagi makan di resto, kamu minta foto'. Kalau kegiatannya kosong, tulis sesuatu generik seperti 'pap aja buat kamu'.",
+        },
+        { role: "user", content: `Karakter: ${name}. Kegiatan sekarang: ${what || "(tidak diketahui)"}.` },
+      ],
+      { temperature: 0.9, maxTokens: 60 },
+    );
+    const line = String(raw || "").replace(/["'`]/g, "").split("\n")[0].trim().slice(0, 140);
+    return line || "";
+  } catch (err) {
+    log(`selfie reason failed: ${err.message}`);
+    return "";
+  }
+}

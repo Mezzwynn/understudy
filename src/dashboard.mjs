@@ -63,7 +63,7 @@ import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
 import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent, photoHistory, rateSent, sceneScores } from "./photo-library.mjs";
 import { PHONE_PROFILES } from "./humanize.mjs";
 import { wardrobeFor, loadWardrobe, addWardrobeItem, updateWardrobeItem, removeWardrobeItem, setWardrobeImage, TIMES, STYLES } from "./photos.mjs";
-import { selfieSettings, selfieMoments, makeSelfie } from "./selfie.mjs";
+import { selfieSettings, selfieMoments, makeSelfie, generateSelfieReason } from "./selfie.mjs";
 import { describeOutfit } from "./photo-check.mjs";
 import {
   loadFace,
@@ -910,11 +910,16 @@ f.addEventListener("load", () => {
             // the selfie card sends only its own fields, so an empty outfit really means "rotate again" —
             // applyValues() skips empty strings on purpose, so it is written directly here
             if (body.values && "SELFIE_OUTFIT" in body.values) setEnv("SELFIE_OUTFIT", String(body.values.SELFIE_OUTFIT || "").trim().slice(0, 120));
+            if (body.values && "SELFIE_WHY" in body.values) setEnv("SELFIE_WHY", String(body.values.SELFIE_WHY || "").trim().slice(0, 140));
             applyValues(body.values || {});
             if (typeof body.spot === "string") setPersonaField(slug, "mirror_spot", body.spot.slice(0, 300));
             reloadConfig();
             log("dashboard: setelan selfie diperbarui");
             return json(res, 200, { ok: true, selfie: selfieSettings(loadPersona(slug)) });
+          }
+          if (act === "selfie-reason") {
+            const reason = await generateSelfieReason(loadPersona(slug));
+            return json(res, 200, { ok: true, reason });
           }
 
           if (act === "wardrobe-add") {
