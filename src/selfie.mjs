@@ -402,14 +402,14 @@ export function markSelfieSent(slug, key) {
 /** Ask a cheap vision judge how believable a generated selfie is (1..10), so the best candidate wins. */
 async function scoreSelfie(file, { avatarFile = null, isPap = false, isShot = false, isTimer = false } = {}) {
   try {
-    if (!config.openrouterApiKey || !fs.existsSync(file)) return 5;
+    if (!config.openrouterApiKey || !fs.existsSync(file)) return { score: 5, title: "" };
     const hint = isTimer ? " (self-timer — phone propped on a surface, not in her hand; the phone may be barely visible at the frame edge)" : isShot ? " (taken by someone else — the camera/phone must NOT be in frame, and it is not an arm's-length selfie)" : isPap ? " (front camera, so the phone must NOT be visible)" : " (mirror selfie, so the phone reflected in the mirror is normal)";
     const parts = [];
     if (avatarFile && fs.existsSync(avatarFile)) parts.push({ type: "image_url", image_url: { url: dataUrl(avatarFile) } });
     parts.push({ type: "image_url", image_url: { url: dataUrl(file) } });
     parts.push({
       type: "text",
-      text: `${avatarFile ? "Image 1 is her face for reference. " : ""}Image ${avatarFile ? 2 : 1} is a photo of her${hint}. Score it 1-10 ONLY on how believable it is as a real casual phone photo, not AI: hands/fingers, skin texture, lighting, background, proportions, uncanny artifacts. Return ONLY JSON: {"score":1-10,"flaw":"short note if below 8"}.`,
+      text: `${avatarFile ? "Image 1 is her face for reference. " : ""}Image ${avatarFile ? 2 : 1} is a photo of her${hint}. Score it 1-10 ONLY on how believable it is as a real casual phone photo, not AI: hands/fingers, skin texture, lighting, background, proportions, uncanny artifacts. Return ONLY JSON: {"score":1-10,"flaw":"short note if below 8","title":"3-6 word name for this photo in Indonesian, describing what is actually in it"}.`,
     });
     const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -420,12 +420,15 @@ async function scoreSelfie(file, { avatarFile = null, isPap = false, isShot = fa
     const j = await r.json();
     const txt = j.choices?.[0]?.message?.content || "";
     const m = txt.match(/\{[\s\S]*\}/);
-    if (!m) return 5;
+    if (!m) return { score: 5, title: "" };
     const v = JSON.parse(m[0]);
     const score = Number(v.score);
-    return Number.isFinite(score) ? Math.max(1, Math.min(10, score)) : 5;
+    return {
+      score: Number.isFinite(score) ? Math.max(1, Math.min(10, score)) : 5,
+      title: String(v.title || "").replace(/["'`]/g, "").slice(0, 80),
+    };
   } catch {
-    return 5;
+    return { score: 5, title: "" };
   }
 }
 
@@ -494,11 +497,11 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
     const cand = path.join(DATA_DIR, "photos", `selfie-cand-${Date.now()}-${i}.jpg`);
     fs.writeFileSync(cand, small.buf);
     fs.rmSync(tmp, { force: true });
-    const score = await scoreSelfie(cand, { avatarFile: avatarRef, isPap: isPapShot, isShot: isShotShot, isTimer: isTimerShot });
-    log(`selfie: kandidat ${i + 1}/${candidates} skor ${score}/10`);
-    if (!best || score > best.score) {
+    const scored = await scoreSelfie(cand, { avatarFile: avatarRef, isPap: isPapShot, isShot: isShotShot, isTimer: isTimerShot });
+    log(`selfie: kandidat ${i + 1}/${candidates} skor ${scored.score}/10${scored.title ? ` — "${scored.title}"` : ""}`);
+    if (!best || scored.score > best.score) {
       if (best) fs.rmSync(best.file, { force: true });
-      best = { file: cand, score };
+      best = { file: cand, score: scored.score, title: scored.title || "" };
     } else {
       fs.rmSync(cand, { force: true });
     }
@@ -507,12 +510,13 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
 
   if (!best) return { ok: false, error: lastError };
   const whyText = String(config.selfieWhy || why || "").trim();
-  const title = (whyText || `${config.selfieType || "mirror"} selfie ${wear || ""}`).slice(0, 80);
+  const title = (best.title || whyText || `${config.selfieType || "mirror"} selfie ${wear || ""}`).slice(0, 80);
   const caption = [whyText, `pakai ${wear || "outfit"}`].filter(Boolean).join(" · ").slice(0, 160);
   const added = addPhoto(s, best.file, {
     scene: `selfie-cermin-${new Date().toISOString().slice(0, 10)}`,
     note: "mirror selfie, same spot as always",
     title,
+    titleFixed: !!best.title,
     caption,
     kind: "self",
     hour: new Date().getHours(),

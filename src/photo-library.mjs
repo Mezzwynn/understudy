@@ -108,6 +108,7 @@ export function addPhoto(slug, file, meta = {}) {
     scene,
     note: String(meta.note || "").slice(0, 200),
     title: String(meta.title || meta.caption || scene).slice(0, 80),
+    titleFixed: meta.titleFixed === true,
     caption: String(meta.caption || "").slice(0, 160),
     allowSend: meta.allowSend !== false,
     kind: meta.kind || (String(scene).startsWith("selfie") ? "self" : "view"),
@@ -131,6 +132,71 @@ export function setPhotoAllow(slug, id, allow) {
   p.allowSend = !!allow;
   saveLibrary(slug, lib);
   return { ok: true, photo: p };
+}
+
+/** A short, honest name for a photo, read from the image itself so the library matches what is in it. */
+export async function titleFor(file) {
+  try {
+    if (!config.openrouterApiKey || !fs.existsSync(file)) return "";
+    const b64 = fs.readFileSync(file).toString("base64");
+    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${config.openrouterApiKey}` },
+      signal: AbortSignal.timeout(60000),
+      body: JSON.stringify({
+        model: "google/gemini-3.1-flash-lite",
+        max_tokens: 60,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } },
+              { type: "text", text: 'Beri SATU nama singkat 3-6 kata bahasa Indonesia untuk foto ini, apa adanya sesuai isinya (mis. "selfie cermin pakai kaos", "pemandangan hutan", "meja kafe sama kopi"). JSON only: {"title":"..."}' },
+            ],
+          },
+        ],
+      }),
+    });
+    const j = await r.json();
+    const txt = j.choices?.[0]?.message?.content || "";
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (!m) return "";
+    const v = JSON.parse(m[0]);
+    return String(v.title || "").replace(/["'`]/g, "").slice(0, 80);
+  } catch {
+    return "";
+  }
+}
+
+/** Re-read one photo's name from the image. */
+export async function retitlePhoto(slug, id) {
+  const lib = loadLibrary(slug);
+  const p = lib.photos.find((x) => x.id === id);
+  if (!p) return { ok: false };
+  const t = await titleFor(path.join(libraryDir(slug), p.file));
+  if (!t) return { ok: false };
+  p.title = t;
+  p.titleFixed = true;
+  saveLibrary(slug, lib);
+  return { ok: true, title: t };
+}
+
+/** Re-read names for a batch of photos that have not been fixed yet. */
+export async function retitleAll(slug, { limit = 8 } = {}) {
+  const lib = loadLibrary(slug);
+  const targets = lib.photos.filter((p) => !p.titleFixed).slice(0, limit);
+  const results = await Promise.all(targets.map((p) => titleFor(path.join(libraryDir(slug), p.file))));
+  let done = 0;
+  targets.forEach((p, i) => {
+    if (results[i]) {
+      p.title = results[i];
+      p.titleFixed = true;
+      done++;
+    }
+  });
+  saveLibrary(slug, lib);
+  const remaining = lib.photos.filter((p) => !p.titleFixed).length;
+  return { ok: true, done, remaining };
 }
 
 export function removePhoto(slug, id) {

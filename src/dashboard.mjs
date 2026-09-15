@@ -60,7 +60,7 @@ function writeRating(entry) {
 
 import { listChats, loadChat, saveChat, loadState } from "./store.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
-import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent, photoHistory, rateSent, sceneScores, setPhotoAllow } from "./photo-library.mjs";
+import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent, photoHistory, rateSent, sceneScores, setPhotoAllow, retitleAll } from "./photo-library.mjs";
 import { PHONE_PROFILES } from "./humanize.mjs";
 import { wardrobeFor, loadWardrobe, addWardrobeItem, updateWardrobeItem, removeWardrobeItem, setWardrobeImage, TIMES, STYLES } from "./photos.mjs";
 import { selfieSettings, selfieMoments, makeSelfie, generateSelfieReason, poseRefGroups, FRAMING_GROUPS } from "./selfie.mjs";
@@ -1028,6 +1028,10 @@ f.addEventListener("load", () => {
           if (act === "photo-allow") {
             const r = setPhotoAllow(slug, String(body.id || ""), body.allow !== false);
             return json(res, r.ok ? 200 : 400, r);
+          }
+          if (act === "photo-retitle") {
+            const r = await retitleAll(slug, { limit: Number(body.limit) || 8 });
+            return json(res, 200, { ok: true, done: r.done, remaining: r.remaining });
           }
           if (act === "remove") {
             const r = removePhoto(slug, String(body.id || ""));

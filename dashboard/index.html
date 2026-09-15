@@ -1610,6 +1610,21 @@ window.uwRefClear = async () => {
   if (res.ok) { photosDirty = false; await refresh(true); }
 };
 
+/* baca ulang nama semua foto dari gambarnya, batch per batch */
+window.uwRetitle = async () => {
+  let remaining = 1, total = 0;
+  toast("Baca ulang nama foto…");
+  while (remaining > 0) {
+    const r = await api("/api/photos", { action: "photo-retitle", limit: 8 });
+    if (!r.ok) { toast("Gagal: " + (r.error || "")); return; }
+    total += r.done || 0;
+    remaining = r.remaining || 0;
+    toast(`Nama foto: ${total} beres${remaining ? ", sisa " + remaining : " ✓"}`);
+  }
+  photosDirty = false;
+  await refresh(true);
+};
+
 /* ═══════════════════════════ photos tab ═══════════════════════════ */
 const SW = (on, attrs, label) => `<button class="switch ${on ? "on" : ""}" ${attrs}><span></span></button>${label ? `<em>${label}</em>` : ""}`;
 
@@ -1706,6 +1721,7 @@ function renderPhotos(){
   <h2 style="margin:20px 0 8px;font-size:17px">Library (${(ph.photos||[]).length}) — pilih yang boleh dikirim</h2>
   <div class="card tight fadein">
     <div class="hint" style="margin-bottom:8px">Hidupin = boleh dikirim (terjadwal / saat diminta). Foto yang udah dikirim ke satu kontak nggak bakal dikirim lagi ke dia.</div>
+    <div class="btns" style="margin-bottom:8px"><button class="act" onclick="uwRetitle()">Perbaiki nama foto</button><span class="tiny">nama dibaca ulang dari gambarnya</span></div>
     ${(ph.photos||[]).length ? `<div class="histgrid">${ph.photos.map((p)=>`
       <div class="hist" data-h="${esc(p.id)}">
         ${p.url?`<img src="${p.url}" loading="lazy" alt="">`:'<div class="noimg">—</div>'}
