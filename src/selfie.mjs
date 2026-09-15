@@ -137,6 +137,14 @@ const FRAMING = [
   "close, the fabric and the mirror edge filling the frame",
 ];
 
+/** The framing setting drives the prompt directly — no reference photo needed. */
+const FRAMING_TEXT = {
+  full: "full body, head to toe, the whole outfit visible",
+  half: "half body, from the hips up",
+  waist: "waist up",
+  face: "close on the face, head and shoulders fill the frame",
+};
+
 /** What she is checking, why this photo exists. */
 const REASONS = [
   "outfit check before leaving",
@@ -183,7 +191,7 @@ const POSE_DEFS = {
  * The prompt. The spot comes from the character (bedroom mirror by the door by default) and is the same
  * every time; everything else is drawn from the lists above by day, so two selfies never look alike.
  */
-export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, typeMode = null, expressionMode = null, scene = null, frameRef = false, style = "casual", why = "", slug: slugIn = null } = {}) {
+export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, typeMode = null, expressionMode = null, scene = null, frameRef = false, frameMode = null, style = "casual", why = "", slug: slugIn = null } = {}) {
   const slug = slugIn || persona?.slug || config.persona;
   const d = day || new Date();
   // Vary per shot, not per day: with a day-only seed every selfie on the same day shared the same
@@ -214,6 +222,11 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   const poseKey = String(poseMode || config.selfiePose || "auto").toLowerCase();
   const poseDef = POSE_DEFS[poseKey];
   const pose = poseDef && (poseDef.type === "both" || poseDef.type === (isPap ? "pap" : "mirror")) ? poseDef.text : null;
+  // framing is a prompt instruction first; the reference photo (frameRef) is only an optional helper
+  const frameKey = String(frameMode || config.selfieFraming || "off").toLowerCase();
+  const frameText = frameKey === "auto"
+    ? FRAMING_TEXT[FRAMING_GROUPS[Math.floor(Math.random() * FRAMING_GROUPS.length)]]
+    : FRAMING_TEXT[frameKey] || "";
   if (isPap) {
     const pf = PAP_FACE(mood)[mode] || PAP_FACE(mood).half;
     return [
@@ -221,7 +234,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
       `New photo: a front-camera selfie she took HERSELF at arm's length with her phone${why ? `, ${why}` : ""}.`,
       `PLACE: ${spotLooksMirror ? "an ordinary lived-in room directly behind her — a plain wall, a bit of her bed or a desk, not tidy, not staged" : spot}.`,
       `She is wearing ${wear}.${garment}`,
-      pose ? `Pose: ${pose}.` : `${pickR(FRAMING, seed + 1)}, ${pickR(LIGHT, seed + 3)}.`,
+      `${frameText || pickR(FRAMING, seed + 1)}, ${pickR(LIGHT, seed + 3)}.${pose ? ` Pose: ${pose}.` : ""}`,
       pf,
       ...(sceneText ? [`This photo is about: ${sceneText}. Include that in the frame — the object, the place, the moment she is showing.`] : []),
       PAP_RULES,
@@ -235,9 +248,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
       ? `PLACE: exactly the place in the reference image — the same spot, background and objects every time; it never changes between photos.`
       : `PLACE (always exactly this, it never changes): ${spot}. The same place in every photo — only the camera angle, framing, light and expression change.`,
     `She is wearing ${wear}.${garment}`,
-    pose
-      ? `${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}. Pose: ${pose}.`
-      : `${pickR(FRAMING, seed + 1)}, ${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}.`,
+    `${frameText || pickR(FRAMING, seed + 1)}, ${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}.${pose ? ` Pose: ${pose}.` : ""}`,
     fm.face,
     ...(sceneText ? [`This photo is about: ${sceneText}. Include that in the frame — the object, the place, the moment she is showing.`] : []),
     `Ordinary and unpolished: the mirror has a smudge, the room behind is lived in, the framing is not quite straight. Not a photoshoot, not a studio, no filter. No text, no watermark.`,
