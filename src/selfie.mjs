@@ -40,6 +40,37 @@ function dataUrl(file) {
   return `data:${MIME_BY_EXT[ext] || "image/jpeg"};base64,${fs.readFileSync(file).toString("base64")}`;
 }
 
+/** Framing reference library: real selfies grouped by crop, so the model copies a believable
+ *  camera distance/pose. One option can hold many photos; the system picks one at random. */
+export const FRAMING_GROUPS = ["full", "half", "waist", "face"];
+const poseDir = (slug) => path.join(DATA_DIR, "photos", "pose", String(slug || config.persona).replace(/[^\w.-]/g, ""));
+
+export function poseRefGroups(slug = config.persona) {
+  const dir = poseDir(slug);
+  const out = {};
+  try {
+    for (const g of fs.readdirSync(dir)) {
+      const gd = path.join(dir, g);
+      if (!fs.statSync(gd).isDirectory()) continue;
+      const files = fs.readdirSync(gd).filter((f) => /\.(jpe?g|png|webp)$/i.test(f));
+      if (files.length) out[g] = files.map((f) => path.join(gd, f));
+    }
+  } catch {}
+  return out;
+}
+
+function pickPoseRef(slug, group) {
+  const files = poseRefGroups(slug)[group] || [];
+  if (!files.length) return null;
+  return files[Math.floor(Math.random() * files.length)];
+}
+
+function pickAnyPoseRef(slug) {
+  const all = Object.values(poseRefGroups(slug)).flat();
+  if (!all.length) return null;
+  return all[Math.floor(Math.random() * all.length)];
+}
+
 /** The angle, the light and the mood rotate; the place never moves. */
 const ANGLES = [
   "the phone held low at chest height, tilted slightly up",
@@ -152,7 +183,7 @@ const POSE_DEFS = {
  * The prompt. The spot comes from the character (bedroom mirror by the door by default) and is the same
  * every time; everything else is drawn from the lists above by day, so two selfies never look alike.
  */
-export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, typeMode = null, expressionMode = null, scene = null, style = "casual", why = "", slug: slugIn = null } = {}) {
+export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, typeMode = null, expressionMode = null, scene = null, frameRef = false, style = "casual", why = "", slug: slugIn = null } = {}) {
   const slug = slugIn || persona?.slug || config.persona;
   const d = day || new Date();
   // Vary per shot, not per day: with a day-only seed every selfie on the same day shared the same
@@ -173,6 +204,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   let n = 2;
   if (outfitRef) refs.push(`Image ${n++} is the outfit she must wear: put that exact garment on her, matching its fabric, colour, cut and pattern.`);
   if (spotRef) refs.push(`Image ${n++} is the place: reproduce that exact room, wall, mirror and objects in the same layout every time — only the camera angle, framing and light change.`);
+  if (frameRef) refs.push(`Image ${n++} is a reference photo for FRAMING and camera distance only: copy its crop and body position, but keep her face and her outfit from the other images.`);
   const who = `${persona?.name || "a young woman"}, ${String(persona?.appearance || "slim, 20, shoulder-length black hair, minimal monochrome clothes").slice(0, 160)}`;
   const moodKey = String(expressionMode || config.selfieExpression || "auto").toLowerCase();
   const mood = EXPRESSIONS[moodKey]?.text || pickR(MOOD_TEXTS, seed + 4);
@@ -337,7 +369,12 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
   const spotFile = String(persona?.mirror_spot_image || "");
   const spotRef = !isPapShot && spotFile && images.length && fs.existsSync(spotFile);
   if (spotRef) images.push(dataUrl(spotFile));
-  const prompt = selfiePrompt(persona, { day, style, why, outfit: wear, outfitItem: item, outfitRef: !!outfitRef, spotRef: !!spotRef, slug: s });
+  // a real selfie reference for framing/composition, picked from the uploaded library
+  const framing = String(config.selfieFraming || "off").toLowerCase();
+  const frameFile = framing === "auto" ? pickAnyPoseRef(s) : framing === "off" ? null : pickPoseRef(s, framing);
+  const frameRef = !!(frameFile && fs.existsSync(frameFile));
+  if (frameRef) images.push(dataUrl(frameFile));
+  const prompt = selfiePrompt(persona, { day, style, why, outfit: wear, outfitItem: item, outfitRef: !!outfitRef, spotRef: !!spotRef, frameRef, slug: s });
   // Generate several candidates and keep the most believable one: a single shot can come out weird,
   // and one bad photo used to mean the whole selfie was a total loss.
   const candidates = Math.min(Math.max(Number(config.selfieCandidates || 3), 1), 5);
@@ -413,7 +450,9 @@ export const selfieSettings = (persona = null) => ({
   expression: String(config.selfieExpression || "auto"),
   expressions: [{ value: "auto", label: "auto (rotasi)" }, ...Object.entries(EXPRESSIONS).map(([value, d]) => ({ value, label: d.label }))],
   why: String(config.selfieWhy || ""),
-  candidates: Number(config.selfieCandidates || 3),
+  candidates: Number(config.selfieCandidates || 1),
+  framing: String(config.selfieFraming || "off"),
+  frameRefs: Object.fromEntries(Object.entries(poseRefGroups(persona?.slug || config.persona)).map(([g, f]) => [g, f.length])),
   spotImage: persona?.mirror_spot_image ? "/spot" : "",
   sent: loadState(persona?.slug || config.persona).sent,
 });

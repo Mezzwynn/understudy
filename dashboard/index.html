@@ -1412,7 +1412,30 @@ function selfieCard(ph, gowns, styles) {
         <input class="nin" id="sf-max" type="number" min="1" max="5" value="${sf.maxPerDay ?? 2}"></div>
 
       <div class="mrow2"><span>Kandidat (1-5, makin banyak makin mahal)</span>
-        <input class="nin" id="sf-cand" type="number" min="1" max="5" value="${sf.candidates ?? 3}"></div>
+        <input class="nin" id="sf-cand" type="number" min="1" max="5" value="${sf.candidates ?? 1}"></div>
+
+      <div class="mrow2"><span>Framing referensi</span>
+        <select class="sin" id="sf-framing">
+          <option value="off" ${(!sf.framing || sf.framing === "off") ? "selected" : ""}>off</option>
+          <option value="auto" ${sf.framing === "auto" ? "selected" : ""}>auto (acak semua)</option>
+          <option value="full" ${sf.framing === "full" ? "selected" : ""}>full body</option>
+          <option value="half" ${sf.framing === "half" ? "selected" : ""}>half body</option>
+          <option value="waist" ${sf.framing === "waist" ? "selected" : ""}>sepinggang</option>
+          <option value="face" ${sf.framing === "face" ? "selected" : ""}>wajah</option>
+        </select></div>
+
+      <div class="mrow2"><span>Upload referensi</span>
+        <span class="swline" style="gap:6px">
+          <select class="sin" id="sf-refgroup">
+            <option value="full">full (${(sf.frameRefs || {}).full || 0})</option>
+            <option value="half">half (${(sf.frameRefs || {}).half || 0})</option>
+            <option value="waist">waist (${(sf.frameRefs || {}).waist || 0})</option>
+            <option value="face">face (${(sf.frameRefs || {}).face || 0})</option>
+          </select>
+          <button class="act" onclick="uwRefPick()">+ foto</button>
+          <button class="act" onclick="uwRefClear()" style="color:var(--bad)">hapus grup</button>
+          <input type="file" accept="image/*" multiple id="sf-reffile" hidden onchange="uwRefUpload(this)">
+        </span></div>
 
       <div class="mrow2"><span>Baju tetap (kosong = rotasi otomatis)</span>
         <select class="sin" id="sf-outfit">
@@ -1462,6 +1485,7 @@ window.uwSelfieSave = async () => {
     SELFIE_EXPRESSION: document.getElementById("sf-expr").value,
     SELFIE_WHY: document.getElementById("sf-why").value.trim(),
     SELFIE_CANDIDATES: document.getElementById("sf-cand").value,
+    SELFIE_FRAMING: document.getElementById("sf-framing").value,
   };
   const spot = document.getElementById("sf-spot").value.trim();
   const typed = document.getElementById("sf-outfit-text").value.trim();
@@ -1533,6 +1557,32 @@ window.uwSelfieReason = async () => {
   const r = await api("/api/photos", { action: "selfie-reason" });
   if (r.ok && r.reason) { inp.value = r.reason; toast("Alasan terisi — jangan lupa Simpan"); }
   else toast("Gagal: " + (r.error || "nggak dapat alasan"));
+};
+
+/* library referensi framing: upload banyak foto per grup, sistem milih acak saat generate */
+window.uwRefPick = () => document.getElementById("sf-reffile")?.click();
+window.uwRefUpload = async (inp) => {
+  const files = [...(inp.files || [])];
+  if (!files.length) return;
+  const group = document.getElementById("sf-refgroup").value;
+  toast(`Upload ${files.length} foto ke ${group}…`);
+  let ok = 0;
+  for (const f of files) {
+    if (f.size > 6 * 1024 * 1024) continue;
+    const ext = (f.name.split(".").pop() || "jpg").toLowerCase();
+    const data = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(",")[1]); fr.readAsDataURL(f); });
+    const res = await api("/api/photos", { action: "pose-ref-upload", group, data, ext });
+    if (res.ok) ok++;
+  }
+  toast(ok ? `${ok} foto masuk ke ${group}` : "Gagal upload");
+  if (ok) { photosDirty = false; await refresh(true); }
+};
+window.uwRefClear = async () => {
+  const group = document.getElementById("sf-refgroup").value;
+  if (!confirm(`Hapus semua referensi di grup ${group}?`)) return;
+  const res = await api("/api/photos", { action: "pose-ref-clear", group });
+  toast(res.ok ? `Grup ${group} dikosongkan` : "Gagal");
+  if (res.ok) { photosDirty = false; await refresh(true); }
 };
 
 /* ═══════════════════════════ photos tab ═══════════════════════════ */

@@ -63,7 +63,7 @@ import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
 import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent, photoHistory, rateSent, sceneScores } from "./photo-library.mjs";
 import { PHONE_PROFILES } from "./humanize.mjs";
 import { wardrobeFor, loadWardrobe, addWardrobeItem, updateWardrobeItem, removeWardrobeItem, setWardrobeImage, TIMES, STYLES } from "./photos.mjs";
-import { selfieSettings, selfieMoments, makeSelfie, generateSelfieReason } from "./selfie.mjs";
+import { selfieSettings, selfieMoments, makeSelfie, generateSelfieReason, poseRefGroups, FRAMING_GROUPS } from "./selfie.mjs";
 import { describeOutfit } from "./photo-check.mjs";
 import {
   loadFace,
@@ -920,6 +920,25 @@ f.addEventListener("load", () => {
           if (act === "selfie-reason") {
             const reason = await generateSelfieReason(loadPersona(slug));
             return json(res, 200, { ok: true, reason });
+          }
+          if (act === "pose-ref-upload") {
+            const group = String(body.group || "full").toLowerCase().replace(/[^a-z]/g, "") || "full";
+            const ext = String(body.ext || "jpg").replace(/[^a-z]/gi, "") || "jpg";
+            const dir = path.join(DATA_DIR, "photos", "pose", slug, group);
+            fs.mkdirSync(dir, { recursive: true });
+            const data = String(body.data || "").replace(/^data:[^,]+,/, "");
+            if (!data || data.length < 100) return json(res, 400, { ok: false, error: "upload kosong" });
+            const target = path.join(dir, `${Date.now()}.${ext}`);
+            fs.writeFileSync(target, Buffer.from(data, "base64"));
+            log(`dashboard: pose ref ditambah ke ${group}`);
+            const counts = Object.fromEntries(Object.entries(poseRefGroups(slug)).map(([g, f]) => [g, f.length]));
+            return json(res, 200, { ok: true, frameRefs: counts });
+          }
+          if (act === "pose-ref-clear") {
+            const group = String(body.group || "").toLowerCase().replace(/[^a-z]/g, "");
+            if (group) fs.rmSync(path.join(DATA_DIR, "photos", "pose", slug, group), { recursive: true, force: true });
+            const counts = Object.fromEntries(Object.entries(poseRefGroups(slug)).map(([g, f]) => [g, f.length]));
+            return json(res, 200, { ok: true, frameRefs: counts });
           }
 
           if (act === "wardrobe-add") {

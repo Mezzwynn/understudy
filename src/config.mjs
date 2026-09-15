@@ -152,6 +152,8 @@ function buildConfig() {
   selfieWhy: envGet("SELFIE_WHY", ""),
   // how many selfie candidates to generate and judge, keeping the best (1-5)
   selfieCandidates: num(envGet("SELFIE_CANDIDATES", "1"), 1),
+  // which framing reference group to use: off | auto | full | half | waist | face
+  selfieFraming: envGet("SELFIE_FRAMING", "off"),
   objectModel: envGet("OBJECT_MODEL", "openai/gpt-image-1-mini/text-to-image"),
   photoCandidateCount: num(envGet("PHOTO_CANDIDATE_COUNT", "4"), 4),
   topicFatigue: envFlag("TOPIC_FATIGUE", true),
