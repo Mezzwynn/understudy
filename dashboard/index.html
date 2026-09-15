@@ -1381,6 +1381,9 @@ function selfieCard(ph, gowns, styles) {
           <option value="full" ${sf.face === "full" ? "selected" : ""}>full — kelihatan semua</option>
           <option value="half" ${(!sf.face || sf.face === "half") ? "selected" : ""}>half — ketutup setengah</option>
           <option value="hide" ${sf.face === "hide" ? "selected" : ""}>hide — ketutup semua</option>
+          <option value="hand" ${sf.face === "hand" ? "selected" : ""}>hand — pakai tangan</option>
+          <option value="object" ${sf.face === "object" ? "selected" : ""}>object — pegang barang</option>
+          <option value="out" ${sf.face === "out" ? "selected" : ""}>out — buang muka</option>
         </select></div>
 
       <div class="mrow2"><span>Pose</span>
@@ -1398,6 +1401,18 @@ function selfieCard(ph, gowns, styles) {
           <input class="sin" id="sf-why" value="${esc(sf.why || "")}" placeholder="mis. nemu bunga di taman pas jogging" style="flex:1">
           <button class="act" onclick="uwSelfieReason()" title="tulis otomatis dari rutinitas sekarang">auto</button>
         </span></div>
+
+      <div class="mrow2"><span>Waktu</span>
+        <select class="sin" id="sf-time">
+          <option value="auto" ${(!sf.time || sf.time === "auto") ? "selected" : ""}>auto</option>
+          <option value="subuh" ${sf.time === "subuh" ? "selected" : ""}>subuh</option>
+          <option value="pagi" ${sf.time === "pagi" ? "selected" : ""}>pagi</option>
+          <option value="siang" ${sf.time === "siang" ? "selected" : ""}>siang</option>
+          <option value="sore" ${sf.time === "sore" ? "selected" : ""}>sore</option>
+          <option value="magrib" ${sf.time === "magrib" ? "selected" : ""}>magrib</option>
+          <option value="malem" ${sf.time === "malem" ? "selected" : ""}>malem</option>
+          <option value="tengahmalam" ${sf.time === "tengahmalam" ? "selected" : ""}>tengah malam</option>
+        </select></div>
 
       <div class="mrow2"><span>Tempat (jangan diubah-ubah)</span>
         <input class="sin" id="sf-spot" value="${esc(sf.spot || "")}"></div>
@@ -1491,6 +1506,7 @@ window.uwSelfieSave = async () => {
     SELFIE_WHY: document.getElementById("sf-why").value.trim(),
     SELFIE_CANDIDATES: document.getElementById("sf-cand").value,
     SELFIE_FRAMING: document.getElementById("sf-framing").value,
+    SELFIE_TIME: document.getElementById("sf-time").value,
   };
   const spot = document.getElementById("sf-spot").value.trim();
   const typed = document.getElementById("sf-outfit-text").value.trim();

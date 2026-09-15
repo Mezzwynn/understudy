@@ -87,6 +87,17 @@ const LIGHT = [
   "bright ceiling light, unflattering and honest",
   "dim, as if she did not bother turning anything on",
 ];
+
+/** The time-of-day setting picks the light, so the photo matches the hour she is in. */
+const TIME_LIGHT = {
+  subuh: "the soft blue-grey light of dawn just before sunrise",
+  pagi: "fresh clear morning daylight",
+  siang: "harsh bright midday daylight with strong shadows",
+  sore: "warm golden late-afternoon light with long shadows",
+  magrib: "dusk after sunset, a warm orange sky fading into blue",
+  malem: "night — a warm lamp or streetlight, dark around the edges",
+  tengahmalam: "deep night, very dim, barely any light, moody",
+};
 /** Her expression in a selfie — the panel exposes this as a dropdown; "auto" rotates. */
 const EXPRESSIONS = {
   flat: { label: "flat — datar", text: "flat and unimpressed, no expression at all" },
@@ -116,6 +127,18 @@ const FACE_LINES = (mood) => ({
     hold: `One arm is bent up and her hand is clearly holding the phone up in front of her face — the hand and the phone are both visible in the mirror, fingers wrapped around the phone.`,
     face: `Her face is FULLY HIDDEN behind the phone: the phone covers her whole face in the mirror, so no eyes, no nose and no mouth are visible — at most a little hair or her forehead above the top edge. Her hand gripping the phone is clearly visible.`,
   },
+  hand: {
+    hold: `One arm is bent up holding the phone, but her other hand is raised to cover her face in the mirror.`,
+    face: `Her face is hidden behind her own free hand: she holds one hand up over her face, fingers together, so no eyes, no nose and no mouth are visible. The phone and the hand holding it stay in the frame.`,
+  },
+  object: {
+    hold: `One arm is bent up holding the phone.`,
+    face: `Her face is hidden behind something she is holding up in front of it — a cup, her bag or a book — so no eyes, no nose and no mouth are visible.`,
+  },
+  out: {
+    hold: `One arm is bent up holding the phone, but she is not looking at the mirror.`,
+    face: `Her face is out of the frame — she is turned away from the mirror or looking down, so no face is visible, only her hair, body and outfit.`,
+  },
 });
 
 /** Front-camera "pap" selfie (no mirror): the face rules read differently when she is the one
@@ -124,6 +147,9 @@ const PAP_FACE = (mood) => ({
   full: `Her whole face is visible and clear, close to the camera. Her expression: ${mood}. She is looking into the lens.`,
   half: `Only half of her face is in the frame — the edge of the photo cuts across her face, so one eye and half her mouth are visible. Her expression on the visible half: ${mood}.`,
   hide: `Her face is hidden behind her own hand — she holds one free hand up over her face, fingers together, like she is waving the camera away, so no eyes, no nose and no mouth are visible. The hand and her forearm are clearly in the frame covering her face, with maybe a little hair or cheek peeking out at the edges. The hand holding the camera is never visible.`,
+  hand: `Her face is hidden behind her own hand — she holds one hand up over her face, fingers together, so no eyes, no nose and no mouth are visible. The hand holding the camera is never visible.`,
+  object: `Her face is hidden behind an object she is holding up in front of it — a cup, a bag or a book — so no eyes, no nose and no mouth are visible. The hand holding the camera is never visible.`,
+  out: `Her face is out of the frame — the photo is from the neck down or she is turned away, so no face is visible, only her hair, body and outfit.`,
 });
 
 /** "diphotoin" — someone else holds the camera, so the face rules are about looking/not looking, not a phone. */
@@ -131,6 +157,9 @@ const SHOT_FACE = (mood) => ({
   full: `Her whole face is visible and clear. Her expression: ${mood}. She is looking at the camera or just past it.`,
   half: `Her face is seen in profile or half-turned, so only one side of her face is visible. Her expression: ${mood}.`,
   hide: `Her face is turned away from the camera or out of frame — no eyes, nose or mouth are visible, like a candid shot from the side or behind.`,
+  hand: `Her face is hidden behind her own hand — she holds one hand up over her face, fingers together, so no eyes, no nose and no mouth are visible.`,
+  object: `Her face is hidden behind an object she is holding up in front of it — a cup, a bag or a book — so no eyes, no nose and no mouth are visible.`,
+  out: `Her face is turned away or out of the frame — no eyes, nose or mouth are visible, like a candid shot from behind or the side.`,
 });
 
 /** A front-camera selfie must look like SHE is holding the lens, never like a third person took it. */
@@ -212,7 +241,7 @@ const POSE_DEFS = {
  * The prompt. The spot comes from the character (bedroom mirror by the door by default) and is the same
  * every time; everything else is drawn from the lists above by day, so two selfies never look alike.
  */
-export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, typeMode = null, expressionMode = null, scene = null, frameRef = false, frameMode = null, style = "casual", why = "", slug: slugIn = null } = {}) {
+export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = null, outfitRef = false, spotRef = false, faceMode = null, poseMode = null, typeMode = null, expressionMode = null, scene = null, frameRef = false, frameMode = null, timeMode = null, style = "casual", why = "", slug: slugIn = null } = {}) {
   const slug = slugIn || persona?.slug || config.persona;
   const d = day || new Date();
   // Vary per shot, not per day: with a day-only seed every selfie on the same day shared the same
@@ -251,6 +280,8 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   const frameText = frameKey === "auto"
     ? FRAMING_TEXT[FRAMING_GROUPS[Math.floor(Math.random() * FRAMING_GROUPS.length)]]
     : FRAMING_TEXT[frameKey] || "";
+  const timeKey = String(timeMode || config.selfieTime || "auto").toLowerCase();
+  const light = TIME_LIGHT[timeKey] || pickR(LIGHT, seed + 3);
   if (isPap) {
     const pf = PAP_FACE(mood)[mode] || PAP_FACE(mood).half;
     return [
@@ -258,7 +289,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
       `New photo: a front-camera selfie she took HERSELF at arm's length with her phone${why ? `, ${why}` : ""}.`,
       `PLACE: ${spotLooksMirror ? "an ordinary lived-in room directly behind her — a plain wall, a bit of her bed or a desk, not tidy, not staged" : spot}.`,
       `She is wearing ${wear}.${garment}`,
-      `${frameText || pickR(FRAMING, seed + 1)}, ${pickR(LIGHT, seed + 3)}.${pose ? ` Pose: ${pose}.` : ""}`,
+      `${frameText || pickR(FRAMING, seed + 1)}, ${light}.${pose ? ` Pose: ${pose}.` : ""}`,
       pf,
       ...(sceneText ? [`This photo is about: ${sceneText}. Include that in the frame — the object, the place, the moment she is showing.`] : []),
       PAP_RULES,
@@ -275,7 +306,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
       intro,
       `PLACE: ${spotLooksMirror ? "an ordinary place that fits the moment" : spot}.`,
       `She is wearing ${wear}.${garment}`,
-      `${frameText || pickR(FRAMING, seed + 1)}, ${pickR(LIGHT, seed + 3)}.${pose ? ` Pose: ${pose}.` : ""}`,
+      `${frameText || pickR(FRAMING, seed + 1)}, ${light}.${pose ? ` Pose: ${pose}.` : ""}`,
       ...(sceneText ? [`This photo is about: ${sceneText}. Include that in the frame — the object, the place, the moment she is showing.`] : []),
       sf,
       ANTI_AI,
@@ -288,7 +319,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
       ? `PLACE: exactly the place in the reference image — the same spot, background and objects every time; it never changes between photos.`
       : `PLACE (always exactly this, it never changes): ${spot}. The same place in every photo — only the camera angle, framing, light and expression change.`,
     `She is wearing ${wear}.${garment}`,
-    `${frameText || pickR(FRAMING, seed + 1)}, ${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}.${pose ? ` Pose: ${pose}.` : ""}`,
+    `${frameText || pickR(FRAMING, seed + 1)}, ${pickR(ANGLES, seed + 2)}, ${light}.${pose ? ` Pose: ${pose}.` : ""}`,
     fm.face,
     ...(sceneText ? [`This photo is about: ${sceneText}. Include that in the frame — the object, the place, the moment she is showing.`] : []),
     `Ordinary and unpolished: the mirror has a smudge, the room behind is lived in, the framing is not quite straight. Not a photoshoot, not a studio, no filter. No text, no watermark.`,
@@ -507,6 +538,7 @@ export const selfieSettings = (persona = null) => ({
   why: String(config.selfieWhy || ""),
   candidates: Number(config.selfieCandidates || 1),
   framing: String(config.selfieFraming || "auto"),
+  time: String(config.selfieTime || "auto"),
   frameRefs: Object.fromEntries(Object.entries(poseRefGroups(persona?.slug || config.persona)).map(([g, f]) => [g, f.length])),
   spotImage: persona?.mirror_spot_image ? "/spot" : "",
   sent: loadState(persona?.slug || config.persona).sent,

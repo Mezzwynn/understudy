@@ -154,6 +154,8 @@ function buildConfig() {
   selfieCandidates: num(envGet("SELFIE_CANDIDATES", "1"), 1),
   // which framing reference group to use: auto | off | full | half | waist | face (auto = no ref is fine)
   selfieFraming: envGet("SELFIE_FRAMING", "auto"),
+  // time-of-day light: auto | subuh | pagi | siang | sore | magrib | malem | tengahmalam
+  selfieTime: envGet("SELFIE_TIME", "auto"),
   objectModel: envGet("OBJECT_MODEL", "openai/gpt-image-1-mini/text-to-image"),
   photoCandidateCount: num(envGet("PHOTO_CANDIDATE_COUNT", "4"), 4),
   topicFatigue: envFlag("TOPIC_FATIGUE", true),
