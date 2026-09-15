@@ -101,6 +101,8 @@ export function addPhoto(slug, file, meta = {}) {
     classFit: classFitOf(`${scene} ${meta.note || ""}`),
     scene,
     note: String(meta.note || "").slice(0, 200),
+    caption: String(meta.caption || "").slice(0, 160),
+    allowSend: meta.allowSend !== false,
     kind: meta.kind || (String(scene).startsWith("selfie") ? "self" : "view"),
     timeOfDay: meta.timeOfDay || partOfDay(meta.hour ?? 12),
     topics,
@@ -113,6 +115,15 @@ export function addPhoto(slug, file, meta = {}) {
   saveLibrary(slug, lib);
   log(`photo library: added ${entry.kind} "${entry.scene}" [${topics.join(",") || "no topics"}] for ${slugOf(slug)}`);
   return { ok: true, photo: entry };
+}
+
+export function setPhotoAllow(slug, id, allow) {
+  const lib = loadLibrary(slug);
+  const p = lib.photos.find((x) => x.id === id);
+  if (!p) return { ok: false, error: "not found" };
+  p.allowSend = !!allow;
+  saveLibrary(slug, lib);
+  return { ok: true, photo: p };
 }
 
 export function removePhoto(slug, id) {
@@ -135,14 +146,17 @@ export function pickPhoto({ slug = config.persona, chat = null, moment = null, b
   const lib = loadLibrary(slug);
   if (!lib.photos.length) return null;
   const who = persona || loadPersona(slug);
-  // a photo from the wrong class of place is a tell: filter before scoring
-  // no kind filter any more — any photo that fits her class and her moment is fair game
-  const eligible = lib.photos.filter((p) => fitsPersonaClass(`${p.scene} ${p.note || ""}`, who, { allowOneStep: true }));
+  const jid = String(chat?.jid || "");
+  // only approved photos, and never the same photo to the same person twice
+  const eligible = lib.photos.filter((p) =>
+    p.allowSend !== false &&
+    !(jid && (p.sentTo || {})[jid]) &&
+    fitsPersonaClass(`${p.scene} ${p.note || ""}`, who, { allowOneStep: true })
+  );
   if (!eligible.length) return null;
   const pod = partOfDay(now.getHours());
   const context = `${block?.what || ""} ${block?.place || ""} ${moment?.what || ""} ${moment?.kind || ""} ${chat?.summary || ""}`.toLowerCase();
   const wanted = topicTagsFor(context);
-  const jid = String(chat?.jid || "");
   const mood = Number(chat?.mood?.valence ?? 0.5);
 
   const scores = config.photoLearn ? sceneScores(slug) : {};
@@ -163,6 +177,12 @@ export function pickPhoto({ slug = config.persona, chat = null, moment = null, b
       if (hits.length) {
         score += 2 * hits.length;
         why.push(`nyambung: ${hits.join(",")}`);
+      }
+      const capWords = (p.caption || "").toLowerCase().split(/\W+/).filter((w) => w.length > 3);
+      const capHits = capWords.filter((w) => context.includes(w)).length;
+      if (capHits) {
+        score += Math.min(3, capHits);
+        why.push("caption nyambung");
       }
       const lastTo = Number(p.sentTo?.[jid] || 0);
       const daysSince = lastTo ? (Date.now() - lastTo) / 86400000 : 999;
@@ -316,6 +336,8 @@ export function librarySummary(slug = config.persona) {
         url: `/photo?d=library/${slugOf(slug)}&f=${encodeURIComponent(p.file)}`,
         scene: p.scene,
         kind: p.kind,
+        caption: p.caption || "",
+        allowSend: p.allowSend !== false,
         timeOfDay: p.timeOfDay,
         topics: p.topics || [],
         usedCount: p.usedCount || 0,

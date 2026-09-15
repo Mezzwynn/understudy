@@ -1703,6 +1703,20 @@ function renderPhotos(){
     </div>
   </div>`).join("")}
 
+  <h2 style="margin:20px 0 8px;font-size:17px">Library (${(ph.photos||[]).length}) — pilih yang boleh dikirim</h2>
+  <div class="card tight fadein">
+    <div class="hint" style="margin-bottom:8px">Hidupin = boleh dikirim (terjadwal / saat diminta). Foto yang udah dikirim ke satu kontak nggak bakal dikirim lagi ke dia.</div>
+    ${(ph.photos||[]).length ? `<div class="histgrid">${ph.photos.map((p)=>`
+      <div class="hist" data-h="${esc(p.id)}">
+        ${p.url?`<img src="${p.url}" loading="lazy" alt="">`:'<div class="noimg">—</div>'}
+        <div class="body">
+          <div class="tiny">${esc(p.caption || p.scene)}</div>
+          <div class="swline" style="margin-top:6px">${SW(p.allowSend !== false, `data-pallow="${esc(p.id)}"`)}<em>${p.allowSend !== false ? "boleh kirim" : "jangan"}</em></div>
+          <div class="btns" style="margin-top:6px"><button class="act" data-pdel="${esc(p.id)}" style="color:var(--bad)">Hapus</button></div>
+        </div>
+      </div>`).join("")}</div>` : '<div class="empty">Belum ada foto di library.</div>'}
+  </div>
+
   <h2 style="margin:20px 0 8px;font-size:17px">History (${(ph.history||[]).length})</h2>
   <div class="card tight fadein">
     <div class="hint" style="margin-bottom:8px">Nilainya dipakai buat memilih foto berikutnya.
@@ -1728,7 +1742,7 @@ function renderPhotos(){
 $("#tab-photos").addEventListener("click", async (e)=>{
   const sw = e.target.closest(".switch");
   if(sw){
-    const swk = sw.dataset.swk, contact = sw.dataset.contact, cat = sw.dataset.wcat, wd = sw.dataset.wd;
+    const swk = sw.dataset.swk, contact = sw.dataset.contact, cat = sw.dataset.wcat, wd = sw.dataset.wd, pallow = sw.dataset.pallow;
     sw.classList.toggle("on");
     const on = sw.classList.contains("on");
     if(swk){
@@ -1754,6 +1768,11 @@ $("#tab-photos").addEventListener("click", async (e)=>{
       toast(on?"Ditandai aneh":"Tanda aneh dihapus");
       return;
     }
+    if(pallow){
+      await api("/api/photos",{ action:"photo-allow", id: pallow, allow: on });
+      toast(on?"Foto boleh dikirim":"Foto diblokir");
+      return;
+    }
   }
 
   const wsave = e.target.closest("[data-wsave]");
@@ -1777,6 +1796,12 @@ $("#tab-photos").addEventListener("click", async (e)=>{
     const inp = document.querySelector('[data-wup="' + wimg.dataset.wimg + '"]');
     if(inp) inp.click(); else toast("input file-nya nggak ketemu");
     return;
+  }
+  const pdel = e.target.closest("[data-pdel]");
+  if(pdel){
+    const r = await api("/api/photos",{ action:"remove", id: pdel.dataset.pdel });
+    toast(r.ok?"Foto dihapus":"Gagal");
+    return refresh(true);
   }
 
   

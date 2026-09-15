@@ -60,7 +60,7 @@ function writeRating(entry) {
 
 import { listChats, loadChat, saveChat, loadState } from "./store.mjs";
 import { loadPersona, parsePersonaFrontmatter } from "./prompt.mjs";
-import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent, photoHistory, rateSent, sceneScores } from "./photo-library.mjs";
+import { librarySummary, loadLibrary, pickPhoto, removePhoto, markSent, photoHistory, rateSent, sceneScores, setPhotoAllow } from "./photo-library.mjs";
 import { PHONE_PROFILES } from "./humanize.mjs";
 import { wardrobeFor, loadWardrobe, addWardrobeItem, updateWardrobeItem, removeWardrobeItem, setWardrobeImage, TIMES, STYLES } from "./photos.mjs";
 import { selfieSettings, selfieMoments, makeSelfie, generateSelfieReason, poseRefGroups, FRAMING_GROUPS } from "./selfie.mjs";
@@ -578,8 +578,10 @@ f.addEventListener("load", () => {
       }
       if (req.method === "GET" && url.pathname === "/photo") {
         const name = path.basename(String(url.searchParams.get("f") || ""));
-        const dir = path.basename(String(url.searchParams.get("d") || "model-test"));
-        const file = path.join("/sdcard/Download/Understudy", dir, name);
+        const d = String(url.searchParams.get("d") || "model-test");
+        const file = d.startsWith("library/")
+          ? path.join(DATA_DIR, "photos", "library", path.basename(d), name)
+          : path.join("/sdcard/Download/Understudy", path.basename(d), name);
         if (!name || !fs.existsSync(file)) return json(res, 404, { ok: false, error: "not found" });
         res.writeHead(200, { "content-type": /\.png$/i.test(name) ? "image/png" : "image/jpeg", "cache-control": "public, max-age=3600" });
         return res.end(fs.readFileSync(file));
@@ -1023,6 +1025,10 @@ f.addEventListener("load", () => {
             return json(res, 200, { ok: true, wardrobe: wardrobeFor(loadPersona(slug)) });
           }
           const { getSock } = await import("./whatsapp.mjs");
+          if (act === "photo-allow") {
+            const r = setPhotoAllow(slug, String(body.id || ""), body.allow !== false);
+            return json(res, r.ok ? 200 : 400, r);
+          }
           if (act === "remove") {
             const r = removePhoto(slug, String(body.id || ""));
             return json(res, r.ok ? 200 : 400, { ...r, ...librarySummary(slug) });
