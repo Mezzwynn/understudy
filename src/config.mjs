@@ -144,7 +144,7 @@ function buildConfig() {
   selfieFace: envGet("SELFIE_FACE", "half"),
   // how she stands/holds herself: auto | natural | peace | hip | hair | sit | shoulder
   selfiePose: envGet("SELFIE_POSE", "auto"),
-  // mirror = the same mirror spot; pap = a plain front-camera selfie at arm's length
+  // mirror = the same mirror spot; pap = front camera; diphotoin = someone else; timer = phone propped
   selfieType: envGet("SELFIE_TYPE", "mirror"),
   // her expression: auto | flat | tired | hurry | halfsmile | annoyed | distant | smirk | soft | laugh | amused
   selfieExpression: envGet("SELFIE_EXPRESSION", "auto"),

@@ -100,7 +100,7 @@ export const FEATURES = [
   { key: "SELFIE_OUTFIT", label: "Selfie: baju tetap (kosong = rotasi)", kind: "text", def: "" },
   { key: "SELFIE_FACE", label: "Selfie: tampilan wajah (full/half/hide)", kind: "text", def: "half" },
   { key: "SELFIE_POSE", label: "Selfie: pose (auto/natural/peace/hip/hair/sit/shoulder)", kind: "text", def: "auto" },
-  { key: "SELFIE_TYPE", label: "Selfie: tipe (mirror/pap)", kind: "text", def: "mirror" },
+  { key: "SELFIE_TYPE", label: "Selfie: tipe (mirror/pap/diphotoin/timer)", kind: "text", def: "mirror" },
   { key: "SELFIE_EXPRESSION", label: "Selfie: ekspresi (auto/flat/tired/...)", kind: "text", def: "auto" },
   { key: "SELFIE_WHY", label: "Selfie: alasan pap (kosong = biasa)", kind: "text", def: "" },
   { key: "SELFIE_CANDIDATES", label: "Selfie: jumlah kandidat (1-5, makin banyak makin mahal)", kind: "int", def: 1 },

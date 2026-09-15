@@ -126,6 +126,13 @@ const PAP_FACE = (mood) => ({
   hide: `Her face is hidden behind her own hand — she holds one free hand up over her face, fingers together, like she is waving the camera away, so no eyes, no nose and no mouth are visible. The hand and her forearm are clearly in the frame covering her face, with maybe a little hair or cheek peeking out at the edges. The hand holding the camera is never visible.`,
 });
 
+/** "diphotoin" — someone else holds the camera, so the face rules are about looking/not looking, not a phone. */
+const SHOT_FACE = (mood) => ({
+  full: `Her whole face is visible and clear. Her expression: ${mood}. She is looking at the camera or just past it.`,
+  half: `Her face is seen in profile or half-turned, so only one side of her face is visible. Her expression: ${mood}.`,
+  hide: `Her face is turned away from the camera or out of frame — no eyes, nose or mouth are visible, like a candid shot from the side or behind.`,
+});
+
 /** A front-camera selfie must look like SHE is holding the lens, never like a third person took it. */
 const PAP_RULES = `She took this photo HERSELF, one arm stretched toward the lens — it must NOT look like someone else photographed her: she is seen from the FRONT and CLOSE, the background directly behind her, a slight foreshortening on the arm holding the phone. NOT a full-body shot from a distance, NOT from across the room, NOT posed for a photographer, no second person. The phone, the screen, the lens and the hand holding the camera are NEVER visible — at most one free hand may be in the frame if the pose or the scene calls for it. No mirror reflection. Slightly crooked framing, mild sensor noise, caught mid-movement, not a produced or staged photo. No text, no watermark.`;
 const ANTI_AI = `This must look like a REAL phone photo, not AI, not a render, not a professional shot: real skin texture (visible pores, tiny blemishes, slight uneven tone — never smooth, never plastic, no retouching, no beautify filter); natural mixed lighting with real shadows (window or lamp light, not studio, no HDR, no perfect white balance); a real lived-in room behind her (a little clutter, a cable, wrinkled fabric — not a clean empty wall, not a backdrop); small photo imperfections (mild sensor noise/grain, a touch of motion blur on any moving hand, slightly crooked framing, edges a little soft — not tack-sharp everywhere); correct hands and fingers; candid and unposed, caught mid-movement, not perfectly symmetrical, not smiling straight at the lens. No text, no watermark, no logo, no border, no vignette.`;
@@ -218,10 +225,13 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   const mood = EXPRESSIONS[moodKey]?.text || pickR(MOOD_TEXTS, seed + 4);
   const mode = String(faceMode || config.selfieFace || "half").toLowerCase();
   const fm = FACE_LINES(mood)[mode] || FACE_LINES(mood).half;
-  const isPap = String(typeMode || config.selfieType || "mirror").toLowerCase() === "pap";
+  const typeKey = String(typeMode || config.selfieType || "mirror").toLowerCase();
+  const isPap = typeKey === "pap";
+  const isShot = typeKey === "diphotoin";
+  const isTimer = typeKey === "timer";
   const poseKey = String(poseMode || config.selfiePose || "auto").toLowerCase();
   const poseDef = POSE_DEFS[poseKey];
-  const pose = poseDef && (poseDef.type === "both" || poseDef.type === (isPap ? "pap" : "mirror")) ? poseDef.text : null;
+  const pose = poseDef && (poseDef.type === "both" || poseDef.type === (isPap ? "pap" : (isShot || isTimer) ? "both" : "mirror")) ? poseDef.text : null;
   // framing is a prompt instruction first; the reference photo (frameRef) is only an optional helper
   const frameKey = String(frameMode || config.selfieFraming || "off").toLowerCase();
   const frameText = frameKey === "auto"
@@ -238,6 +248,22 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
       pf,
       ...(sceneText ? [`This photo is about: ${sceneText}. Include that in the frame — the object, the place, the moment she is showing.`] : []),
       PAP_RULES,
+      ANTI_AI,
+    ].join(" ");
+  }
+  if (isShot || isTimer) {
+    const sf = SHOT_FACE(mood)[mode] || SHOT_FACE(mood).full;
+    const intro = isTimer
+      ? `New photo: a self-timer photo — she propped her own phone on a table, shelf or ledge and stepped back${why ? `, ${why}` : ""}. She is alone, she is NOT holding the phone, and the phone may peek into the frame at the very edge or stay out of it.`
+      : `New photo: someone else took this photo of her with a phone${why ? `, ${why}` : ""}. It is NOT a selfie — the camera is a few steps away, so there is no phone or camera-hand in the frame and it must not look like she is holding the camera.`;
+    return [
+      refs.length > 1 ? refs.join(" ") : `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
+      intro,
+      `PLACE: ${spotLooksMirror ? "an ordinary place that fits the moment" : spot}.`,
+      `She is wearing ${wear}.${garment}`,
+      `${frameText || pickR(FRAMING, seed + 1)}, ${pickR(LIGHT, seed + 3)}.${pose ? ` Pose: ${pose}.` : ""}`,
+      ...(sceneText ? [`This photo is about: ${sceneText}. Include that in the frame — the object, the place, the moment she is showing.`] : []),
+      sf,
       ANTI_AI,
     ].join(" ");
   }
@@ -329,15 +355,16 @@ export function markSelfieSent(slug, key) {
 }
 
 /** Ask a cheap vision judge how believable a generated selfie is (1..10), so the best candidate wins. */
-async function scoreSelfie(file, { avatarFile = null, isPap = false } = {}) {
+async function scoreSelfie(file, { avatarFile = null, isPap = false, isShot = false, isTimer = false } = {}) {
   try {
     if (!config.openrouterApiKey || !fs.existsSync(file)) return 5;
+    const hint = isTimer ? " (self-timer — phone propped on a surface, not in her hand; the phone may be barely visible at the frame edge)" : isShot ? " (taken by someone else — the camera/phone must NOT be in frame, and it is not an arm's-length selfie)" : isPap ? " (front camera, so the phone must NOT be visible)" : " (mirror selfie, so the phone reflected in the mirror is normal)";
     const parts = [];
     if (avatarFile && fs.existsSync(avatarFile)) parts.push({ type: "image_url", image_url: { url: dataUrl(avatarFile) } });
     parts.push({ type: "image_url", image_url: { url: dataUrl(file) } });
     parts.push({
       type: "text",
-      text: `${avatarFile ? "Image 1 is her face for reference. " : ""}Image ${avatarFile ? 2 : 1} is a selfie she supposedly took with her phone${isPap ? " (front camera, so the phone must NOT be visible)" : " (mirror selfie, so the phone reflected in the mirror is normal)"}. Score it 1-10 ONLY on how believable it is as a real casual phone photo, not AI: hands/fingers, skin texture, lighting, background, proportions, uncanny artifacts. Return ONLY JSON: {"score":1-10,"flaw":"short note if below 8"}.`,
+      text: `${avatarFile ? "Image 1 is her face for reference. " : ""}Image ${avatarFile ? 2 : 1} is a photo of her${hint}. Score it 1-10 ONLY on how believable it is as a real casual phone photo, not AI: hands/fingers, skin texture, lighting, background, proportions, uncanny artifacts. Return ONLY JSON: {"score":1-10,"flaw":"short note if below 8"}.`,
     });
     const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -376,9 +403,12 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
   const outfitRef = item?.image && images.length && fs.existsSync(item.image);
   if (outfitRef) images.push(dataUrl(item.image));
   // the same room every time, when the panel attached a picture of it: then only the camera moves
-  const isPapShot = String(config.selfieType || "mirror").toLowerCase() === "pap";
+  const typeKey = String(config.selfieType || "mirror").toLowerCase();
+  const isPapShot = typeKey === "pap";
+  const isShotShot = typeKey === "diphotoin";
+  const isTimerShot = typeKey === "timer";
   const spotFile = String(persona?.mirror_spot_image || "");
-  const spotRef = !isPapShot && spotFile && images.length && fs.existsSync(spotFile);
+  const spotRef = typeKey === "mirror" && spotFile && images.length && fs.existsSync(spotFile);
   if (spotRef) images.push(dataUrl(spotFile));
   // a real selfie reference for framing/composition, picked from the uploaded library
   const framing = String(config.selfieFraming || "off").toLowerCase();
@@ -419,7 +449,7 @@ export async function makeSelfie(persona, { slug = null, day = null, style = "ca
     const cand = path.join(DATA_DIR, "photos", `selfie-cand-${Date.now()}-${i}.jpg`);
     fs.writeFileSync(cand, small.buf);
     fs.rmSync(tmp, { force: true });
-    const score = await scoreSelfie(cand, { avatarFile: avatarRef, isPap: isPapShot });
+    const score = await scoreSelfie(cand, { avatarFile: avatarRef, isPap: isPapShot, isShot: isShotShot, isTimer: isTimerShot });
     log(`selfie: kandidat ${i + 1}/${candidates} skor ${score}/10`);
     if (!best || score > best.score) {
       if (best) fs.rmSync(best.file, { force: true });

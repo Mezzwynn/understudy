@@ -1369,6 +1369,8 @@ function selfieCard(ph, gowns, styles) {
         <select class="sin" id="sf-type" onchange="uwTypeChange()">
           <option value="mirror" ${(!sf.type || sf.type === "mirror") ? "selected" : ""}>mirror — lewat cermin</option>
           <option value="pap" ${sf.type === "pap" ? "selected" : ""}>pap — selfie biasa (front cam)</option>
+          <option value="diphotoin" ${sf.type === "diphotoin" ? "selected" : ""}>diphotoin — difoto orang</option>
+          <option value="timer" ${sf.type === "timer" ? "selected" : ""}>timer — hp ditaruh</option>
         </select></div>
 
       <div class="mrow2"><span>Wajah</span>
