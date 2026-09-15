@@ -158,6 +158,8 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
   const seed = d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate() + Math.floor(Math.random() * 100000);
   // the card carries it as mirror_spot (snake_case, like every other frontmatter key)
   const spot = String(persona?.mirror_spot || persona?.mirrorSpot || config.selfieSpot || "the full-length mirror on the inside of her bedroom door");
+  // the default spot describes a mirror; if Hik overrides it (e.g. "Park"), use that as the real place
+  const spotLooksMirror = /mirror|cermin/i.test(spot);
   const item = outfitItem || null;
   const wear = item?.name || outfit || pickOutfit(persona, { hour: d.getHours(), style: style || "casual", avoid: lastOutfit(slug) });
   // a bare name gives the model nothing to match; the wardrobe entry carries what the garment really looks like
@@ -181,7 +183,7 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
     return [
       refs.length > 1 ? refs.join(" ") : `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
       `New photo: a front-camera selfie she took HERSELF at arm's length with her phone${why ? `, ${why}` : ""}.`,
-      `PLACE: an ordinary lived-in room directly behind her — a plain wall, a bit of her bed or a desk, not tidy, not staged.`,
+      `PLACE: ${spotLooksMirror ? "an ordinary lived-in room directly behind her — a plain wall, a bit of her bed or a desk, not tidy, not staged" : spot}.`,
       `She is wearing ${wear}.${garment}`,
       pose ? `Pose: ${pose}.` : `${pickR(FRAMING, seed + 1)}, ${pickR(LIGHT, seed + 3)}.`,
       pf,
@@ -192,8 +194,8 @@ export function selfiePrompt(persona, { day = null, outfit = null, outfitItem = 
     refs.length > 1 ? refs.join(" ") : `Keep the same woman as the reference photo — the same face and hair. Do not change her face.`,
     `New photo: a mirror selfie she took with her phone${why ? `, ${why}` : ""}. ${fm.hold}`,
     spotRef
-      ? `PLACE: exactly the place in the reference image — the same room, the same mirror, wall and objects, the same corner; it never changes between photos.`
-      : `PLACE (always exactly this, it never changes): ${spot}, a plain wall behind her, the edge of her room visible — same corner of the same room as every other mirror photo she has taken.`,
+      ? `PLACE: exactly the place in the reference image — the same spot, background and objects every time; it never changes between photos.`
+      : `PLACE (always exactly this, it never changes): ${spot}. The same place in every photo — only the camera angle, framing, light and expression change.`,
     `She is wearing ${wear}.${garment}`,
     pose
       ? `${pickR(ANGLES, seed + 2)}, ${pickR(LIGHT, seed + 3)}. Pose: ${pose}.`
