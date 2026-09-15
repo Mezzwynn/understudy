@@ -481,16 +481,23 @@ export async function generateSelfieReason(persona) {
       [
         {
           role: "system",
-          content: "Kamu nulis SATU baris alasan informal bahasa Indonesia (maks 12 kata, tanpa kutipan, tanpa emoji) kenapa dia ngirim selfie/pap sekarang. Contoh: 'nemu bunga cantik di taman pas jogging, mau nunjukin ke kamu', 'beli matcha pas jalan pulang', 'lagi makan di resto, kamu minta foto'. Kalau kegiatannya kosong, tulis sesuatu generik seperti 'pap aja buat kamu'.",
+          content: "Return JSON only: {\"reason\":\"SATU baris alasan informal bahasa Indonesia (maks 12 kata, tanpa kutipan, tanpa emoji) kenapa dia ngirim selfie/pap sekarang\",\"place\":\"tempat singkat 2-5 kata bahasa Indonesia, mis. 'jalan pulang', 'taman', 'kafe', 'meja makan resto'\"}. Contoh reason: 'nemu bunga cantik di taman pas jogging, mau nunjukin ke kamu', 'beli matcha pas jalan pulang', 'lagi makan di resto, kamu minta foto'. Kalau kegiatannya kosong: reason 'pap aja buat kamu', place 'kamar'.",
         },
         { role: "user", content: `Karakter: ${name}. Kegiatan sekarang: ${what || "(tidak diketahui)"}.` },
       ],
-      { temperature: 0.9, maxTokens: 60 },
+      { temperature: 0.9, maxTokens: 140 },
     );
+    const m = String(raw || "").match(/\{[\s\S]*\}/);
+    if (m) {
+      try {
+        const v = JSON.parse(m[0]);
+        return { reason: String(v.reason || "").slice(0, 140), place: String(v.place || "").slice(0, 60) };
+      } catch {}
+    }
     const line = String(raw || "").replace(/["'`]/g, "").split("\n")[0].trim().slice(0, 140);
-    return line || "";
+    return { reason: line, place: "" };
   } catch (err) {
     log(`selfie reason failed: ${err.message}`);
-    return "";
+    return { reason: "", place: "" };
   }
 }

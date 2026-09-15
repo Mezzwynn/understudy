@@ -1553,10 +1553,14 @@ window.uwTypeChange = () => {
 window.uwSelfieReason = async () => {
   const inp = document.getElementById("sf-why");
   if (!inp) return;
-  toast("Nulis alasan dari rutinitas…");
+  toast("Nulis alasan + tempat dari rutinitas…");
   const r = await api("/api/photos", { action: "selfie-reason" });
-  if (r.ok && r.reason) { inp.value = r.reason; toast("Alasan terisi — jangan lupa Simpan"); }
-  else toast("Gagal: " + (r.error || "nggak dapat alasan"));
+  if (r.ok && r.reason) {
+    inp.value = r.reason;
+    const spot = document.getElementById("sf-spot");
+    if (spot && r.place) spot.value = r.place;
+    toast("Alasan + tempat terisi — jangan lupa Simpan");
+  } else toast("Gagal: " + (r.error || "nggak dapat alasan"));
 };
 
 /* library referensi framing: upload banyak foto per grup, sistem milih acak saat generate */

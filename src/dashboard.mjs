@@ -918,8 +918,8 @@ f.addEventListener("load", () => {
             return json(res, 200, { ok: true, selfie: selfieSettings(loadPersona(slug)) });
           }
           if (act === "selfie-reason") {
-            const reason = await generateSelfieReason(loadPersona(slug));
-            return json(res, 200, { ok: true, reason });
+            const r = await generateSelfieReason(loadPersona(slug));
+            return json(res, 200, { ok: true, reason: r.reason, place: r.place });
           }
           if (act === "pose-ref-upload") {
             const group = String(body.group || "full").toLowerCase().replace(/[^a-z]/g, "") || "full";
