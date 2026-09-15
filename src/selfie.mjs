@@ -92,7 +92,7 @@ const FACE_LINES = (mood) => ({
 const PAP_FACE = (mood) => ({
   full: `Her whole face is visible and clear, close to the camera. Her expression: ${mood}. She is looking into the lens.`,
   half: `Only half of her face is in the frame — the edge of the photo cuts across her face, so one eye and half her mouth are visible. Her expression on the visible half: ${mood}.`,
-  hide: `Her face is NOT in the frame at all — the photo is from the neck down or she is turned away, so no eyes, no nose and no mouth are visible. One of her hands may be in the frame (holding or pointing at the thing in the scene), but the hand holding the camera is never visible.`,
+  hide: `Her face is hidden behind her own hand — she holds one free hand up over her face, fingers together, like she is waving the camera away, so no eyes, no nose and no mouth are visible. The hand and her forearm are clearly in the frame covering her face, with maybe a little hair or cheek peeking out at the edges. The hand holding the camera is never visible.`,
 });
 
 /** A front-camera selfie must look like SHE is holding the lens, never like a third person took it. */
